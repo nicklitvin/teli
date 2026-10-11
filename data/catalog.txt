@@ -1,0 +1,934 @@
+# Teli catalog source.
+# One title per line:  Title|Year|M or T|Genre,Genre|tag,tag|Director (movies) or Network (TV)
+# Run `npm run catalog` to compile into src/data/catalog.json.
+# Order matters a little: earlier lines get a small popularity boost in recommendations.
+
+# ---------- Movies ----------
+The Shawshank Redemption|1994|M|Drama|prison,friendship,hope|Frank Darabont
+The Godfather|1972|M|Crime,Drama|mob,family,epic,classic|Francis Ford Coppola
+The Godfather Part II|1974|M|Crime,Drama|mob,family,epic,classic|Francis Ford Coppola
+The Dark Knight|2008|M|Action,Crime,Drama|superhero,dc,dark|Christopher Nolan
+Batman Begins|2005|M|Action,Adventure|superhero,dc,origin|Christopher Nolan
+The Dark Knight Rises|2012|M|Action,Drama|superhero,dc,epic|Christopher Nolan
+Inception|2010|M|Sci-Fi,Action,Thriller|mind-bending,heist,dreams|Christopher Nolan
+Interstellar|2014|M|Sci-Fi,Drama,Adventure|space,time,epic|Christopher Nolan
+The Prestige|2006|M|Mystery,Thriller,Drama|magic,twist,period|Christopher Nolan
+Memento|2000|M|Mystery,Thriller|mind-bending,twist,neo-noir|Christopher Nolan
+Dunkirk|2017|M|War,Drama,History|ww2,survival|Christopher Nolan
+Tenet|2020|M|Sci-Fi,Action,Thriller|mind-bending,spy,time|Christopher Nolan
+Oppenheimer|2023|M|Drama,History|biopic,ww2,true-story|Christopher Nolan
+Pulp Fiction|1994|M|Crime,Drama|nonlinear,dark-comedy,cult|Quentin Tarantino
+Reservoir Dogs|1992|M|Crime,Thriller|heist,cult|Quentin Tarantino
+Kill Bill: Vol. 1|2003|M|Action,Crime|revenge,martial-arts|Quentin Tarantino
+Kill Bill: Vol. 2|2004|M|Action,Crime|revenge,martial-arts|Quentin Tarantino
+Inglourious Basterds|2009|M|War,Drama,Action|ww2,revenge|Quentin Tarantino
+Django Unchained|2012|M|Western,Drama|revenge,slavery|Quentin Tarantino
+Once Upon a Time in Hollywood|2019|M|Comedy,Drama|hollywood,period|Quentin Tarantino
+The Hateful Eight|2015|M|Western,Mystery|ensemble,dark,one-location|Quentin Tarantino
+Jackie Brown|1997|M|Crime,Thriller|heist,neo-noir|Quentin Tarantino
+Fight Club|1999|M|Drama,Thriller|twist,psychological,cult|David Fincher
+Se7en|1995|M|Crime,Thriller,Mystery|serial-killer,detective,dark|David Fincher
+Zodiac|2007|M|Crime,Mystery,Thriller|serial-killer,true-story,journalism|David Fincher
+The Social Network|2010|M|Drama|tech,startup,true-story|David Fincher
+Gone Girl|2014|M|Thriller,Mystery,Drama|twist,psychological,marriage|David Fincher
+The Girl with the Dragon Tattoo|2011|M|Crime,Mystery,Thriller|detective,dark|David Fincher
+The Curious Case of Benjamin Button|2008|M|Drama,Fantasy,Romance|epic,time|David Fincher
+Forrest Gump|1994|M|Drama,Romance|epic,feel-good,period|Robert Zemeckis
+Back to the Future|1985|M|Sci-Fi,Comedy,Adventure|time-travel,feel-good,80s|Robert Zemeckis
+Back to the Future Part II|1989|M|Sci-Fi,Comedy,Adventure|time-travel,80s|Robert Zemeckis
+Cast Away|2000|M|Drama,Adventure|survival,island|Robert Zemeckis
+Who Framed Roger Rabbit|1988|M|Comedy,Animation,Mystery|noir,hybrid|Robert Zemeckis
+Contact|1997|M|Sci-Fi,Drama|space,aliens,faith|Robert Zemeckis
+The Matrix|1999|M|Sci-Fi,Action|cyberpunk,ai,mind-bending|The Wachowskis
+The Matrix Reloaded|2003|M|Sci-Fi,Action|cyberpunk,ai|The Wachowskis
+Cloud Atlas|2012|M|Sci-Fi,Drama|epic,mind-bending,ensemble|The Wachowskis
+Star Wars: A New Hope|1977|M|Sci-Fi,Adventure|space,star-wars,epic|George Lucas
+The Empire Strikes Back|1980|M|Sci-Fi,Adventure|space,star-wars,epic|Irvin Kershner
+Return of the Jedi|1983|M|Sci-Fi,Adventure|space,star-wars,epic|Richard Marquand
+Star Wars: The Force Awakens|2015|M|Sci-Fi,Adventure|space,star-wars|J.J. Abrams
+Rogue One: A Star Wars Story|2016|M|Sci-Fi,Action,War|space,star-wars|Gareth Edwards
+Star Wars: The Last Jedi|2017|M|Sci-Fi,Adventure|space,star-wars|Rian Johnson
+The Lord of the Rings: The Fellowship of the Ring|2001|M|Fantasy,Adventure|epic,quest,magic|Peter Jackson
+The Lord of the Rings: The Two Towers|2002|M|Fantasy,Adventure|epic,quest,war|Peter Jackson
+The Lord of the Rings: The Return of the King|2003|M|Fantasy,Adventure|epic,quest,war|Peter Jackson
+The Hobbit: An Unexpected Journey|2012|M|Fantasy,Adventure|quest,dragons,magic|Peter Jackson
+Jurassic Park|1993|M|Sci-Fi,Adventure,Thriller|dinosaurs,blockbuster|Steven Spielberg
+Jaws|1975|M|Thriller,Adventure,Horror|shark,blockbuster,classic|Steven Spielberg
+E.T. the Extra-Terrestrial|1982|M|Sci-Fi,Family|aliens,feel-good,80s|Steven Spielberg
+Raiders of the Lost Ark|1981|M|Adventure,Action|treasure,classic|Steven Spielberg
+Indiana Jones and the Last Crusade|1989|M|Adventure,Action|treasure,father-son|Steven Spielberg
+Schindler's List|1993|M|Drama,History,War|ww2,holocaust,true-story|Steven Spielberg
+Saving Private Ryan|1998|M|War,Drama|ww2,epic|Steven Spielberg
+Catch Me If You Can|2002|M|Crime,Drama,Comedy|con-artist,true-story,period|Steven Spielberg
+Minority Report|2002|M|Sci-Fi,Action,Thriller|dystopia,detective|Steven Spielberg
+Close Encounters of the Third Kind|1977|M|Sci-Fi,Drama|aliens,classic|Steven Spielberg
+Lincoln|2012|M|Drama,History|biopic,politics|Steven Spielberg
+Bridge of Spies|2015|M|Drama,Thriller,History|spy,cold-war,true-story|Steven Spielberg
+Ready Player One|2018|M|Sci-Fi,Adventure|virtual-reality,80s,video-games|Steven Spielberg
+The Fabelmans|2022|M|Drama|coming-of-age,filmmaking,family|Steven Spielberg
+West Side Story|2021|M|Musical,Romance,Drama|dance,new-york,remake|Steven Spielberg
+The Post|2017|M|Drama,History|journalism,politics,true-story|Steven Spielberg
+Titanic|1997|M|Romance,Drama|epic,disaster,period|James Cameron
+Avatar|2009|M|Sci-Fi,Adventure|aliens,epic,blockbuster|James Cameron
+Avatar: The Way of Water|2022|M|Sci-Fi,Adventure|aliens,ocean,epic|James Cameron
+Aliens|1986|M|Sci-Fi,Action,Horror|aliens,space,survival|James Cameron
+The Terminator|1984|M|Sci-Fi,Action|robots,time-travel,ai|James Cameron
+Terminator 2: Judgment Day|1991|M|Sci-Fi,Action|robots,time-travel,ai|James Cameron
+Alien|1979|M|Sci-Fi,Horror|aliens,space,survival,classic|Ridley Scott
+Blade Runner|1982|M|Sci-Fi,Thriller|cyberpunk,ai,neo-noir|Ridley Scott
+Gladiator|2000|M|Action,Drama,History|epic,revenge,ancient-rome|Ridley Scott
+Gladiator II|2024|M|Action,Drama|epic,ancient-rome|Ridley Scott
+The Martian|2015|M|Sci-Fi,Adventure,Drama|space,survival,feel-good|Ridley Scott
+Thelma & Louise|1991|M|Crime,Drama,Adventure|road-trip,friendship|Ridley Scott
+Black Hawk Down|2001|M|War,Action|true-story,military|Ridley Scott
+Prometheus|2012|M|Sci-Fi,Horror|aliens,space|Ridley Scott
+Blade Runner 2049|2017|M|Sci-Fi,Drama|cyberpunk,ai,neo-noir|Denis Villeneuve
+Arrival|2016|M|Sci-Fi,Drama|aliens,mind-bending,language|Denis Villeneuve
+Dune|2021|M|Sci-Fi,Adventure|space,epic,desert|Denis Villeneuve
+Dune: Part Two|2024|M|Sci-Fi,Adventure|space,epic,desert|Denis Villeneuve
+Sicario|2015|M|Crime,Thriller|cartel,drugs,dark|Denis Villeneuve
+Prisoners|2013|M|Crime,Thriller,Mystery|kidnapping,dark,detective|Denis Villeneuve
+Enemy|2013|M|Mystery,Thriller|psychological,mind-bending|Denis Villeneuve
+Incendies|2010|M|Drama,Mystery,War|twist,family|Denis Villeneuve
+Goodfellas|1990|M|Crime,Drama|mob,true-story|Martin Scorsese
+Taxi Driver|1976|M|Crime,Drama|psychological,new-york,dark,classic|Martin Scorsese
+The Departed|2006|M|Crime,Thriller|mob,police,undercover,boston|Martin Scorsese
+The Wolf of Wall Street|2013|M|Comedy,Crime,Drama|finance,true-story,drugs|Martin Scorsese
+Casino|1995|M|Crime,Drama|mob,las-vegas,true-story|Martin Scorsese
+Raging Bull|1980|M|Drama,Sports|boxing,biopic|Martin Scorsese
+Shutter Island|2010|M|Mystery,Thriller|psychological,twist|Martin Scorsese
+The Irishman|2019|M|Crime,Drama|mob,epic,true-story|Martin Scorsese
+Killers of the Flower Moon|2023|M|Crime,Drama,History|true-story,neo-western|Martin Scorsese
+Hugo|2011|M|Adventure,Family,Drama|filmmaking,paris|Martin Scorsese
+The Silence of the Lambs|1991|M|Crime,Thriller,Horror|serial-killer,fbi,psychological|Jonathan Demme
+Philadelphia|1993|M|Drama|legal,lgbtq|Jonathan Demme
+No Country for Old Men|2007|M|Crime,Thriller,Western|neo-noir,cat-and-mouse,neo-western|Coen Brothers
+Fargo|1996|M|Crime,Comedy,Thriller|dark-comedy,small-town,snow|Coen Brothers
+The Big Lebowski|1998|M|Comedy,Crime|cult,stoner,quirky|Coen Brothers
+O Brother, Where Art Thou?|2000|M|Comedy,Adventure,Music|quirky,road-trip|Coen Brothers
+Inside Llewyn Davis|2013|M|Drama,Music|folk,indie|Coen Brothers
+True Grit|2010|M|Western,Drama|revenge|Coen Brothers
+There Will Be Blood|2007|M|Drama|oil,epic,period|Paul Thomas Anderson
+Boogie Nights|1997|M|Drama,Comedy|70s,ensemble|Paul Thomas Anderson
+Magnolia|1999|M|Drama|ensemble,los-angeles|Paul Thomas Anderson
+Phantom Thread|2017|M|Drama,Romance|fashion,period|Paul Thomas Anderson
+Licorice Pizza|2021|M|Comedy,Romance|coming-of-age,70s|Paul Thomas Anderson
+One Battle After Another|2025|M|Action,Thriller,Drama|revolution,satire,father-daughter|Paul Thomas Anderson
+The Grand Budapest Hotel|2014|M|Comedy,Adventure|quirky,wes-anderson,period|Wes Anderson
+Moonrise Kingdom|2012|M|Comedy,Romance|quirky,wes-anderson,coming-of-age|Wes Anderson
+The Royal Tenenbaums|2001|M|Comedy,Drama|quirky,wes-anderson,family|Wes Anderson
+Fantastic Mr. Fox|2009|M|Animation,Comedy,Family|stop-motion,wes-anderson,quirky|Wes Anderson
+Isle of Dogs|2018|M|Animation,Comedy|stop-motion,wes-anderson,dogs|Wes Anderson
+Asteroid City|2023|M|Comedy,Drama|quirky,wes-anderson|Wes Anderson
+The French Dispatch|2021|M|Comedy,Drama|quirky,wes-anderson,anthology,journalism|Wes Anderson
+Parasite|2019|M|Thriller,Drama,Comedy|korean,class,twist,dark-comedy|Bong Joon-ho
+Memories of Murder|2003|M|Crime,Mystery,Thriller|korean,serial-killer,detective|Bong Joon-ho
+Snowpiercer|2013|M|Sci-Fi,Action|dystopia,class,train|Bong Joon-ho
+Mother|2009|M|Crime,Drama,Mystery|korean,twist|Bong Joon-ho
+Okja|2017|M|Adventure,Drama,Sci-Fi|korean,animals|Bong Joon-ho
+Mickey 17|2025|M|Sci-Fi,Comedy|space,clones,satire|Bong Joon-ho
+Oldboy|2003|M|Thriller,Mystery,Drama|korean,revenge,twist|Park Chan-wook
+The Handmaiden|2016|M|Thriller,Romance,Drama|korean,twist,period|Park Chan-wook
+Decision to Leave|2022|M|Mystery,Romance|korean,detective|Park Chan-wook
+Train to Busan|2016|M|Horror,Action|korean,zombies,survival,train|Yeon Sang-ho
+Burning|2018|M|Mystery,Drama|korean,slow-burn,psychological|Lee Chang-dong
+Past Lives|2023|M|Romance,Drama|korean,immigration|Celine Song
+Minari|2020|M|Drama|korean,immigration,family|Lee Isaac Chung
+Spirited Away|2001|M|Animation,Fantasy,Family|ghibli,anime,magic|Hayao Miyazaki
+My Neighbor Totoro|1988|M|Animation,Family,Fantasy|ghibli,anime,feel-good|Hayao Miyazaki
+Princess Mononoke|1997|M|Animation,Fantasy,Adventure|ghibli,anime,nature,epic|Hayao Miyazaki
+Howl's Moving Castle|2004|M|Animation,Fantasy,Romance|ghibli,anime,magic|Hayao Miyazaki
+Kiki's Delivery Service|1989|M|Animation,Family,Fantasy|ghibli,anime,witches,coming-of-age|Hayao Miyazaki
+Ponyo|2008|M|Animation,Family,Fantasy|ghibli,anime,ocean|Hayao Miyazaki
+The Wind Rises|2013|M|Animation,Drama,Romance|ghibli,anime,biopic,aviation|Hayao Miyazaki
+The Boy and the Heron|2023|M|Animation,Fantasy,Adventure|ghibli,anime,grief|Hayao Miyazaki
+Castle in the Sky|1986|M|Animation,Adventure,Fantasy|ghibli,anime|Hayao Miyazaki
+Nausicaä of the Valley of the Wind|1984|M|Animation,Adventure,Sci-Fi|ghibli,anime,post-apocalyptic|Hayao Miyazaki
+Grave of the Fireflies|1988|M|Animation,Drama,War|ghibli,anime,ww2|Isao Takahata
+Akira|1988|M|Animation,Sci-Fi,Action|anime,cyberpunk,dystopia|Katsuhiro Otomo
+Ghost in the Shell|1995|M|Animation,Sci-Fi|anime,cyberpunk,ai|Mamoru Oshii
+Your Name|2016|M|Animation,Romance,Fantasy|anime,body-swap,time|Makoto Shinkai
+Weathering with You|2019|M|Animation,Romance,Fantasy|anime,tokyo|Makoto Shinkai
+Suzume|2022|M|Animation,Adventure,Fantasy|anime,road-trip|Makoto Shinkai
+Perfect Blue|1997|M|Animation,Thriller|anime,psychological|Satoshi Kon
+Paprika|2006|M|Animation,Sci-Fi|anime,dreams,mind-bending|Satoshi Kon
+A Silent Voice|2016|M|Animation,Drama|anime,coming-of-age|Naoko Yamada
+Seven Samurai|1954|M|Action,Drama|samurai,japanese,classic,epic|Akira Kurosawa
+Rashomon|1950|M|Drama,Mystery|japanese,classic,nonlinear|Akira Kurosawa
+Ran|1985|M|Drama,War|samurai,japanese,shakespeare,epic|Akira Kurosawa
+Yojimbo|1961|M|Action,Drama|samurai,japanese,classic|Akira Kurosawa
+Toy Story|1995|M|Animation,Family,Comedy|pixar,toys,friendship|John Lasseter
+Toy Story 2|1999|M|Animation,Family,Comedy|pixar,toys|John Lasseter
+Toy Story 3|2010|M|Animation,Family,Comedy|pixar,toys,coming-of-age|Lee Unkrich
+Toy Story 4|2019|M|Animation,Family,Comedy|pixar,toys|Josh Cooley
+Finding Nemo|2003|M|Animation,Family,Adventure|pixar,ocean,father-son|Andrew Stanton
+WALL-E|2008|M|Animation,Sci-Fi,Family|pixar,robots,space|Andrew Stanton
+Up|2009|M|Animation,Adventure,Family|pixar,feel-good,grief|Pete Docter
+Inside Out|2015|M|Animation,Family,Comedy|pixar,emotions,coming-of-age|Pete Docter
+Inside Out 2|2024|M|Animation,Family,Comedy|pixar,emotions,teen|Kelsey Mann
+Monsters, Inc.|2001|M|Animation,Family,Comedy|pixar,monsters,friendship|Pete Docter
+Soul|2020|M|Animation,Family,Comedy|pixar,music,jazz|Pete Docter
+The Incredibles|2004|M|Animation,Action,Family|pixar,superhero,family|Brad Bird
+Incredibles 2|2018|M|Animation,Action,Family|pixar,superhero,family|Brad Bird
+Ratatouille|2007|M|Animation,Family,Comedy|pixar,cooking,paris|Brad Bird
+The Iron Giant|1999|M|Animation,Sci-Fi,Family|robots,cold-war|Brad Bird
+Coco|2017|M|Animation,Family,Music|pixar,mexican,family|Lee Unkrich
+Cars|2006|M|Animation,Family,Comedy|pixar,cars,racing|John Lasseter
+Luca|2021|M|Animation,Family|pixar,friendship,italian|Enrico Casarosa
+Turning Red|2022|M|Animation,Family,Comedy|pixar,coming-of-age,teen|Domee Shi
+Elemental|2023|M|Animation,Family,Romance|pixar|Peter Sohn
+Brave|2012|M|Animation,Fantasy,Family|pixar,scotland,magic|Mark Andrews
+Frozen|2013|M|Animation,Musical,Family|disney,princess,magic|Chris Buck
+Frozen II|2019|M|Animation,Musical,Family|disney,princess,magic|Chris Buck
+Moana|2016|M|Animation,Musical,Adventure|disney,ocean,quest|Ron Clements
+The Lion King|1994|M|Animation,Musical,Family|disney,animals,epic|Roger Allers
+Aladdin|1992|M|Animation,Musical,Family|disney,magic|Ron Clements
+Beauty and the Beast|1991|M|Animation,Musical,Romance|disney,princess,fairy-tale|Gary Trousdale
+The Little Mermaid|1989|M|Animation,Musical,Romance|disney,princess,ocean|Ron Clements
+Mulan|1998|M|Animation,Musical,Adventure|disney,war,princess|Tony Bancroft
+Tangled|2010|M|Animation,Musical,Romance|disney,princess,fairy-tale|Nathan Greno
+Zootopia|2016|M|Animation,Comedy,Mystery|disney,animals,detective|Byron Howard
+Encanto|2021|M|Animation,Musical,Family|disney,family,magic|Byron Howard
+Big Hero 6|2014|M|Animation,Action,Family|disney,superhero,robots|Don Hall
+Wreck-It Ralph|2012|M|Animation,Comedy,Family|disney,video-games|Rich Moore
+Shrek|2001|M|Animation,Comedy,Family|dreamworks,fairy-tale,satire|Andrew Adamson
+Shrek 2|2004|M|Animation,Comedy,Family|dreamworks,fairy-tale|Andrew Adamson
+How to Train Your Dragon|2010|M|Animation,Fantasy,Adventure|dreamworks,dragons,coming-of-age|Dean DeBlois
+Kung Fu Panda|2008|M|Animation,Comedy,Action|dreamworks,martial-arts|Mark Osborne
+The Wild Robot|2024|M|Animation,Family,Sci-Fi|dreamworks,robots,nature|Chris Sanders
+Spider-Man: Into the Spider-Verse|2018|M|Animation,Action,Adventure|superhero,marvel,multiverse|Bob Persichetti
+Spider-Man: Across the Spider-Verse|2023|M|Animation,Action,Adventure|superhero,marvel,multiverse|Joaquim Dos Santos
+KPop Demon Hunters|2025|M|Animation,Musical,Fantasy|music,korean,demons|Maggie Kang
+Coraline|2009|M|Animation,Fantasy,Horror|stop-motion,dark,fairy-tale|Henry Selick
+The Nightmare Before Christmas|1993|M|Animation,Musical,Fantasy|stop-motion,christmas,halloween|Henry Selick
+Flow|2024|M|Animation,Adventure|animals,no-dialogue|Gints Zilbalodis
+Wallace & Gromit: The Curse of the Were-Rabbit|2005|M|Animation,Comedy|stop-motion,british|Nick Park
+Paddington 2|2017|M|Family,Comedy|feel-good,british|Paul King
+Wonka|2023|M|Musical,Family,Fantasy|feel-good,british|Paul King
+Iron Man|2008|M|Action,Sci-Fi|superhero,marvel,mcu,origin|Jon Favreau
+The Avengers|2012|M|Action,Sci-Fi|superhero,marvel,mcu,ensemble|Joss Whedon
+Avengers: Infinity War|2018|M|Action,Sci-Fi|superhero,marvel,mcu,epic|Russo Brothers
+Avengers: Endgame|2019|M|Action,Sci-Fi|superhero,marvel,mcu,epic|Russo Brothers
+Captain America: The Winter Soldier|2014|M|Action,Thriller|superhero,marvel,mcu,spy|Russo Brothers
+Captain America: Civil War|2016|M|Action,Sci-Fi|superhero,marvel,mcu|Russo Brothers
+Guardians of the Galaxy|2014|M|Action,Sci-Fi,Comedy|superhero,marvel,mcu,space|James Gunn
+Guardians of the Galaxy Vol. 3|2023|M|Action,Sci-Fi,Comedy|superhero,marvel,mcu,space|James Gunn
+Thor: Ragnarok|2017|M|Action,Comedy,Fantasy|superhero,marvel,mcu|Taika Waititi
+Black Panther|2018|M|Action,Adventure|superhero,marvel,mcu|Ryan Coogler
+Spider-Man: Homecoming|2017|M|Action,Comedy|superhero,marvel,mcu,teen|Jon Watts
+Spider-Man: No Way Home|2021|M|Action,Adventure|superhero,marvel,mcu,multiverse|Jon Watts
+Doctor Strange|2016|M|Action,Fantasy|superhero,marvel,mcu,magic|Scott Derrickson
+Deadpool|2016|M|Action,Comedy|superhero,marvel,satire|Tim Miller
+Deadpool & Wolverine|2024|M|Action,Comedy|superhero,marvel,multiverse|Shawn Levy
+Logan|2017|M|Action,Drama,Western|superhero,marvel,dark|James Mangold
+Spider-Man 2|2004|M|Action,Adventure|superhero,marvel|Sam Raimi
+X-Men: Days of Future Past|2014|M|Action,Sci-Fi|superhero,marvel,time-travel|Bryan Singer
+Thunderbolts*|2025|M|Action|superhero,marvel,mcu|Jake Schreier
+The Batman|2022|M|Crime,Action,Mystery|superhero,dc,detective,dark|Matt Reeves
+Joker|2019|M|Crime,Drama,Thriller|dc,psychological,dark|Todd Phillips
+Wonder Woman|2017|M|Action,Fantasy|superhero,dc,ww1|Patty Jenkins
+Superman|2025|M|Action,Sci-Fi|superhero,dc|James Gunn
+The Suicide Squad|2021|M|Action,Comedy|superhero,dc,ensemble|James Gunn
+Watchmen|2009|M|Action,Drama,Mystery|superhero,dystopia,dark|Zack Snyder
+Unbreakable|2000|M|Drama,Thriller|superhero,twist|M. Night Shyamalan
+The Sixth Sense|1999|M|Thriller,Horror,Drama|ghosts,twist|M. Night Shyamalan
+Signs|2002|M|Sci-Fi,Thriller|aliens,faith|M. Night Shyamalan
+Split|2016|M|Thriller,Horror|psychological,twist|M. Night Shyamalan
+Mad Max: Fury Road|2015|M|Action,Sci-Fi|post-apocalyptic,cars,desert|George Miller
+Furiosa: A Mad Max Saga|2024|M|Action,Sci-Fi|post-apocalyptic,cars,revenge|George Miller
+Die Hard|1988|M|Action,Thriller|christmas,80s,one-location|John McTiernan
+Predator|1987|M|Action,Sci-Fi|aliens,jungle,80s|John McTiernan
+John Wick|2014|M|Action,Thriller|revenge,assassins,neo-noir|Chad Stahelski
+John Wick: Chapter 4|2023|M|Action,Thriller|assassins,epic|Chad Stahelski
+Mission: Impossible – Fallout|2018|M|Action,Thriller|spy,stunts|Christopher McQuarrie
+Mission: Impossible – Dead Reckoning|2023|M|Action,Thriller|spy,ai,stunts|Christopher McQuarrie
+Top Gun|1986|M|Action,Drama|military,aviation,80s|Tony Scott
+Top Gun: Maverick|2022|M|Action,Drama|military,aviation,blockbuster|Joseph Kosinski
+F1|2025|M|Action,Sports,Drama|racing,cars|Joseph Kosinski
+Casino Royale|2006|M|Action,Thriller|spy,bond|Martin Campbell
+Skyfall|2012|M|Action,Thriller|spy,bond|Sam Mendes
+1917|2019|M|War,Drama|ww1,one-shot|Sam Mendes
+American Beauty|1999|M|Drama|suburbia,satire|Sam Mendes
+Heat|1995|M|Crime,Action,Thriller|heist,police,los-angeles|Michael Mann
+Collateral|2004|M|Crime,Thriller|assassins,los-angeles,night|Michael Mann
+The Last of the Mohicans|1992|M|Adventure,Romance,War|period|Michael Mann
+The Raid|2011|M|Action,Thriller|martial-arts,indonesian,one-location|Gareth Evans
+Crouching Tiger, Hidden Dragon|2000|M|Action,Fantasy,Romance|martial-arts,chinese,wuxia|Ang Lee
+Brokeback Mountain|2005|M|Romance,Drama,Western|lgbtq,tearjerker|Ang Lee
+Life of Pi|2012|M|Adventure,Drama,Fantasy|survival,ocean,faith|Ang Lee
+Hero|2002|M|Action,Drama|martial-arts,chinese,wuxia|Zhang Yimou
+Everything Everywhere All at Once|2022|M|Sci-Fi,Comedy,Action|multiverse,family,martial-arts,a24|Daniels
+Speed|1994|M|Action,Thriller|bus,90s|Jan de Bont
+Point Break|1991|M|Action,Crime|surfing,heist,undercover|Kathryn Bigelow
+The Hurt Locker|2008|M|War,Thriller|military,iraq|Kathryn Bigelow
+Zero Dark Thirty|2012|M|Thriller,History|military,true-story,spy|Kathryn Bigelow
+Kingsman: The Secret Service|2014|M|Action,Comedy|spy,british|Matthew Vaughn
+Baby Driver|2017|M|Action,Crime|heist,cars,music|Edgar Wright
+Shaun of the Dead|2004|M|Comedy,Horror|zombies,british|Edgar Wright
+Hot Fuzz|2007|M|Comedy,Action|police,british,small-town|Edgar Wright
+Scott Pilgrim vs. the World|2010|M|Comedy,Action,Romance|video-games,quirky,cult|Edgar Wright
+The Fast and the Furious|2001|M|Action,Crime|cars,racing,heist|Rob Cohen
+Fast Five|2011|M|Action,Crime|cars,heist|Justin Lin
+Ocean's Eleven|2001|M|Crime,Comedy,Thriller|heist,las-vegas,ensemble|Steven Soderbergh
+Traffic|2000|M|Crime,Drama|drugs,cartel,ensemble|Steven Soderbergh
+Erin Brockovich|2000|M|Drama|legal,true-story|Steven Soderbergh
+Gravity|2013|M|Sci-Fi,Thriller|space,survival|Alfonso Cuarón
+Children of Men|2006|M|Sci-Fi,Thriller,Drama|dystopia,one-shot|Alfonso Cuarón
+Roma|2018|M|Drama|mexican,black-and-white,family|Alfonso Cuarón
+Y Tu Mamá También|2001|M|Drama,Comedy|mexican,road-trip,coming-of-age|Alfonso Cuarón
+Harry Potter and the Sorcerer's Stone|2001|M|Fantasy,Adventure,Family|magic,wizards,school|Chris Columbus
+Harry Potter and the Prisoner of Azkaban|2004|M|Fantasy,Adventure,Family|magic,wizards,time-travel|Alfonso Cuarón
+Harry Potter and the Goblet of Fire|2005|M|Fantasy,Adventure|magic,wizards,school|Mike Newell
+Harry Potter and the Deathly Hallows – Part 2|2011|M|Fantasy,Adventure|magic,wizards,epic|David Yates
+Home Alone|1990|M|Comedy,Family|christmas,90s|Chris Columbus
+Mrs. Doubtfire|1993|M|Comedy,Family|family,90s|Chris Columbus
+Pan's Labyrinth|2006|M|Fantasy,Drama,War|spanish,fairy-tale,dark|Guillermo del Toro
+The Shape of Water|2017|M|Fantasy,Romance,Drama|monsters,cold-war|Guillermo del Toro
+Guillermo del Toro's Pinocchio|2022|M|Animation,Fantasy,Musical|stop-motion,fairy-tale|Guillermo del Toro
+Frankenstein|2025|M|Horror,Drama,Fantasy|gothic,monsters|Guillermo del Toro
+Pacific Rim|2013|M|Sci-Fi,Action|kaiju,robots|Guillermo del Toro
+Godzilla Minus One|2023|M|Sci-Fi,Drama,Action|kaiju,japanese,post-war|Takashi Yamazaki
+Edge of Tomorrow|2014|M|Sci-Fi,Action|time-loop,aliens|Doug Liman
+The Bourne Identity|2002|M|Action,Thriller|spy,amnesia|Doug Liman
+The Bourne Ultimatum|2007|M|Action,Thriller|spy|Paul Greengrass
+District 9|2009|M|Sci-Fi,Action|aliens,mockumentary,south-african|Neill Blomkamp
+Ex Machina|2014|M|Sci-Fi,Thriller,Drama|ai,robots,slow-burn,a24|Alex Garland
+Annihilation|2018|M|Sci-Fi,Horror,Mystery|mind-bending,aliens|Alex Garland
+Civil War|2024|M|Action,Thriller,War|journalism,dystopia,road-trip,a24|Alex Garland
+Warfare|2025|M|War,Action|military,iraq,true-story,a24|Alex Garland
+Her|2013|M|Sci-Fi,Romance,Drama|ai,loneliness|Spike Jonze
+Being John Malkovich|1999|M|Comedy,Fantasy|quirky,mind-bending|Spike Jonze
+Eternal Sunshine of the Spotless Mind|2004|M|Romance,Sci-Fi,Drama|mind-bending,memory|Michel Gondry
+Moon|2009|M|Sci-Fi,Drama|space,clones,twist|Duncan Jones
+Source Code|2011|M|Sci-Fi,Thriller|time-loop,train|Duncan Jones
+Looper|2012|M|Sci-Fi,Action|time-travel,assassins|Rian Johnson
+Knives Out|2019|M|Mystery,Comedy,Crime|whodunit,detective,ensemble|Rian Johnson
+Glass Onion: A Knives Out Mystery|2022|M|Mystery,Comedy|whodunit,detective,ensemble|Rian Johnson
+Wake Up Dead Man: A Knives Out Mystery|2025|M|Mystery,Comedy|whodunit,detective,religion|Rian Johnson
+Primer|2004|M|Sci-Fi,Thriller|time-travel,indie,mind-bending|Shane Carruth
+Gattaca|1997|M|Sci-Fi,Drama|dystopia,genetics|Andrew Niccol
+The Truman Show|1998|M|Comedy,Drama,Sci-Fi|satire,tv,mind-bending|Peter Weir
+Dead Poets Society|1989|M|Drama|school,coming-of-age|Peter Weir
+2001: A Space Odyssey|1968|M|Sci-Fi|space,ai,classic|Stanley Kubrick
+The Shining|1980|M|Horror,Thriller|psychological,hotel,classic,stephen-king|Stanley Kubrick
+A Clockwork Orange|1971|M|Crime,Sci-Fi,Drama|dystopia,classic|Stanley Kubrick
+Full Metal Jacket|1987|M|War,Drama|vietnam,military|Stanley Kubrick
+Dr. Strangelove|1964|M|Comedy,War|satire,cold-war,classic|Stanley Kubrick
+Apocalypse Now|1979|M|War,Drama|vietnam,epic,classic|Francis Ford Coppola
+Platoon|1986|M|War,Drama|vietnam|Oliver Stone
+The Thing|1982|M|Horror,Sci-Fi|aliens,snow,paranoia|John Carpenter
+Halloween|1978|M|Horror,Thriller|slasher,classic|John Carpenter
+Psycho|1960|M|Horror,Thriller,Mystery|classic,twist,hitchcock|Alfred Hitchcock
+Vertigo|1958|M|Mystery,Thriller,Romance|classic,hitchcock,psychological|Alfred Hitchcock
+Rear Window|1954|M|Mystery,Thriller|classic,hitchcock,one-location|Alfred Hitchcock
+North by Northwest|1959|M|Thriller,Adventure|classic,hitchcock,spy|Alfred Hitchcock
+Casablanca|1942|M|Romance,Drama,War|classic,ww2|Michael Curtiz
+Citizen Kane|1941|M|Drama,Mystery|classic,journalism|Orson Welles
+Singin' in the Rain|1952|M|Musical,Comedy,Romance|classic,hollywood,dance|Stanley Donen
+Some Like It Hot|1959|M|Comedy,Romance|classic|Billy Wilder
+Sunset Boulevard|1950|M|Drama,Mystery|classic,hollywood,noir|Billy Wilder
+The Apartment|1960|M|Comedy,Romance,Drama|classic,workplace|Billy Wilder
+12 Angry Men|1957|M|Drama|courtroom,classic,one-location|Sidney Lumet
+Network|1976|M|Drama|satire,tv,classic|Sidney Lumet
+Dog Day Afternoon|1975|M|Crime,Drama|heist,true-story|Sidney Lumet
+Chinatown|1974|M|Mystery,Crime|noir,detective,los-angeles|Roman Polanski
+Rosemary's Baby|1968|M|Horror|psychological,classic,satanic|Roman Polanski
+The Pianist|2002|M|Drama,War|ww2,holocaust,true-story,music|Roman Polanski
+One Flew Over the Cuckoo's Nest|1975|M|Drama|psychiatric,classic|Miloš Forman
+Amadeus|1984|M|Drama,Music|biopic,period,classical-music|Miloš Forman
+Lawrence of Arabia|1962|M|Adventure,Drama,History|epic,desert,classic|David Lean
+The Good, the Bad and the Ugly|1966|M|Western|spaghetti-western,classic|Sergio Leone
+Once Upon a Time in the West|1968|M|Western|spaghetti-western,classic,revenge|Sergio Leone
+Unforgiven|1992|M|Western,Drama|revenge|Clint Eastwood
+Million Dollar Baby|2004|M|Drama,Sports|boxing,tearjerker|Clint Eastwood
+Gran Torino|2008|M|Drama|veteran|Clint Eastwood
+Mystic River|2003|M|Crime,Drama,Mystery|boston,dark|Clint Eastwood
+Rocky|1976|M|Drama,Sports|boxing,underdog,classic|John G. Avildsen
+Creed|2015|M|Drama,Sports|boxing,underdog|Ryan Coogler
+Sinners|2025|M|Horror,Drama,Music|vampires,period,blues|Ryan Coogler
+Fruitvale Station|2013|M|Drama|true-story|Ryan Coogler
+Moneyball|2011|M|Drama,Sports|baseball,true-story|Bennett Miller
+Ford v Ferrari|2019|M|Drama,Sports|racing,cars,true-story|James Mangold
+Walk the Line|2005|M|Drama,Music,Romance|biopic,country|James Mangold
+A Complete Unknown|2024|M|Drama,Music|biopic,folk|James Mangold
+Rush|2013|M|Drama,Sports|racing,true-story|Ron Howard
+Apollo 13|1995|M|Drama,History|space,true-story,survival|Ron Howard
+A Beautiful Mind|2001|M|Drama|biopic,math,psychological|Ron Howard
+Whiplash|2014|M|Drama,Music|jazz,obsession|Damien Chazelle
+La La Land|2016|M|Musical,Romance,Drama|jazz,los-angeles,dance|Damien Chazelle
+First Man|2018|M|Drama,History|space,biopic|Damien Chazelle
+Babylon|2022|M|Drama,Comedy|hollywood,period,excess|Damien Chazelle
+Remember the Titans|2000|M|Drama,Sports|football,true-story|Boaz Yakin
+Friday Night Lights|2004|M|Drama,Sports|football,small-town|Peter Berg
+The Blind Side|2009|M|Drama,Sports|football,true-story|John Lee Hancock
+Hoosiers|1986|M|Drama,Sports|basketball,underdog|David Anspaugh
+Challengers|2024|M|Drama,Romance,Sports|tennis,love-triangle|Luca Guadagnino
+Call Me by Your Name|2017|M|Romance,Drama|lgbtq,italian,coming-of-age|Luca Guadagnino
+Air|2023|M|Drama,Sports|basketball,business,true-story|Ben Affleck
+Argo|2012|M|Thriller,Drama,History|spy,true-story|Ben Affleck
+The Town|2010|M|Crime,Thriller|heist,boston|Ben Affleck
+Gone Baby Gone|2007|M|Crime,Drama,Mystery|boston,kidnapping,detective|Ben Affleck
+Good Will Hunting|1997|M|Drama|boston,math,friendship|Gus Van Sant
+Uncut Gems|2019|M|Crime,Thriller|anxiety,new-york,gambling,a24|Safdie Brothers
+Good Time|2017|M|Crime,Thriller|anxiety,new-york,night,a24|Safdie Brothers
+Marty Supreme|2025|M|Comedy,Drama,Sports|ping-pong,new-york,period,a24|Josh Safdie
+Nightcrawler|2014|M|Crime,Thriller|journalism,los-angeles,psychological|Dan Gilroy
+Drive|2011|M|Crime,Drama,Thriller|neo-noir,cars,los-angeles|Nicolas Winding Refn
+American Psycho|2000|M|Horror,Comedy,Crime|serial-killer,satire,80s|Mary Harron
+The Usual Suspects|1995|M|Crime,Mystery,Thriller|twist,heist|Bryan Singer
+Bohemian Rhapsody|2018|M|Drama,Music|biopic,rock|Bryan Singer
+L.A. Confidential|1997|M|Crime,Mystery|neo-noir,police,los-angeles|Curtis Hanson
+Scarface|1983|M|Crime,Drama|drugs,cartel,80s|Brian De Palma
+The Untouchables|1987|M|Crime,Drama|mob,prohibition|Brian De Palma
+Lock, Stock and Two Smoking Barrels|1998|M|Crime,Comedy|british,heist|Guy Ritchie
+Snatch|2000|M|Crime,Comedy|british,heist,ensemble|Guy Ritchie
+The Gentlemen|2019|M|Crime,Comedy,Action|british,drugs|Guy Ritchie
+Trainspotting|1996|M|Drama,Comedy|drugs,scottish,cult|Danny Boyle
+Slumdog Millionaire|2008|M|Drama,Romance|indian,game-show|Danny Boyle
+28 Days Later|2002|M|Horror,Sci-Fi|zombies,post-apocalyptic,british|Danny Boyle
+28 Years Later|2025|M|Horror,Sci-Fi|zombies,post-apocalyptic,british|Danny Boyle
+127 Hours|2010|M|Drama,Adventure|survival,true-story|Danny Boyle
+Sunshine|2007|M|Sci-Fi,Thriller|space,survival|Danny Boyle
+In Bruges|2008|M|Crime,Comedy,Drama|dark-comedy,assassins,british|Martin McDonagh
+The Banshees of Inisherin|2022|M|Comedy,Drama|dark-comedy,irish,friendship|Martin McDonagh
+Three Billboards Outside Ebbing, Missouri|2017|M|Crime,Drama,Comedy|dark-comedy,small-town,revenge|Martin McDonagh
+Lady Bird|2017|M|Comedy,Drama|coming-of-age,a24,mother-daughter|Greta Gerwig
+Little Women|2019|M|Drama,Romance|period,sisters|Greta Gerwig
+Barbie|2023|M|Comedy,Fantasy|satire,toys,feel-good|Greta Gerwig
+Frances Ha|2012|M|Comedy,Drama|new-york,black-and-white,indie|Noah Baumbach
+Marriage Story|2019|M|Drama,Comedy|divorce,family|Noah Baumbach
+Lost in Translation|2003|M|Drama,Romance|tokyo,loneliness|Sofia Coppola
+Midsommar|2019|M|Horror,Drama,Mystery|folk-horror,a24,cult|Ari Aster
+Hereditary|2018|M|Horror,Drama,Mystery|supernatural,a24,family|Ari Aster
+Get Out|2017|M|Horror,Mystery,Thriller|satire,twist,social-thriller|Jordan Peele
+Us|2019|M|Horror,Thriller|doppelganger,social-thriller|Jordan Peele
+Nope|2022|M|Horror,Sci-Fi|aliens,neo-western|Jordan Peele
+The Witch|2015|M|Horror,Drama|folk-horror,a24,period,witches|Robert Eggers
+The Lighthouse|2019|M|Horror,Drama|a24,black-and-white,psychological|Robert Eggers
+Nosferatu|2024|M|Horror,Fantasy|vampires,gothic,period|Robert Eggers
+The Northman|2022|M|Action,Drama,Fantasy|vikings,revenge,epic|Robert Eggers
+It Follows|2014|M|Horror|supernatural,teen,indie|David Robert Mitchell
+The Babadook|2014|M|Horror,Drama|supernatural,grief,australian|Jennifer Kent
+A Quiet Place|2018|M|Horror,Sci-Fi|monsters,family,survival|John Krasinski
+The Conjuring|2013|M|Horror|supernatural,ghosts,true-story|James Wan
+Saw|2004|M|Horror,Mystery|twist,gore|James Wan
+Scream|1996|M|Horror,Mystery|slasher,satire,teen|Wes Craven
+A Nightmare on Elm Street|1984|M|Horror|slasher,dreams,80s|Wes Craven
+The Exorcist|1973|M|Horror|supernatural,demons,classic|William Friedkin
+It|2017|M|Horror|supernatural,clowns,coming-of-age,stephen-king|Andy Muschietti
+Talk to Me|2022|M|Horror|supernatural,teen,australian,a24|Danny Philippou
+Barbarian|2022|M|Horror,Thriller|twist,one-location|Zach Cregger
+Weapons|2025|M|Horror,Mystery|small-town,ensemble,supernatural|Zach Cregger
+The Substance|2024|M|Horror,Sci-Fi,Drama|body-horror,satire,hollywood|Coralie Fargeat
+Smile|2022|M|Horror|supernatural,psychological|Parker Finn
+Longlegs|2024|M|Horror,Crime,Thriller|serial-killer,fbi,satanic|Osgood Perkins
+Alien: Romulus|2024|M|Sci-Fi,Horror|aliens,space,survival|Fede Álvarez
+Pearl|2022|M|Horror|slasher,a24,period|Ti West
+The Cabin in the Woods|2011|M|Horror,Comedy|satire,twist|Drew Goddard
+Event Horizon|1997|M|Sci-Fi,Horror|space,cult|Paul W. S. Anderson
+Misery|1990|M|Thriller,Horror|stephen-king,psychological|Rob Reiner
+Stand by Me|1986|M|Drama,Adventure|coming-of-age,stephen-king,friendship|Rob Reiner
+The Princess Bride|1987|M|Fantasy,Adventure,Romance|fairy-tale,cult|Rob Reiner
+When Harry Met Sally...|1989|M|Comedy,Romance|new-york,friendship|Rob Reiner
+The Green Mile|1999|M|Drama,Fantasy,Crime|prison,stephen-king,supernatural|Frank Darabont
+The Mist|2007|M|Horror,Sci-Fi|monsters,stephen-king,twist|Frank Darabont
+Notting Hill|1999|M|Comedy,Romance|british,celebrity|Roger Michell
+Love Actually|2003|M|Comedy,Romance|christmas,british,ensemble|Richard Curtis
+About Time|2013|M|Romance,Drama,Fantasy|time-travel,british,feel-good|Richard Curtis
+Pride & Prejudice|2005|M|Romance,Drama|period,british,jane-austen|Joe Wright
+Atonement|2007|M|Romance,Drama,War|period,british,ww2|Joe Wright
+The Notebook|2004|M|Romance,Drama|tearjerker,period|Nick Cassavetes
+Before Sunrise|1995|M|Romance,Drama|walk-and-talk,europe|Richard Linklater
+Before Sunset|2004|M|Romance,Drama|walk-and-talk,paris|Richard Linklater
+Boyhood|2014|M|Drama|coming-of-age,family|Richard Linklater
+Dazed and Confused|1993|M|Comedy|teen,70s,high-school|Richard Linklater
+School of Rock|2003|M|Comedy,Music|school,feel-good|Richard Linklater
+10 Things I Hate About You|1999|M|Comedy,Romance|teen,high-school,shakespeare|Gil Junger
+Clueless|1995|M|Comedy,Romance|teen,high-school,90s|Amy Heckerling
+Mean Girls|2004|M|Comedy|teen,high-school|Mark Waters
+Superbad|2007|M|Comedy|teen,high-school,friendship|Greg Mottola
+Booksmart|2019|M|Comedy|teen,high-school,friendship|Olivia Wilde
+Ferris Bueller's Day Off|1986|M|Comedy|teen,high-school,80s|John Hughes
+The Breakfast Club|1985|M|Comedy,Drama|teen,high-school,80s|John Hughes
+Eighth Grade|2018|M|Comedy,Drama|teen,coming-of-age,a24|Bo Burnham
+The Perks of Being a Wallflower|2012|M|Drama,Romance|teen,coming-of-age|Stephen Chbosky
+Juno|2007|M|Comedy,Drama|teen,indie|Jason Reitman
+Up in the Air|2009|M|Comedy,Drama|business,loneliness|Jason Reitman
+Little Miss Sunshine|2006|M|Comedy,Drama|road-trip,family,indie|Jonathan Dayton
+Napoleon Dynamite|2004|M|Comedy|quirky,small-town,cult|Jared Hess
+Anchorman: The Legend of Ron Burgundy|2004|M|Comedy|70s,journalism,improv|Adam McKay
+Step Brothers|2008|M|Comedy|improv,family|Adam McKay
+The Big Short|2015|M|Comedy,Drama|finance,true-story,satire|Adam McKay
+Don't Look Up|2021|M|Comedy,Sci-Fi|satire,politics|Adam McKay
+The Hangover|2009|M|Comedy|las-vegas,friendship|Todd Phillips
+Bridesmaids|2011|M|Comedy|friendship,wedding|Paul Feig
+Groundhog Day|1993|M|Comedy,Fantasy,Romance|time-loop,small-town|Harold Ramis
+Ghostbusters|1984|M|Comedy,Fantasy|ghosts,new-york,80s|Ivan Reitman
+Airplane!|1980|M|Comedy|parody,classic|Jim Abrahams
+Monty Python and the Holy Grail|1975|M|Comedy,Fantasy|parody,british,cult|Terry Gilliam
+Office Space|1999|M|Comedy|workplace,satire,cult|Mike Judge
+Zoolander|2001|M|Comedy|fashion,satire|Ben Stiller
+Galaxy Quest|1999|M|Sci-Fi,Comedy|parody,space|Dean Parisot
+Elf|2003|M|Comedy,Family,Fantasy|christmas,feel-good|Jon Favreau
+Chef|2014|M|Comedy,Drama|cooking,road-trip,feel-good|Jon Favreau
+The Holdovers|2023|M|Comedy,Drama|christmas,school,70s|Alexander Payne
+Sideways|2004|M|Comedy,Drama|wine,road-trip,friendship|Alexander Payne
+Jojo Rabbit|2019|M|Comedy,Drama,War|ww2,satire,coming-of-age|Taika Waititi
+What We Do in the Shadows|2014|M|Comedy,Horror|vampires,mockumentary|Taika Waititi
+Hunt for the Wilderpeople|2016|M|Comedy,Adventure|new-zealand,road-trip,feel-good|Taika Waititi
+Palm Springs|2020|M|Comedy,Romance,Sci-Fi|time-loop|Max Barbakow
+Crazy Rich Asians|2018|M|Comedy,Romance|wedding,wealth|Jon M. Chu
+Wicked|2024|M|Musical,Fantasy|witches,oz,friendship|Jon M. Chu
+Wicked: For Good|2025|M|Musical,Fantasy|witches,oz|Jon M. Chu
+In the Heights|2021|M|Musical,Romance|new-york,dance|Jon M. Chu
+The Greatest Showman|2017|M|Musical,Drama|circus,biopic|Michael Gracey
+Mamma Mia!|2008|M|Musical,Comedy,Romance|abba,greece,feel-good|Phyllida Lloyd
+A Star Is Born|2018|M|Drama,Romance,Music|music-industry,tearjerker|Bradley Cooper
+Elvis|2022|M|Drama,Music|biopic,rock|Baz Luhrmann
+The Great Gatsby|2013|M|Drama,Romance|period,1920s,wealth|Baz Luhrmann
+Moulin Rouge!|2001|M|Musical,Romance,Drama|paris,period|Baz Luhrmann
+Rocketman|2019|M|Musical,Drama|biopic,rock|Dexter Fletcher
+Almost Famous|2000|M|Drama,Comedy,Music|rock,journalism,coming-of-age|Cameron Crowe
+Jerry Maguire|1996|M|Comedy,Drama,Romance|football,business|Cameron Crowe
+Amélie|2001|M|Romance,Comedy|french,quirky,paris|Jean-Pierre Jeunet
+The Intouchables|2011|M|Comedy,Drama|french,friendship,true-story|Olivier Nakache
+Portrait of a Lady on Fire|2019|M|Romance,Drama|french,lgbtq,period|Céline Sciamma
+Anatomy of a Fall|2023|M|Drama,Mystery|french,courtroom|Justine Triet
+La Haine|1995|M|Crime,Drama|french,black-and-white|Mathieu Kassovitz
+Léon: The Professional|1994|M|Action,Crime,Drama|assassins,new-york|Luc Besson
+The Fifth Element|1997|M|Sci-Fi,Action|space,quirky,cult|Luc Besson
+Cinema Paradiso|1988|M|Drama,Romance|italian,filmmaking,nostalgia|Giuseppe Tornatore
+Life Is Beautiful|1997|M|Comedy,Drama,War|italian,ww2,holocaust|Roberto Benigni
+The Lives of Others|2006|M|Drama,Thriller|german,cold-war,spy|Florian Henckel von Donnersmarck
+Das Boot|1981|M|War,Drama|german,submarine,ww2|Wolfgang Petersen
+Run Lola Run|1998|M|Thriller,Crime|german,time-loop|Tom Tykwer
+Downfall|2004|M|War,Drama,History|german,ww2|Oliver Hirschbiegel
+All Quiet on the Western Front|2022|M|War,Drama|german,ww1|Edward Berger
+Conclave|2024|M|Drama,Mystery,Thriller|religion,politics|Edward Berger
+The Zone of Interest|2023|M|Drama,History,War|holocaust,ww2,a24|Jonathan Glazer
+The Hunt|2012|M|Drama|danish,small-town|Thomas Vinterberg
+Another Round|2020|M|Comedy,Drama|danish,friendship|Thomas Vinterberg
+The Seventh Seal|1957|M|Drama,Fantasy|swedish,classic,death|Ingmar Bergman
+Let the Right One In|2008|M|Horror,Romance|swedish,vampires|Tomas Alfredson
+City of God|2002|M|Crime,Drama|brazilian,gangs,true-story|Fernando Meirelles
+Amores Perros|2000|M|Drama,Thriller|mexican,anthology|Alejandro G. Iñárritu
+Birdman|2014|M|Comedy,Drama|theater,one-shot|Alejandro G. Iñárritu
+The Revenant|2015|M|Adventure,Drama,Western|survival,revenge,snow|Alejandro G. Iñárritu
+The Secret in Their Eyes|2009|M|Mystery,Crime,Romance|argentine|Juan José Campanella
+Wild Tales|2014|M|Comedy,Thriller|argentine,anthology,dark-comedy|Damián Szifron
+RRR|2022|M|Action,Drama|indian,epic,friendship|S. S. Rajamouli
+Baahubali: The Beginning|2015|M|Action,Fantasy|indian,epic|S. S. Rajamouli
+3 Idiots|2009|M|Comedy,Drama|indian,school,friendship|Rajkumar Hirani
+Lagaan|2001|M|Drama,Sports,Musical|indian,cricket,period|Ashutosh Gowariker
+Dangal|2016|M|Drama,Sports|indian,wrestling,true-story|Nitesh Tiwari
+In the Mood for Love|2000|M|Romance,Drama|hong-kong,slow-burn|Wong Kar-wai
+Chungking Express|1994|M|Romance,Comedy,Drama|hong-kong,quirky|Wong Kar-wai
+Infernal Affairs|2002|M|Crime,Thriller|hong-kong,undercover,police|Andrew Lau
+Shoplifters|2018|M|Drama,Crime|japanese,family|Hirokazu Kore-eda
+Drive My Car|2021|M|Drama|japanese,grief,slow-burn|Ryusuke Hamaguchi
+Perfect Days|2023|M|Drama|japanese,slow-burn,tokyo|Wim Wenders
+The Farewell|2019|M|Comedy,Drama|chinese,family,immigration,a24|Lulu Wang
+A Separation|2011|M|Drama,Mystery|iranian,divorce|Asghar Farhadi
+Capernaum|2018|M|Drama|lebanese,poverty|Nadine Labaki
+12 Years a Slave|2013|M|Drama,History|slavery,true-story|Steve McQueen
+Moonlight|2016|M|Drama|coming-of-age,lgbtq,a24|Barry Jenkins
+If Beale Street Could Talk|2018|M|Romance,Drama|period,new-york|Barry Jenkins
+Manchester by the Sea|2016|M|Drama|grief,family|Kenneth Lonergan
+Spotlight|2015|M|Drama,History|journalism,true-story,boston|Tom McCarthy
+All the President's Men|1976|M|Drama,Thriller,History|journalism,politics,true-story|Alan J. Pakula
+Michael Clayton|2007|M|Thriller,Drama|legal,corporate|Tony Gilroy
+The King's Speech|2010|M|Drama,History|biopic,british,royalty|Tom Hooper
+The Imitation Game|2014|M|Drama,Thriller,History|biopic,ww2,math|Morten Tyldum
+The Theory of Everything|2014|M|Drama,Romance|biopic,science|James Marsh
+Hidden Figures|2016|M|Drama,History|space,true-story,math|Theodore Melfi
+Green Book|2018|M|Comedy,Drama|road-trip,true-story,music|Peter Farrelly
+Dallas Buyers Club|2013|M|Drama|true-story,medical|Jean-Marc Vallée
+The Pursuit of Happyness|2006|M|Drama|true-story,father-son|Gabriele Muccino
+Braveheart|1995|M|War,Drama,History|epic,scotland,medieval|Mel Gibson
+Hacksaw Ridge|2016|M|War,Drama|ww2,true-story|Mel Gibson
+Apocalypto|2006|M|Action,Adventure|survival,jungle|Mel Gibson
+Dances with Wolves|1990|M|Western,Drama|epic|Kevin Costner
+Anora|2024|M|Comedy,Drama,Romance|new-york,indie|Sean Baker
+The Florida Project|2017|M|Drama|childhood,a24,indie|Sean Baker
+Aftersun|2022|M|Drama|father-daughter,a24,memory|Charlotte Wells
+The Whale|2022|M|Drama|a24,one-location|Darren Aronofsky
+Black Swan|2010|M|Thriller,Drama,Horror|ballet,psychological|Darren Aronofsky
+Requiem for a Dream|2000|M|Drama|drugs,dark|Darren Aronofsky
+Poor Things|2023|M|Comedy,Sci-Fi,Romance|quirky,period,gothic|Yorgos Lanthimos
+The Favourite|2018|M|Comedy,Drama,History|period,royalty,dark-comedy|Yorgos Lanthimos
+The Lobster|2015|M|Comedy,Romance,Sci-Fi|dystopia,quirky,dark-comedy|Yorgos Lanthimos
+Bugonia|2025|M|Comedy,Sci-Fi,Thriller|aliens,dark-comedy,conspiracy|Yorgos Lanthimos
+The Brutalist|2024|M|Drama|architecture,immigration,epic,a24|Brady Corbet
+Tár|2022|M|Drama,Music|classical-music,psychological|Todd Field
+Saltburn|2023|M|Thriller,Comedy|class,british,dark-comedy|Emerald Fennell
+Promising Young Woman|2020|M|Thriller,Drama|revenge,dark-comedy|Emerald Fennell
+The Talented Mr. Ripley|1999|M|Thriller,Crime|con-artist,italian,period|Anthony Minghella
+The Sting|1973|M|Crime,Comedy|con-artist,heist,classic|George Roy Hill
+Butch Cassidy and the Sundance Kid|1969|M|Western,Crime|outlaws,classic,friendship|George Roy Hill
+Rain Man|1988|M|Drama|road-trip,brothers|Barry Levinson
+The Fugitive|1993|M|Action,Thriller|chase,police|Andrew Davis
+Wind River|2017|M|Crime,Thriller,Mystery|snow,neo-western|Taylor Sheridan
+Hell or High Water|2016|M|Crime,Western,Drama|heist,neo-western,brothers|David Mackenzie
+Total Recall|1990|M|Sci-Fi,Action|mind-bending,mars|Paul Verhoeven
+RoboCop|1987|M|Sci-Fi,Action|cyberpunk,satire,robots|Paul Verhoeven
+Starship Troopers|1997|M|Sci-Fi,Action|satire,aliens,military|Paul Verhoeven
+Independence Day|1996|M|Sci-Fi,Action|aliens,blockbuster|Roland Emmerich
+Men in Black|1997|M|Sci-Fi,Comedy,Action|aliens,buddy|Barry Sonnenfeld
+Project Hail Mary|2026|M|Sci-Fi,Adventure|space,aliens,feel-good|Phil Lord & Christopher Miller
+The Lego Movie|2014|M|Animation,Comedy,Family|toys,satire|Phil Lord & Christopher Miller
+21 Jump Street|2012|M|Comedy,Action|police,high-school,buddy|Phil Lord & Christopher Miller
+Free Solo|2018|M|Documentary,Sports|climbing,true-story|Jimmy Chin
+Won't You Be My Neighbor?|2018|M|Documentary|tv,feel-good|Morgan Neville
+Man on Wire|2008|M|Documentary|true-story,new-york|James Marsh
+Searching for Sugar Man|2012|M|Documentary,Music|true-story|Malik Bendjelloul
+Jiro Dreams of Sushi|2011|M|Documentary|cooking,japanese|David Gelb
+Icarus|2017|M|Documentary,Sports|doping,true-story|Bryan Fogel
+The Social Dilemma|2020|M|Documentary|tech|Jeff Orlowski
+My Octopus Teacher|2020|M|Documentary|nature,ocean|Pippa Ehrlich
+Amy|2015|M|Documentary,Music|biopic|Asif Kapadia
+Senna|2010|M|Documentary,Sports|racing,biopic|Asif Kapadia
+Grizzly Man|2005|M|Documentary|nature|Werner Herzog
+Fyre|2019|M|Documentary|scam,true-story|Chris Smith
+Blackfish|2013|M|Documentary|animals,ocean|Gabriela Cowperthwaite
+Summer of Soul|2021|M|Documentary,Music|concert,history|Questlove
+Stop Making Sense|1984|M|Documentary,Music|concert,rock|Jonathan Demme
+
+# ---------- TV Shows ----------
+Breaking Bad|2008|T|Crime,Drama,Thriller|drugs,prestige,dark|AMC
+Better Call Saul|2015|T|Crime,Drama|legal,prestige,slow-burn|AMC
+Mad Men|2007|T|Drama|period,workplace,advertising,prestige|AMC
+The Walking Dead|2010|T|Horror,Drama|zombies,post-apocalyptic,survival|AMC
+Halt and Catch Fire|2014|T|Drama|tech,80s,startup|AMC
+The Sopranos|1999|T|Crime,Drama|mob,family,prestige|HBO
+The Wire|2002|T|Crime,Drama|police,drugs,prestige|HBO
+Game of Thrones|2011|T|Fantasy,Drama,Action|epic,dragons,politics|HBO
+House of the Dragon|2022|T|Fantasy,Drama|dragons,politics,epic|HBO
+A Knight of the Seven Kingdoms|2026|T|Fantasy,Adventure|quest,medieval|HBO
+Succession|2018|T|Drama,Comedy|family,business,satire,prestige,wealth|HBO
+True Detective|2014|T|Crime,Mystery,Drama|detective,anthology,dark|HBO
+The Last of Us|2023|T|Drama,Horror,Sci-Fi|post-apocalyptic,zombies,video-game|HBO
+Chernobyl|2019|T|Drama,History|miniseries,true-story,disaster|HBO
+Band of Brothers|2001|T|War,Drama,History|ww2,miniseries,true-story|HBO
+The Pacific|2010|T|War,Drama|ww2,miniseries,true-story|HBO
+Generation Kill|2008|T|War,Drama|iraq,miniseries,military|HBO
+Westworld|2016|T|Sci-Fi,Western,Mystery|ai,robots,mind-bending|HBO
+Euphoria|2019|T|Drama|teen,drugs,high-school|HBO
+The White Lotus|2021|T|Comedy,Drama,Mystery|satire,ensemble,anthology,wealth|HBO
+Barry|2018|T|Comedy,Crime|dark-comedy,assassins,hollywood|HBO
+Veep|2012|T|Comedy|politics,satire,workplace|HBO
+Curb Your Enthusiasm|2000|T|Comedy|improv,cringe|HBO
+Silicon Valley|2014|T|Comedy|tech,startup,workplace,satire|HBO
+Six Feet Under|2001|T|Drama,Comedy|family,death|HBO
+Deadwood|2004|T|Western,Drama|period,prestige|HBO
+Boardwalk Empire|2010|T|Crime,Drama|mob,prohibition,period|HBO
+The Leftovers|2014|T|Drama,Mystery,Fantasy|grief,mind-bending|HBO
+Watchmen|2019|T|Sci-Fi,Drama,Mystery|superhero,miniseries,dc|HBO
+Big Little Lies|2017|T|Drama,Mystery|whodunit,ensemble,wealth|HBO
+Sharp Objects|2018|T|Mystery,Thriller|psychological,small-town,miniseries|HBO
+Mare of Easttown|2021|T|Crime,Drama,Mystery|detective,small-town,miniseries|HBO
+The Penguin|2024|T|Crime,Drama|dc,mob|HBO
+Hacks|2021|T|Comedy,Drama|comedy-world,workplace,friendship|HBO
+The Pitt|2025|T|Drama|medical,workplace,real-time|HBO
+Task|2025|T|Crime,Drama|police,fbi,small-town|HBO
+Sex and the City|1998|T|Comedy,Romance|new-york,friendship,dating|HBO
+Entourage|2004|T|Comedy,Drama|hollywood,friendship|HBO
+Girls|2012|T|Comedy,Drama|new-york,friendship|HBO
+Insecure|2016|T|Comedy,Drama|friendship,los-angeles,dating|HBO
+Station Eleven|2021|T|Sci-Fi,Drama|post-apocalyptic,miniseries,theater|HBO
+Industry|2020|T|Drama|finance,workplace,british|HBO
+I May Destroy You|2020|T|Drama|british,miniseries|HBO
+The Night Of|2016|T|Crime,Drama|legal,prison,miniseries|HBO
+Oz|1997|T|Crime,Drama|prison|HBO
+The Gilded Age|2022|T|Drama|period,new-york,wealth|HBO
+Rome|2005|T|Drama,History|ancient-rome,epic|HBO
+The Newsroom|2012|T|Drama|journalism,workplace|HBO
+Tokyo Vice|2022|T|Crime,Drama|japanese,journalism|HBO
+The Rehearsal|2022|T|Comedy,Documentary|cringe,meta|HBO
+The Jinx|2015|T|Documentary,Crime|true-crime|HBO
+Last Week Tonight with John Oliver|2014|T|Comedy|satire,politics,news|HBO
+Stranger Things|2016|T|Sci-Fi,Horror,Drama|80s,supernatural,teen,small-town|Netflix
+Squid Game|2021|T|Thriller,Drama|korean,survival,class|Netflix
+The Crown|2016|T|Drama,History|royalty,british,period|Netflix
+Ozark|2017|T|Crime,Drama,Thriller|drugs,cartel,family|Netflix
+Narcos|2015|T|Crime,Drama|drugs,cartel,true-story|Netflix
+Mindhunter|2017|T|Crime,Drama|serial-killer,fbi,true-story|Netflix
+Black Mirror|2011|T|Sci-Fi,Thriller,Drama|anthology,tech,dystopia|Netflix
+Dark|2017|T|Sci-Fi,Mystery,Thriller|time-travel,german,mind-bending|Netflix
+Money Heist|2017|T|Crime,Thriller|heist,spanish|Netflix
+The Witcher|2019|T|Fantasy,Action|magic,monsters|Netflix
+Bridgerton|2020|T|Romance,Drama|period,british|Netflix
+Wednesday|2022|T|Comedy,Mystery,Fantasy|teen,supernatural,school|Netflix
+The Queen's Gambit|2020|T|Drama|chess,period,miniseries|Netflix
+Adolescence|2025|T|Crime,Drama|british,one-shot,miniseries,teen|Netflix
+Baby Reindeer|2024|T|Drama,Thriller|british,miniseries,true-story|Netflix
+BoJack Horseman|2014|T|Animation,Comedy,Drama|adult-animation,hollywood,dark-comedy|Netflix
+Arcane|2021|T|Animation,Action,Fantasy|video-game,steampunk|Netflix
+Love, Death & Robots|2019|T|Animation,Sci-Fi|anthology,adult-animation|Netflix
+Blue Eye Samurai|2023|T|Animation,Action|samurai,revenge,adult-animation|Netflix
+Castlevania|2017|T|Animation,Horror,Fantasy|vampires,video-game,adult-animation|Netflix
+Beef|2023|T|Comedy,Drama|dark-comedy,revenge|Netflix
+Russian Doll|2019|T|Comedy,Mystery|time-loop,new-york|Netflix
+Sex Education|2019|T|Comedy,Drama|teen,british,high-school|Netflix
+Heartstopper|2022|T|Romance,Drama|teen,lgbtq,british|Netflix
+Never Have I Ever|2020|T|Comedy|teen,high-school|Netflix
+Orange Is the New Black|2013|T|Comedy,Drama|prison,ensemble|Netflix
+House of Cards|2013|T|Drama,Thriller|politics|Netflix
+The Haunting of Hill House|2018|T|Horror,Drama|ghosts,family|Netflix
+Midnight Mass|2021|T|Horror,Drama|religion,small-town,vampires|Netflix
+Cobra Kai|2018|T|Action,Comedy,Drama|martial-arts,teen,nostalgia|Netflix
+The Umbrella Academy|2019|T|Sci-Fi,Action|superhero,family,time-travel|Netflix
+Lupin|2021|T|Crime,Mystery|french,heist,con-artist|Netflix
+3 Body Problem|2024|T|Sci-Fi,Mystery|aliens,science|Netflix
+One Piece|2023|T|Adventure,Fantasy,Action|pirates,live-action|Netflix
+Daredevil|2015|T|Action,Crime|superhero,marvel|Netflix
+Unbelievable|2019|T|Crime,Drama|detective,true-story,miniseries|Netflix
+Maid|2021|T|Drama|miniseries,poverty|Netflix
+The Diplomat|2023|T|Drama,Thriller|politics|Netflix
+Nobody Wants This|2024|T|Comedy,Romance|dating,religion|Netflix
+Kingdom|2019|T|Horror,Action|korean,zombies,period|Netflix
+Alice in Borderland|2020|T|Sci-Fi,Thriller|japanese,survival|Netflix
+The Glory|2022|T|Thriller,Drama|korean,k-drama,revenge|Netflix
+Ripley|2024|T|Crime,Thriller|con-artist,italian,black-and-white|Netflix
+Dead to Me|2019|T|Comedy,Drama|dark-comedy,grief|Netflix
+Master of None|2015|T|Comedy,Drama|new-york,dating|Netflix
+I Think You Should Leave with Tim Robinson|2019|T|Comedy|sketch,cringe|Netflix
+Unbreakable Kimmy Schmidt|2015|T|Comedy|new-york,quirky|Netflix
+13 Reasons Why|2017|T|Drama,Mystery|teen,high-school|Netflix
+Outer Banks|2020|T|Adventure,Drama|teen,treasure|Netflix
+Ginny & Georgia|2021|T|Comedy,Drama|teen,mother-daughter|Netflix
+Emily in Paris|2020|T|Comedy,Romance|paris,fashion|Netflix
+You|2018|T|Thriller,Crime|psychological,stalker|Netflix
+The Night Agent|2023|T|Action,Thriller|spy,politics|Netflix
+The OA|2016|T|Sci-Fi,Mystery|mind-bending,supernatural|Netflix
+Making a Murderer|2015|T|Documentary,Crime|true-crime|Netflix
+Tiger King|2020|T|Documentary,Crime|true-crime,animals|Netflix
+Wild Wild Country|2018|T|Documentary|cult,true-story|Netflix
+Chef's Table|2015|T|Documentary|cooking|Netflix
+Our Planet|2019|T|Documentary|nature|Netflix
+Formula 1: Drive to Survive|2019|T|Documentary,Sports|racing|Netflix
+Love Is Blind|2020|T|Reality|dating|Netflix
+Queer Eye|2018|T|Reality|makeover,feel-good|Netflix
+Selling Sunset|2019|T|Reality|real-estate,wealth|Netflix
+Ted Lasso|2020|T|Comedy,Drama|soccer,feel-good,british|Apple TV+
+Severance|2022|T|Sci-Fi,Thriller,Mystery|workplace,mind-bending,dystopia|Apple TV+
+Pluribus|2025|T|Sci-Fi,Drama|mind-bending,dystopia|Apple TV+
+Slow Horses|2022|T|Thriller,Drama|spy,british,dark-comedy|Apple TV+
+The Studio|2025|T|Comedy|hollywood,satire,workplace|Apple TV+
+Shrinking|2023|T|Comedy,Drama|grief,therapy,feel-good|Apple TV+
+For All Mankind|2019|T|Sci-Fi,Drama|space,alt-history|Apple TV+
+Silo|2023|T|Sci-Fi,Mystery|dystopia,post-apocalyptic|Apple TV+
+Foundation|2021|T|Sci-Fi,Drama|space,epic|Apple TV+
+Pachinko|2022|T|Drama|korean,family,period|Apple TV+
+The Morning Show|2019|T|Drama|journalism,workplace|Apple TV+
+Bad Sisters|2022|T|Comedy,Mystery,Thriller|dark-comedy,irish,sisters|Apple TV+
+Mythic Quest|2020|T|Comedy|video-games,workplace|Apple TV+
+Black Bird|2022|T|Crime,Drama|prison,true-story,miniseries|Apple TV+
+Masters of the Air|2024|T|War,Drama|ww2,aviation,miniseries|Apple TV+
+The Bear|2022|T|Comedy,Drama|cooking,workplace,chicago|FX
+Atlanta|2016|T|Comedy,Drama|surreal,music|FX
+Fargo|2014|T|Crime,Drama,Comedy|dark-comedy,anthology,snow|FX
+Shōgun|2024|T|Drama,History,Adventure|japanese,samurai,period|FX
+The Americans|2013|T|Drama,Thriller|spy,cold-war,80s,marriage|FX
+What We Do in the Shadows|2019|T|Comedy,Horror|vampires,mockumentary|FX
+Reservation Dogs|2021|T|Comedy,Drama|teen,indigenous|FX
+It's Always Sunny in Philadelphia|2005|T|Comedy|sitcom,dark-comedy,friendship|FX
+Justified|2010|T|Crime,Western,Drama|police,neo-western|FX
+Sons of Anarchy|2008|T|Crime,Drama|bikers,family|FX
+American Horror Story|2011|T|Horror,Drama|anthology,supernatural|FX
+The Shield|2002|T|Crime,Drama|police,corruption|FX
+Legion|2017|T|Sci-Fi,Drama|superhero,marvel,mind-bending|FX
+Archer|2009|T|Animation,Comedy,Action|spy,adult-animation|FX
+The People v. O. J. Simpson|2016|T|Crime,Drama|legal,true-story,miniseries|FX
+Devs|2020|T|Sci-Fi,Thriller|tech,mind-bending,miniseries|FX
+Alien: Earth|2025|T|Sci-Fi,Horror|aliens,space|FX
+Andor|2022|T|Sci-Fi,Thriller,Drama|star-wars,space,politics|Disney+
+The Mandalorian|2019|T|Sci-Fi,Western,Action|star-wars,space|Disney+
+WandaVision|2021|T|Sci-Fi,Comedy,Mystery|superhero,marvel,mcu,sitcom|Disney+
+Loki|2021|T|Sci-Fi,Fantasy|superhero,marvel,mcu,time-travel|Disney+
+Moving|2023|T|Action,Sci-Fi|korean,superhero|Disney+
+Only Murders in the Building|2021|T|Comedy,Mystery|whodunit,new-york,podcast|Hulu
+The Handmaid's Tale|2017|T|Drama,Sci-Fi|dystopia|Hulu
+Normal People|2020|T|Romance,Drama|irish,miniseries,coming-of-age|Hulu
+Dopesick|2021|T|Drama|drugs,true-story,miniseries|Hulu
+The Dropout|2022|T|Drama|startup,true-story,scam|Hulu
+PEN15|2019|T|Comedy|teen,cringe,2000s|Hulu
+The Boys|2019|T|Action,Comedy,Sci-Fi|superhero,satire,dark|Prime Video
+Fleabag|2016|T|Comedy,Drama|british,fourth-wall|Prime Video
+The Marvelous Mrs. Maisel|2017|T|Comedy,Drama|comedy-world,period,new-york|Prime Video
+Invincible|2021|T|Animation,Action|superhero,adult-animation|Prime Video
+Fallout|2024|T|Sci-Fi,Action,Comedy|post-apocalyptic,video-game|Prime Video
+Reacher|2022|T|Action,Crime|small-town,drifter|Prime Video
+The Expanse|2015|T|Sci-Fi,Drama|space,politics|Prime Video
+The Lord of the Rings: The Rings of Power|2022|T|Fantasy,Adventure|epic,magic|Prime Video
+Mr. & Mrs. Smith|2024|T|Action,Comedy,Romance|spy,marriage|Prime Video
+Jack Ryan|2018|T|Action,Thriller|spy|Prime Video
+Good Omens|2019|T|Fantasy,Comedy|angels,british|Prime Video
+Mr. Robot|2015|T|Thriller,Drama,Crime|hacker,tech,mind-bending|USA
+Suits|2011|T|Drama,Comedy|legal,workplace|USA
+Psych|2006|T|Comedy,Mystery|detective,buddy|USA
+Monk|2002|T|Comedy,Mystery|detective|USA
+Twin Peaks|1990|T|Mystery,Drama,Horror|surreal,small-town,cult|ABC
+Lost|2004|T|Mystery,Adventure,Drama|island,survival,mind-bending|ABC
+Abbott Elementary|2021|T|Comedy|mockumentary,workplace,school|ABC
+Modern Family|2009|T|Comedy|mockumentary,family,sitcom|ABC
+Grey's Anatomy|2005|T|Drama,Romance|medical,workplace|ABC
+Desperate Housewives|2004|T|Comedy,Drama,Mystery|suburbia|ABC
+The Wonder Years|1988|T|Comedy,Drama|coming-of-age,60s|ABC
+Black-ish|2014|T|Comedy|family,sitcom|ABC
+Pretty Little Liars|2010|T|Mystery,Drama|teen,small-town|ABC Family
+The Office|2005|T|Comedy|mockumentary,workplace,sitcom|NBC
+Parks and Recreation|2009|T|Comedy|mockumentary,workplace,politics,feel-good|NBC
+Friends|1994|T|Comedy,Romance|sitcom,new-york,friendship|NBC
+Seinfeld|1989|T|Comedy|sitcom,new-york|NBC
+30 Rock|2006|T|Comedy|workplace,tv,sitcom|NBC
+Community|2009|T|Comedy|sitcom,school,meta|NBC
+The Good Place|2016|T|Comedy,Fantasy|afterlife,philosophy,feel-good|NBC
+Brooklyn Nine-Nine|2013|T|Comedy|police,workplace,sitcom|NBC
+Scrubs|2001|T|Comedy,Drama|medical,sitcom,workplace|NBC
+Superstore|2015|T|Comedy|workplace,sitcom|NBC
+This Is Us|2016|T|Drama|family,tearjerker|NBC
+Friday Night Lights|2006|T|Drama,Sports|football,small-town,teen|NBC
+Hannibal|2013|T|Crime,Horror,Thriller|serial-killer,fbi,psychological|NBC
+Cheers|1982|T|Comedy|sitcom,bar|NBC
+Frasier|1993|T|Comedy|sitcom,family|NBC
+The West Wing|1999|T|Drama|politics,workplace|NBC
+ER|1994|T|Drama|medical,workplace|NBC
+Law & Order: Special Victims Unit|1999|T|Crime,Drama|police,procedural|NBC
+Saturday Night Live|1975|T|Comedy|sketch,live|NBC
+The Fresh Prince of Bel-Air|1990|T|Comedy|sitcom,family,90s|NBC
+Freaks and Geeks|1999|T|Comedy,Drama|teen,high-school,80s|NBC
+Heroes|2006|T|Sci-Fi,Drama|superhero,ensemble|NBC
+Columbo|1971|T|Crime,Mystery|detective,classic|NBC
+How I Met Your Mother|2005|T|Comedy,Romance|sitcom,new-york,friendship|CBS
+The Big Bang Theory|2007|T|Comedy|sitcom,science,friendship|CBS
+Everybody Loves Raymond|1996|T|Comedy|sitcom,family|CBS
+The Good Wife|2009|T|Drama|legal,politics|CBS
+NCIS|2003|T|Crime,Drama|procedural,military|CBS
+Criminal Minds|2005|T|Crime,Drama|serial-killer,fbi,procedural|CBS
+Person of Interest|2011|T|Action,Sci-Fi,Crime|ai,surveillance|CBS
+The Twilight Zone|1959|T|Sci-Fi,Fantasy|anthology,classic,twist|CBS
+Murder, She Wrote|1984|T|Mystery|detective,small-town|CBS
+Survivor|2000|T|Reality|competition,island|CBS
+The Amazing Race|2001|T|Reality|competition,travel|CBS
+The X-Files|1993|T|Sci-Fi,Mystery|aliens,fbi,supernatural|Fox
+The Simpsons|1989|T|Animation,Comedy|sitcom,family,satire|Fox
+Family Guy|1999|T|Animation,Comedy|adult-animation,sitcom|Fox
+Futurama|1999|T|Animation,Comedy,Sci-Fi|adult-animation,space|Fox
+Bob's Burgers|2011|T|Animation,Comedy|family,sitcom|Fox
+King of the Hill|1997|T|Animation,Comedy|family,small-town|Fox
+Arrested Development|2003|T|Comedy|family,satire,cult|Fox
+Malcolm in the Middle|2000|T|Comedy|family,sitcom|Fox
+That '70s Show|1998|T|Comedy|sitcom,70s,teen|Fox
+New Girl|2011|T|Comedy|sitcom,friendship|Fox
+24|2001|T|Action,Thriller|real-time,spy|Fox
+House|2004|T|Drama,Mystery|medical,procedural|Fox
+Prison Break|2005|T|Action,Crime,Thriller|prison,heist|Fox
+Glee|2009|T|Comedy,Musical|high-school,music|Fox
+The O.C.|2003|T|Drama,Romance|teen,wealth|Fox
+Firefly|2002|T|Sci-Fi,Western|space,cult|Fox
+Fringe|2008|T|Sci-Fi,Mystery|fbi,mind-bending|Fox
+Cosmos: A Spacetime Odyssey|2014|T|Documentary|space,science|Fox
+Kitchen Nightmares|2007|T|Reality|cooking,restaurant|Fox
+Hell's Kitchen|2005|T|Reality|cooking,competition|Fox
+Buffy the Vampire Slayer|1997|T|Fantasy,Action,Drama|vampires,teen,supernatural|The WB
+Gilmore Girls|2000|T|Comedy,Drama|small-town,mother-daughter|The WB
+Supernatural|2005|T|Fantasy,Horror|supernatural,brothers,monsters|The CW
+Gossip Girl|2007|T|Drama,Romance|teen,new-york,wealth|The CW
+The Vampire Diaries|2009|T|Fantasy,Romance,Drama|vampires,teen,supernatural|The CW
+Riverdale|2017|T|Drama,Mystery|teen,small-town|The CW
+Veronica Mars|2004|T|Mystery,Drama|teen,detective|UPN
+Everybody Hates Chris|2005|T|Comedy|family,80s,sitcom|UPN
+Schitt's Creek|2015|T|Comedy|small-town,family,feel-good|CBC
+Letterkenny|2016|T|Comedy|small-town,canadian|Crave
+Orphan Black|2013|T|Sci-Fi,Thriller|clones|BBC America
+Killing Eve|2018|T|Thriller,Comedy|spy,assassins,british|BBC America
+Doctor Who|2005|T|Sci-Fi,Adventure|time-travel,british,space|BBC
+Sherlock|2010|T|Crime,Mystery|detective,british|BBC
+Peaky Blinders|2013|T|Crime,Drama|british,gangs,period|BBC
+Line of Duty|2012|T|Crime,Thriller|police,corruption,british|BBC
+Luther|2010|T|Crime,Thriller|detective,british|BBC
+Happy Valley|2014|T|Crime,Drama|police,british|BBC
+The Office (UK)|2001|T|Comedy|mockumentary,workplace,british,cringe|BBC
+Blackadder|1983|T|Comedy|british,period|BBC
+Fawlty Towers|1975|T|Comedy|british,sitcom,hotel|BBC
+Gavin & Stacey|2007|T|Comedy,Romance|british,family|BBC
+The Last Kingdom|2015|T|Action,Drama,History|vikings,period|BBC
+Planet Earth|2006|T|Documentary|nature|BBC
+Planet Earth II|2016|T|Documentary|nature|BBC
+Blue Planet II|2017|T|Documentary|nature,ocean|BBC
+The Great British Bake Off|2010|T|Reality|cooking,competition,british,feel-good|BBC
+Top Gear|2002|T|Reality|cars,british|BBC
+Downton Abbey|2010|T|Drama|period,british,wealth|ITV
+Broadchurch|2013|T|Crime,Drama,Mystery|detective,small-town,british|ITV
+Love Island|2015|T|Reality|dating,british|ITV2
+Derry Girls|2018|T|Comedy|irish,teen,90s|Channel 4
+Peep Show|2003|T|Comedy|british,cringe|Channel 4
+The IT Crowd|2006|T|Comedy|british,workplace,sitcom|Channel 4
+Taskmaster|2015|T|Comedy,Reality|british,competition|Channel 4
+Skins|2007|T|Drama|teen,british|E4
+Misfits|2009|T|Sci-Fi,Comedy|superhero,british,teen|E4
+Dexter|2006|T|Crime,Drama|serial-killer,dark|Showtime
+Homeland|2011|T|Drama,Thriller|spy,politics|Showtime
+Yellowjackets|2021|T|Horror,Drama,Mystery|survival,teen,90s|Showtime
+Billions|2016|T|Drama|finance,legal,wealth|Showtime
+Shameless|2011|T|Comedy,Drama|family,poverty,chicago|Showtime
+Yellowstone|2018|T|Western,Drama|ranch,family|Paramount Network
+1883|2021|T|Western,Drama|period|Paramount+
+Landman|2024|T|Drama|oil,neo-western|Paramount+
+Tulsa King|2022|T|Crime,Comedy,Drama|mob|Paramount+
+Star Trek: Strange New Worlds|2022|T|Sci-Fi,Adventure|space,star-trek|Paramount+
+Star Trek: The Next Generation|1987|T|Sci-Fi,Adventure|space,star-trek|Syndication
+Battlestar Galactica|2004|T|Sci-Fi,Drama|space,ai,war|Syfy
+Outlander|2014|T|Romance,Fantasy,Drama|time-travel,scotland,period|Starz
+Power|2014|T|Crime,Drama|drugs,new-york|Starz
+Spartacus|2010|T|Action,Drama|ancient-rome|Starz
+Vikings|2013|T|Action,Drama,History|vikings|History
+Poker Face|2023|T|Mystery,Comedy|detective,road-trip|Peacock
+The Day of the Jackal|2024|T|Thriller|assassins,spy|Peacock
+The Traitors|2023|T|Reality|competition,deception|Peacock
+Nathan for You|2013|T|Comedy,Reality|cringe,business|Comedy Central
+Key & Peele|2012|T|Comedy|sketch|Comedy Central
+Chappelle's Show|2003|T|Comedy|sketch|Comedy Central
+South Park|1997|T|Animation,Comedy|satire,adult-animation|Comedy Central
+Broad City|2014|T|Comedy|new-york,friendship|Comedy Central
+The Daily Show|1996|T|Comedy|satire,politics,news|Comedy Central
+Rick and Morty|2013|T|Animation,Comedy,Sci-Fi|adult-animation,multiverse,dark-comedy|Adult Swim
+Avatar: The Last Airbender|2005|T|Animation,Fantasy,Adventure|kids,epic,martial-arts|Nickelodeon
+SpongeBob SquarePants|1999|T|Animation,Comedy|kids,ocean|Nickelodeon
+Adventure Time|2010|T|Animation,Fantasy,Adventure|kids,surreal|Cartoon Network
+Gravity Falls|2012|T|Animation,Mystery,Comedy|kids,supernatural,small-town|Disney Channel
+Bluey|2018|T|Animation,Family,Comedy|kids,family,feel-good|ABC Kids
+Attack on Titan|2013|T|Animation,Action,Fantasy|anime,dark,epic|MBS
+Fullmetal Alchemist: Brotherhood|2009|T|Animation,Adventure,Fantasy|anime,magic,brothers|MBS
+Jujutsu Kaisen|2020|T|Animation,Action,Fantasy|anime,supernatural,shonen|MBS
+Haikyu!!|2014|T|Animation,Sports,Comedy|anime,volleyball,school|MBS
+Death Note|2006|T|Animation,Thriller,Mystery|anime,detective,supernatural|Nippon TV
+My Hero Academia|2016|T|Animation,Action|anime,superhero,school,shonen|Nippon TV
+Hunter x Hunter|2011|T|Animation,Action,Adventure|anime,shonen|Nippon TV
+Frieren: Beyond Journey's End|2023|T|Animation,Fantasy,Adventure|anime,quest,slow-burn|Nippon TV
+Cowboy Bebop|1998|T|Animation,Sci-Fi,Action|anime,space,noir|TV Tokyo
+Neon Genesis Evangelion|1995|T|Animation,Sci-Fi,Drama|anime,mecha,psychological|TV Tokyo
+Naruto|2002|T|Animation,Action,Adventure|anime,ninja,shonen|TV Tokyo
+Spy x Family|2022|T|Animation,Comedy,Action|anime,spy,family|TV Tokyo
+Chainsaw Man|2022|T|Animation,Action,Horror|anime,demons|TV Tokyo
+One Piece|1999|T|Animation,Adventure,Action|anime,pirates,shonen|Fuji TV
+Dragon Ball Z|1989|T|Animation,Action|anime,martial-arts,shonen|Fuji TV
+Demon Slayer|2019|T|Animation,Action,Fantasy|anime,demons,shonen|Tokyo MX
+Mob Psycho 100|2016|T|Animation,Action,Comedy|anime,supernatural|Tokyo MX
+Steins;Gate|2011|T|Animation,Sci-Fi,Thriller|anime,time-travel|Tokyo MX
+Vinland Saga|2019|T|Animation,Action,Drama|anime,vikings,revenge|NHK
+Crash Landing on You|2019|T|Romance,Comedy,Drama|korean,k-drama|tvN
+Reply 1988|2015|T|Comedy,Drama|korean,k-drama,family,80s|tvN
+Extraordinary Attorney Woo|2022|T|Drama,Comedy|korean,k-drama,legal|ENA
+Borgen|2010|T|Drama|politics,danish|DR1
+Babylon Berlin|2017|T|Crime,Drama|german,period,noir|Sky
+Gomorrah|2014|T|Crime,Drama|italian,mob|Sky Italia
+Call My Agent!|2015|T|Comedy|french,workplace,celebrity|France 2
+RuPaul's Drag Race|2009|T|Reality|competition,drag|VH1
+The Bachelor|2002|T|Reality|dating|ABC
+Shark Tank|2009|T|Reality|business,startup|ABC
+Top Chef|2006|T|Reality|cooking,competition|Bravo
+The Real Housewives of Beverly Hills|2010|T|Reality|wealth|Bravo
+Vanderpump Rules|2013|T|Reality|restaurant|Bravo
+The Last Dance|2020|T|Documentary,Sports|basketball,true-story|ESPN
+Anthony Bourdain: Parts Unknown|2013|T|Documentary|cooking,travel|CNN
