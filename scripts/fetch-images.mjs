@@ -104,14 +104,30 @@ async function imageFor(page) {
   return infoboxImage(page);
 }
 
+// Titles imported from Wikidata already know their exact article.
+const WIKI = new Map();
+try {
+  for (const w of JSON.parse(readFileSync(join(root, 'data/wikidata.json'), 'utf8'))) WIKI.set(w.id, w.wiki);
+} catch { /* no Wikidata import yet */ }
+
 const todo = catalog.filter((t) => !images[t.id]);
 console.log(`${todo.length} of ${catalog.length} titles need an image`);
-
-// Pass 1: guess article titles, look them all up in batches of 50.
-const resolve = await lookup([...new Set(todo.flatMap(candidates))]);
 const found = new Map();
+
+// Pass 0: known articles.
+const known = todo.filter((t) => WIKI.has(t.id));
+const resolveKnown = await lookup(known.map((t) => WIKI.get(t.id)));
+for (const t of known) {
+  const page = resolveKnown(WIKI.get(t.id));
+  if (page && !page.missing && !page.invalid) found.set(t.id, page);
+}
+console.log(`found ${found.size} of ${known.length} known articles`);
+
+// Pass 1: guess article titles for the rest, look them all up in batches of 50.
+const guess = todo.filter((t) => !WIKI.has(t.id));
+const resolve = await lookup([...new Set(guess.flatMap(candidates))]);
 const missing = [];
-for (const t of todo) {
+for (const t of guess) {
   const cands = candidates(t);
   const page = cands.map((c, i) => [resolve(c), i < cands.length - 1]).find(([p, specific]) => fits(t, p, specific))?.[0];
   if (page) found.set(t.id, page);
@@ -133,20 +149,26 @@ for (const t of missing) {
   if (page) found.set(t.id, page);
 }
 
+// Most pages already came back with a thumbnail; the rest need a couple of requests each,
+// so run a few at a time.
 let done = 0;
-for (const [id, page] of found) {
-  try {
-    const img = await imageFor(page);
-    if (img) images[id] = img;
-  } catch (e) {
-    console.warn(`  ${id}: ${e.message}`);
+const queue = [...found];
+await Promise.all(Array.from({ length: 4 }, async () => {
+  for (let next = queue.shift(); next; next = queue.shift()) {
+    const [id, page] = next;
+    try {
+      const img = await imageFor(page);
+      if (img) images[id] = img;
+    } catch (e) {
+      console.warn(`  ${id}: ${e.message}`);
+    }
+    if (++done % 500 === 0) console.log(`  images: ${done}/${found.size}`);
   }
-  if (++done % 100 === 0) console.log(`  images: ${done}/${found.size}`);
-}
+}));
 
 // Keep only ids that still exist, in catalog order, one per line.
 const ids = catalog.map((t) => t.id).filter((id) => images[id]);
 writeFileSync(OUT, '{\n' + ids.map((id) => `${JSON.stringify(id)}:${JSON.stringify(images[id])}`).join(',\n') + '\n}\n');
 const without = catalog.filter((t) => !images[t.id]);
 console.log(`Wrote ${ids.length}/${catalog.length} images. Without one: ${without.length}`);
-if (without.length) console.log(without.map((t) => `  ${t.title} (${t.year})`).join('\n'));
+if (without.length && without.length <= 50) console.log(without.map((t) => `  ${t.title} (${t.year})`).join('\n'));

@@ -1,4 +1,5 @@
-// Compiles data/catalog.txt into src/data/catalog.json.
+// Compiles data/catalog.txt (hand-written) plus data/wikidata.json (from `npm run wikidata`)
+// into src/data/catalog.json. Hand-written entries win when both have the same title.
 import { readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -66,9 +67,56 @@ if (errors) {
   console.error(`${errors} error(s); catalog not written.`);
   process.exit(1);
 }
+const curated = out.length;
+
+// ---- Wikidata titles ----
+// Themes that are too clinical or too vague to show as a taste-map bubble.
+const DROP_THEME = new Set([
+  'incest', 'rape and revenge', 'prostitution', 'human pregnancy', 'erotic', 'erotic thriller', 'suicide', 'girls with guns',
+  'hood', 'arthouse science', 'live-action/animated', 'flashback', 'youth', 'love', 'romantic love', 'human', 'film',
+  'television', 'death', 'sexuality', 'human sexuality', 'violence', 'pornographic', 'sexploitation', 'nudity',
+]);
+const SAME_THEME = { 'police television drama': 'police procedural', 'satirical': 'satire', 'espionage': 'spy', 'female buddy': 'buddy' };
+// Match networks to the short names the hand-written list uses.
+const SAME_CREATOR = {
+  'American Broadcasting Company': 'ABC', 'Fox Broadcasting Company': 'Fox', 'Seoul Broadcasting System': 'SBS', 'SBS TV': 'SBS',
+  'Munhwa Broadcasting Corporation': 'MBC', 'MBC TV': 'MBC', 'Korean Broadcasting System': 'KBS', 'KBS 2TV': 'KBS2',
+  'Amazon Prime Video': 'Prime Video', 'Apple TV': 'Apple TV+', 'Fuji Television': 'Fuji TV', 'Nippon Television': 'Nippon TV',
+  'USA Network': 'USA', 'broadcast syndication': 'Syndication', 'British Broadcasting Corporation': 'BBC', 'BBC One': 'BBC',
+  'CBC Television': 'CBC', 'NHK General TV': 'NHK', 'CTV Television Network': 'CTV', 'HBO Max': 'Max', 'ITV1': 'ITV',
+};
+
+const key = (t) => `${t.type}:${slug(t.title)}`;
+const byTitle = new Map();
+for (const t of out) {
+  if (!byTitle.has(key(t))) byTitle.set(key(t), []);
+  byTitle.get(key(t)).push(t.year);
+}
+let wd = [];
+try {
+  wd = JSON.parse(readFileSync(join(root, 'data/wikidata.json'), 'utf8'));
+} catch {
+  console.log('No data/wikidata.json yet: run `npm run wikidata` to add thousands more titles.');
+}
+for (const w of wd) {
+  if (w.year > new Date().getFullYear()) continue; // announced, not out yet
+  // Shows are often dated by their pilot on Wikidata (Columbo: 1968 vs 1971), so allow more slack.
+  if ((byTitle.get(key(w)) ?? []).some((y) => Math.abs(y - w.year) <= (w.type === 'tv' ? 3 : 1))) continue;
+  if (ids.has(w.id)) continue;
+  ids.add(w.id);
+  out.push({
+    id: w.id,
+    title: w.title,
+    year: w.year,
+    type: w.type,
+    genres: w.genres,
+    tags: [...new Set(w.tags.map((x) => SAME_THEME[x] ?? x).filter((x) => !DROP_THEME.has(x.toLowerCase())))],
+    creator: SAME_CREATOR[w.creator] ?? w.creator,
+  });
+}
 
 // One title per line keeps diffs readable without bloating the file.
 const json = '[\n' + out.map((t) => JSON.stringify(t)).join(',\n') + '\n]\n';
 writeFileSync(join(root, 'src/data/catalog.json'), json);
 const movies = out.filter((t) => t.type === 'movie').length;
-console.log(`Wrote ${out.length} titles (${movies} movies, ${out.length - movies} shows), ${(json.length / 1024).toFixed(1)} KB`);
+console.log(`Wrote ${out.length} titles (${curated} hand-written, ${out.length - curated} from Wikidata; ${movies} movies, ${out.length - movies} shows), ${(json.length / 1024).toFixed(1)} KB`);

@@ -1,15 +1,18 @@
 import { useState, type ChangeEvent } from 'react';
-import { GENRES } from '../lib/catalog';
+import { BY_ID, GENRES, metaLine } from '../lib/catalog';
 import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
 import { exploredCount } from '../lib/taste';
-import { CheckIcon, DownloadIcon, TrashIcon, UploadIcon, UserIcon, XIcon } from './Icons';
+import { CheckIcon, DownloadIcon, EyeSlashIcon, TrashIcon, UploadIcon, UserIcon, XIcon } from './Icons';
+import { Poster } from './Poster';
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
 type Pending = { kind: 'import'; data: Data; name: string } | { kind: 'reset' };
 
 export function ProfileSheet({ onClose }: { onClose: () => void }) {
-  const { data, ratings, replace } = useStore();
+  const { data, ratings, replace, toggleDismissed } = useStore();
+  const [allHidden, setAllHidden] = useState(false);
+  const hidden = [...data.dismissed].reverse().map((id) => BY_ID.get(id)).filter((t) => !!t);
   const [pending, setPending] = useState<Pending | null>(null);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
 
@@ -73,6 +76,35 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
         <div><strong>{data.watchlist.length}</strong><span>Watchlist</span></div>
         <div><strong>{explored}<small>/{GENRES.length}</small></strong><span>Genres</span></div>
       </div>
+
+      <h3 className="panel-label">Not interested</h3>
+      {hidden.length ? (
+        <>
+          <div className="list">
+            {(allHidden ? hidden : hidden.slice(0, 5)).map((t) => (
+              <div className="row hidden-row" key={t.id}>
+                <div className="row-main static">
+                  <Poster t={t} size="sm" />
+                  <span className="row-text">
+                    <span className="row-title">{t.title}</span>
+                    <span className="row-sub">{metaLine(t)}</span>
+                  </span>
+                </div>
+                <span className="row-actions">
+                  <button className="secondary-btn small" onClick={() => toggleDismissed(t.id)}>Show again</button>
+                </span>
+              </div>
+            ))}
+          </div>
+          {hidden.length > 5 && (
+            <button className="text-btn subtle center" onClick={() => setAllHidden((v) => !v)}>
+              {allHidden ? 'Show fewer' : `Show all ${hidden.length}`}
+            </button>
+          )}
+        </>
+      ) : (
+        <p className="hint empty-hint"><EyeSlashIcon size={15} /> Titles you mark “Not interested” show up here, so you can bring them back.</p>
+      )}
 
       <h3 className="panel-label">Data</h3>
       <div className="list settings">

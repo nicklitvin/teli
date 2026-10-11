@@ -80,7 +80,14 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
           )}
         </div>
         {!r && (
-          <button className="text-btn subtle" onClick={() => toggleDismissed(id)}>
+          <button className="text-btn subtle" onClick={() => {
+            toggleDismissed(id);
+            if (dismissed) return;
+            // Hiding a title means you're done with it: go back to wherever you came from.
+            nav.notify(`Hid ${t.title}`, () => toggleDismissed(id));
+            if (canGoBack) onBack();
+            else onClose();
+          }}>
             <EyeSlashIcon size={16} /> {dismissed ? 'Show in recommendations again' : 'Not interested'}
           </button>
         )}

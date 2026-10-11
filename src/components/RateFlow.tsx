@@ -3,7 +3,7 @@ import type { Sentiment } from '../types';
 import { BY_ID, metaLine } from '../lib/catalog';
 import { SENTIMENT_LABEL, maxComparisons } from '../lib/ranking';
 import { useStore } from '../lib/store';
-import { CheckIcon, MehIcon, ThumbIcon, UndoIcon, XIcon } from './Icons';
+import { MehIcon, ThumbIcon, UndoIcon, XIcon } from './Icons';
 import { Poster, ScoreBadge } from './Poster';
 
 interface Range {
@@ -124,7 +124,6 @@ export function RateFlow({ id, onClose }: { id: string; onClose: () => void }) {
 
       {step === 'done' && result && (
         <div className="rate-step done fade-in">
-          <div className="done-check"><CheckIcon size={18} /></div>
           <ScoreBadge rating={result} size="xl" className="pop-in" />
           <h2 className="rate-title">{t.title}</h2>
           <p className="rate-sub">#{result.rank} of {result.total} {noun} you've ranked</p>

@@ -97,18 +97,54 @@ export const POSITIONS: Map<string, { x: number; y: number }> = (() => {
   return new Map(GENRES.map((g, i) => [g, q[i]]));
 })();
 
-export interface GenreStat {
-  genre: string;
-  /** Your ranked titles in this genre, best first. */
+/** What the taste map groups your titles by. */
+export type Dimension = 'genres' | 'themes' | 'decades' | 'makers';
+
+export const decadeOf = (t: Title) => `${Math.floor(t.year / 10) * 10}s`;
+
+export function keysOf(dim: Dimension, t: Title): string[] {
+  if (dim === 'genres') return t.genres;
+  if (dim === 'themes') return t.tags;
+  if (dim === 'decades') return [decadeOf(t)];
+  return t.creator ? [t.creator] : [];
+}
+
+const COUNTS: Record<Dimension, Map<string, number>> = { genres: TOTAL, themes: new Map(), decades: new Map(), makers: new Map() };
+for (const t of CATALOG) {
+  for (const dim of ['themes', 'decades', 'makers'] as const) {
+    for (const k of keysOf(dim, t)) COUNTS[dim].set(k, (COUNTS[dim].get(k) ?? 0) + 1);
+  }
+}
+
+/**
+ * The groups worth exploring in each dimension: every genre, every decade with a real
+ * selection, and the themes and directors/networks that come up most in the library.
+ */
+export const UNIVERSE: Record<Dimension, string[]> = {
+  genres: GENRES,
+  decades: [...COUNTS.decades.entries()].filter(([, n]) => n >= 15).map(([k]) => k).sort(),
+  themes: [...COUNTS.themes.entries()].filter(([, n]) => n >= 40).sort((a, b) => b[1] - a[1]).map(([k]) => k),
+  makers: [...COUNTS.makers.entries()].filter(([, n]) => n >= 12).sort((a, b) => b[1] - a[1]).map(([k]) => k),
+};
+
+export interface GroupStat {
+  name: string;
+  /** Your ranked titles in this group, best first. */
   rated: Rating[];
   avg: number;
-  /** Titles in the catalog with this genre. */
+  /** Titles in the catalog in this group. */
   catalog: number;
 }
 
-export function genreStats(ratings: Map<string, Rating>): Map<string, GenreStat> {
-  const m = new Map<string, GenreStat>(GENRES.map((g) => [g, { genre: g, rated: [], avg: 0, catalog: TOTAL.get(g) ?? 0 }]));
-  for (const r of ratings.values()) for (const g of BY_ID.get(r.id)!.genres) m.get(g)?.rated.push(r);
+export function groupStats(dim: Dimension, ratings: Map<string, Rating>): Map<string, GroupStat> {
+  const m = new Map<string, GroupStat>();
+  const get = (k: string) => {
+    let s = m.get(k);
+    if (!s) m.set(k, (s = { name: k, rated: [], avg: 0, catalog: COUNTS[dim].get(k) ?? 0 }));
+    return s;
+  };
+  for (const k of UNIVERSE[dim]) get(k);
+  for (const r of ratings.values()) for (const k of keysOf(dim, BY_ID.get(r.id)!)) get(k).rated.push(r);
   for (const s of m.values()) {
     s.rated.sort((a, b) => b.score - a.score);
     s.avg = s.rated.length ? s.rated.reduce((n, r) => n + r.score, 0) / s.rated.length : 0;
@@ -119,18 +155,24 @@ export function genreStats(ratings: Map<string, Rating>): Map<string, GenreStat>
 export const exploredCount = (ratings: Map<string, Rating>) =>
   new Set([...ratings.keys()].flatMap((id) => BY_ID.get(id)!.genres)).size;
 
-export interface Bubble { genre: string; x: number; y: number; r: number }
+export interface Bubble { name: string; x: number; y: number; r: number }
 
 /**
- * Packs genre bubbles into a tight cluster. Each starts at its spot on the catalog map, so related
- * genres end up side by side, then gravity pulls everything in while collisions keep bubbles apart.
+ * Packs bubbles into a tight cluster. Genres start at their spot on the catalog map, so related
+ * genres end up side by side; anything else starts on a spiral, biggest in the middle. Then gravity
+ * pulls everything in while collisions keep bubbles apart.
  */
-export function bubbleLayout(sizes: { genre: string; r: number }[]): { bubbles: Bubble[]; box: [number, number, number, number] } {
-  const nodes = sizes.map(({ genre, r }) => {
-    const p = POSITIONS.get(genre)!;
-    return { genre, r, x: (p.x - MAP_W / 2) * 0.8, y: (p.y - MAP_H / 2) * 0.8 };
+export function bubbleLayout(sizes: { name: string; r: number }[]): { bubbles: Bubble[]; box: [number, number, number, number] } {
+  if (!sizes.length) return { bubbles: [], box: [0, 0, 0, 0] };
+  const order = [...sizes].sort((a, b) => b.r - a.r).map((s) => s.name);
+  const nodes = sizes.map(({ name, r }) => {
+    const p = POSITIONS.get(name);
+    if (p) return { name, r, x: (p.x - MAP_W / 2) * 0.8, y: (p.y - MAP_H / 2) * 0.8 };
+    const i = order.indexOf(name);
+    const a = i * 2.39996; // golden angle
+    return { name, r, x: Math.cos(a) * 30 * Math.sqrt(i + 0.5), y: Math.sin(a) * 30 * Math.sqrt(i + 0.5) };
   });
-  const idx = new Map(nodes.map((n, i) => [n.genre, i]));
+  const idx = new Map(nodes.map((n, i) => [n.name, i]));
   const links = EDGES.filter((e) => idx.has(e.a) && idx.has(e.b));
   const GAP = 5;
   const steps = 360;
@@ -176,22 +218,4 @@ export function bubbleLayout(sizes: { genre: string; r: number }[]): { bubbles: 
   return { bubbles: nodes, box: [x0, y0, x1 - x0, y1 - y0] };
 }
 
-/** Unexplored genres ranked by how close they sit to what you already watch, with the reason why. */
-export function nextGenres(stats: Map<string, GenreStat>): { genre: string; via: string[] }[] {
-  const out: { genre: string; via: string[]; score: number }[] = [];
-  for (const s of stats.values()) {
-    if (s.rated.length) continue;
-    const links = EDGES
-      .filter((e) => e.a === s.genre || e.b === s.genre)
-      .map((e) => {
-        const other = e.a === s.genre ? e.b : e.a;
-        return { other, v: e.w * Math.sqrt(stats.get(other)!.rated.length) };
-      })
-      .filter((l) => l.v > 0)
-      .sort((a, b) => b.v - a.v);
-    out.push({ genre: s.genre, via: links.slice(0, 2).map((l) => l.other), score: links.reduce((n, l) => n + l.v, 0) });
-  }
-  return out.sort((a, b) => b.score - a.score);
-}
-
-export const genreTitles = (g: string): Title[] => CATALOG.filter((t) => t.genres.includes(g));
+export const groupTitles = (dim: Dimension, k: string): Title[] => CATALOG.filter((t) => keysOf(dim, t).includes(k));

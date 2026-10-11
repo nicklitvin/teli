@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DetailSheet } from './components/DetailSheet';
 import { ListIcon, MapIcon, SearchIcon, SparklesIcon, UsersIcon } from './components/Icons';
 import { ProfileSheet } from './components/ProfileSheet';
@@ -33,6 +33,13 @@ export default function App() {
   const [rate, setRate] = useState<{ id: string; key: number } | null>(null);
   const [rateOpen, setRateOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
+  const [toast, setToast] = useState<{ text: string; undo?: () => void; key: number } | null>(null);
+
+  useEffect(() => {
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4500);
+    return () => clearTimeout(t);
+  }, [toast]);
 
   const nav = useMemo<Nav>(() => ({
     openDetail(id) {
@@ -46,6 +53,9 @@ export default function App() {
     },
     openProfile() {
       setProfileOpen(true);
+    },
+    notify(text, undo) {
+      setToast({ text, undo, key: Date.now() });
     },
   }), []);
 
@@ -94,6 +104,12 @@ export default function App() {
       <Sheet open={rateOpen} onClose={closeRate} z={60} label="Rate title">
         {rate && <RateFlow key={rate.key} id={rate.id} onClose={closeRate} />}
       </Sheet>
+      {toast && (
+        <div className="toast" key={toast.key} role="status">
+          <span>{toast.text}</span>
+          {toast.undo && <button onClick={() => { toast.undo!(); setToast(null); }}>Undo</button>}
+        </div>
+      )}
     </NavCtx.Provider>
   );
 }
