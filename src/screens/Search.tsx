@@ -3,7 +3,8 @@ import type { MediaType } from '../types';
 import { GENRES, GENRE_COLORS } from '../lib/catalog';
 import { search } from '../lib/search';
 import { useStore } from '../lib/store';
-import { SearchIcon, XIcon } from '../components/Icons';
+import { useNav } from '../nav';
+import { BookmarkIcon, SearchIcon, XIcon } from '../components/Icons';
 import { Empty, Screen, Segmented, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
@@ -15,6 +16,7 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
   const [focused, setFocused] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const { data, toggleWatchlist, ratings } = useStore();
+  const nav = useNav();
 
   // Focus the field when another screen sends the user here.
   useEffect(() => {
@@ -75,13 +77,14 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
                 const saved = data.watchlist.includes(t.id);
                 return (
                   <TitleRow key={t.id} t={t}
-                    accessory={ratings.has(t.id) ? undefined : (
-                      <span role="button" tabIndex={0} className={`add-btn ${saved ? 'on' : ''}`}
-                        aria-label={saved ? 'Remove from watchlist' : 'Add to watchlist'}
-                        onClick={(e) => { e.stopPropagation(); toggleWatchlist(t.id); }}
-                        onKeyDown={(e) => { if (e.key === 'Enter') { e.stopPropagation(); toggleWatchlist(t.id); } }}>
-                        {saved ? '✓' : '+'}
-                      </span>
+                    actions={ratings.has(t.id) ? undefined : (
+                      <>
+                        <button className={`icon-btn bookmark ${saved ? 'on' : ''}`} onClick={() => toggleWatchlist(t.id)}
+                          aria-label={saved ? 'Remove from watchlist' : 'Save to watchlist'} aria-pressed={saved}>
+                          <BookmarkIcon size={17} filled={saved} />
+                        </button>
+                        <button className="rate-btn" onClick={() => nav.openRate(t.id)}>Rate</button>
+                      </>
                     )} />
                 );
               })}

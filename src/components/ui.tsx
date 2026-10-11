@@ -3,24 +3,21 @@ import type { Title } from '../types';
 import { metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { ChevronRight } from './Icons';
+import { ChevronRight, UserIcon } from './Icons';
 import { Poster, ScoreBadge } from './Poster';
 
-/** A tab's scroll container with an iOS large title that collapses into the nav bar. */
-export function Screen({ title, active, children, trailing }: {
-  title: string;
-  active: boolean;
-  children: ReactNode;
-  trailing?: ReactNode;
-}) {
-  const [compact, setCompact] = useState(false);
+/** A tab's scroll container with a compact top bar; the avatar opens profile & settings. */
+export function Screen({ title, active, children }: { title: string; active: boolean; children: ReactNode }) {
+  const nav = useNav();
+  const [scrolled, setScrolled] = useState(false);
   return (
-    <div className="screen" hidden={!active} onScroll={(e) => setCompact(e.currentTarget.scrollTop > 36)}>
-      <header className={`navbar ${compact ? 'compact' : ''}`}>
-        <span className="navbar-title">{title}</span>
-        {trailing && <span className="navbar-trailing">{trailing}</span>}
+    <div className="screen" hidden={!active} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 2)}>
+      <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
+        <h1>{title}</h1>
+        <button className="avatar" onClick={nav.openProfile} aria-label="Profile and settings">
+          <UserIcon size={17} />
+        </button>
       </header>
-      <h1 className="large-title">{title}</h1>
       {children}
     </div>
   );
@@ -57,25 +54,30 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
   );
 }
 
-export function TitleRow({ t, rank, detail, accessory }: {
+/** `accessory` sits inside the tap target; `actions` are separate buttons at the end of the row. */
+export function TitleRow({ t, rank, detail, accessory, actions }: {
   t: Title;
   rank?: number;
   detail?: ReactNode;
   accessory?: ReactNode;
+  actions?: ReactNode;
 }) {
   const { ratings } = useStore();
   const nav = useNav();
   const r = ratings.get(t.id);
   return (
-    <button className="row" onClick={() => nav.openDetail(t.id)}>
-      {rank !== undefined && <span className="row-rank">{rank}</span>}
-      <Poster t={t} size="sm" />
-      <span className="row-text">
-        <span className="row-title">{t.title}</span>
-        <span className="row-sub">{detail ?? metaLine(t)}</span>
-      </span>
-      {accessory ?? (r ? <ScoreBadge rating={r} /> : <ChevronRight size={18} className="row-chevron" />)}
-    </button>
+    <div className="row">
+      <button className="row-main" onClick={() => nav.openDetail(t.id)}>
+        {rank !== undefined && <span className="row-rank">{rank}</span>}
+        <Poster t={t} size="sm" />
+        <span className="row-text">
+          <span className="row-title">{t.title}</span>
+          <span className="row-sub">{detail ?? metaLine(t)}</span>
+        </span>
+        {accessory ?? (r ? <ScoreBadge rating={r} /> : !actions && <ChevronRight size={16} className="row-chevron" />)}
+      </button>
+      {actions && <span className="row-actions">{actions}</span>}
+    </div>
   );
 }
 

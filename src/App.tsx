@@ -1,18 +1,23 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { DetailSheet } from './components/DetailSheet';
-import { ListIcon, SearchIcon, SparklesIcon } from './components/Icons';
+import { ListIcon, MapIcon, SearchIcon, SparklesIcon, UsersIcon } from './components/Icons';
+import { ProfileSheet } from './components/ProfileSheet';
 import { RateFlow } from './components/RateFlow';
 import { Sheet } from './components/Sheet';
 import { NavCtx, type Nav } from './nav';
 import { ForYou } from './screens/ForYou';
 import { MyList } from './screens/MyList';
 import { Search } from './screens/Search';
+import { TasteMap } from './screens/TasteMap';
+import { Together } from './screens/Together';
 
-type Tab = 'foryou' | 'search' | 'list';
+type Tab = 'foryou' | 'search' | 'map' | 'together' | 'list';
 
 const TABS: { id: Tab; label: string; Icon: typeof SearchIcon }[] = [
   { id: 'foryou', label: 'For You', Icon: SparklesIcon },
   { id: 'search', label: 'Search', Icon: SearchIcon },
+  { id: 'map', label: 'Taste Map', Icon: MapIcon },
+  { id: 'together', label: 'Together', Icon: UsersIcon },
   { id: 'list', label: 'My List', Icon: ListIcon },
 ];
 
@@ -27,6 +32,7 @@ export default function App() {
 
   const [rate, setRate] = useState<{ id: string; key: number } | null>(null);
   const [rateOpen, setRateOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
 
   const nav = useMemo<Nav>(() => ({
     openDetail(id) {
@@ -38,6 +44,9 @@ export default function App() {
       setRate({ id, key: Date.now() });
       setRateOpen(true);
     },
+    openProfile() {
+      setProfileOpen(true);
+    },
   }), []);
 
   const closeDetail = useCallback(() => {
@@ -45,6 +54,7 @@ export default function App() {
     setDetailOpen(false);
   }, []);
   const closeRate = useCallback(() => setRateOpen(false), []);
+  const closeProfile = useCallback(() => setProfileOpen(false), []);
 
   const goSearch = () => {
     setTab('search');
@@ -58,12 +68,14 @@ export default function App() {
       <div className="app">
         <ForYou active={tab === 'foryou'} onSearch={goSearch} />
         <Search active={tab === 'search'} focusKey={searchFocus} />
+        <TasteMap active={tab === 'map'} />
+        <Together active={tab === 'together'} />
         <MyList active={tab === 'list'} onSearch={goSearch} />
 
         <nav className="tabbar">
           {TABS.map(({ id, label, Icon }) => (
             <button key={id} className={tab === id ? 'on' : ''} onClick={() => setTab(id)} aria-current={tab === id}>
-              <Icon size={25} />
+              <Icon size={22} />
               <span>{label}</span>
             </button>
           ))}
@@ -75,6 +87,9 @@ export default function App() {
           <DetailSheet id={current} canGoBack={stack.length > 1}
             onBack={() => setStack((s) => s.slice(0, -1))} onClose={closeDetail} />
         )}
+      </Sheet>
+      <Sheet open={profileOpen} onClose={closeProfile} z={50} label="Profile and settings">
+        <ProfileSheet onClose={closeProfile} />
       </Sheet>
       <Sheet open={rateOpen} onClose={closeRate} z={60} label="Rate title">
         {rate && <RateFlow key={rate.key} id={rate.id} onClose={closeRate} />}

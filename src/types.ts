@@ -10,6 +10,8 @@ export interface Title {
   tags: string[];
   /** Director for movies, network for shows. */
   creator: string;
+  /** Wikipedia lead image: [url, width, height]. */
+  image?: [string, number, number];
 }
 
 export interface Rating {

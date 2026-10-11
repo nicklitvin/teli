@@ -45,6 +45,18 @@ export function sanitize(x: unknown): Data {
   return d;
 }
 
+export const rankedCount = (d: Data) =>
+  TYPES.reduce((n, type) => n + SENTIMENTS.reduce((m, s) => m + d.ranks[type][s].length, 0), 0);
+
+/** Parses an exported backup file; throws if it isn't one or holds nothing we recognize. */
+export function parseBackup(text: string): Data {
+  const parsed: unknown = JSON.parse(text);
+  if (!parsed || typeof parsed !== 'object' || !('ranks' in parsed)) throw new Error('not a backup');
+  const d = sanitize(parsed);
+  if (!rankedCount(d) && !d.watchlist.length) throw new Error('empty backup');
+  return d;
+}
+
 function load(): Data {
   try {
     const s = localStorage.getItem(KEY);

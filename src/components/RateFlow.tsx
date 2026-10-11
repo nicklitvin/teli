@@ -74,9 +74,9 @@ export function RateFlow({ id, onClose }: { id: string; onClose: () => void }) {
     <div className="rate">
       <div className="sheet-toolbar">
         {step === 'compare' ? (
-          <button className="toolbar-btn" onClick={undo}><UndoIcon size={18} /> Back</button>
+          <button className="toolbar-btn" onClick={undo}><UndoIcon size={16} /> Back</button>
         ) : <span />}
-        <button className="icon-btn" onClick={onClose} aria-label="Close"><XIcon size={18} /></button>
+        <button className="icon-btn" onClick={onClose} aria-label="Close"><XIcon size={16} /></button>
       </div>
 
       {step === 'react' && (
@@ -89,7 +89,7 @@ export function RateFlow({ id, onClose }: { id: string; onClose: () => void }) {
             {(['liked', 'fine', 'disliked'] as Sentiment[]).map((s) => (
               <button key={s} className={`react react-${s} ${previous?.sentiment === s ? 'prev' : ''}`} onClick={() => react(s)}>
                 <span className="react-circle">
-                  {s === 'liked' ? <ThumbIcon size={30} /> : s === 'fine' ? <MehIcon size={30} /> : <ThumbIcon size={30} down />}
+                  {s === 'liked' ? <ThumbIcon size={24} /> : s === 'fine' ? <MehIcon size={24} /> : <ThumbIcon size={24} down />}
                 </span>
                 <span className="react-label">{SENTIMENT_LABEL[s]}</span>
               </button>
@@ -124,7 +124,7 @@ export function RateFlow({ id, onClose }: { id: string; onClose: () => void }) {
 
       {step === 'done' && result && (
         <div className="rate-step done fade-in">
-          <div className="done-check"><CheckIcon size={22} /></div>
+          <div className="done-check"><CheckIcon size={18} /></div>
           <ScoreBadge rating={result} size="xl" className="pop-in" />
           <h2 className="rate-title">{t.title}</h2>
           <p className="rate-sub">#{result.rank} of {result.total} {noun} you've ranked</p>

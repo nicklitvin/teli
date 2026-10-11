@@ -1,4 +1,4 @@
-import type { CSSProperties } from 'react';
+import { useState, type CSSProperties } from 'react';
 import type { Rating, Title } from '../types';
 
 function hash(s: string) {
@@ -43,9 +43,21 @@ interface PosterProps {
   style?: CSSProperties;
 }
 
+/** Image URLs that failed this session (offline, removed upstream), so we don't retry them every render. */
+const BROKEN = new Set<string>();
+
+/** The Wikipedia image when there is one, drawn over generated art that doubles as placeholder and fallback. */
 export function Poster({ t, size = 'md', rating, className = '', style }: PosterProps) {
   const art = posterArt(t);
   const tiny = size === 'xs' || size === 'sm';
+  const [, setBroken] = useState(0);
+  const img = t.image && !BROKEN.has(t.image[0]) ? t.image : null;
+  // Title cards and logos are landscape: show them whole over a blurred copy instead of cropping.
+  const wide = !!img && img[1] / img[2] > 0.85;
+  const onError = () => {
+    BROKEN.add(img![0]);
+    setBroken((n) => n + 1);
+  };
   return (
     <div className={`poster poster-${size} font-${art.font} align-${art.align} ${className}`}
       style={{ background: art.background, ['--fit' as string]: art.fit, ...style }} aria-hidden="true">
@@ -53,6 +65,11 @@ export function Poster({ t, size = 'md', rating, className = '', style }: Poster
         <span className="poster-initials">{initials(t.title)}</span>
       ) : (
         <span className="poster-title">{t.title}</span>
+      )}
+      {img && wide && <img className="poster-img blur" src={img[0]} alt="" loading="lazy" decoding="async" />}
+      {img && (
+        <img key={img[0]} className={`poster-img ${wide ? 'contain' : ''}`} src={img[0]} alt="" loading="lazy" decoding="async"
+          onLoad={(e) => e.currentTarget.classList.add('loaded')} onError={onError} />
       )}
       {!tiny && t.type === 'tv' && <span className="poster-tag">TV</span>}
       {rating && !tiny && <ScoreBadge rating={rating} size="sm" className="poster-score" />}

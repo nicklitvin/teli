@@ -60,3 +60,20 @@ export const ThumbIcon = ({ down, ...p }: P & { down?: boolean }) => (
 export const MehIcon = (p: P) => (
   <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M8 15h8" /><circle cx="9" cy="10" r=".8" fill="currentColor" /><circle cx="15" cy="10" r=".8" fill="currentColor" /></Svg>
 );
+export const MapIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M7.5 7.5l3 8M9 6h6.5M16.5 8l-2.5 7.5" />
+    <circle cx="6" cy="6" r="2.5" /><circle cx="18" cy="6.5" r="2" /><circle cx="12" cy="18" r="3" />
+  </Svg>
+);
+export const UserIcon = (p: P) => (
+  <Svg {...p}><circle cx="12" cy="8.5" r="3.5" /><path d="M5 20a7 7 0 0114 0" /></Svg>
+);
+export const DownloadIcon = (p: P) => <Svg {...p}><path d="M12 4v11M7 10.5l5 5 5-5M5 20h14" /></Svg>;
+export const UploadIcon = (p: P) => <Svg {...p}><path d="M12 15.5V4M7 9l5-5 5 5M5 20h14" /></Svg>;
+export const UsersIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="9" cy="8.5" r="3.2" /><path d="M3 19.5a6 6 0 0112 0" />
+    <path d="M15.5 5.6a3.2 3.2 0 010 5.8M17.5 14a6 6 0 013.5 5.5" />
+  </Svg>
+);

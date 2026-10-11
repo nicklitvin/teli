@@ -11,10 +11,13 @@ The score comes from where the title lands. Each reaction has its own band (like
 ## Features
 
 - **For You**: content-based recommendations from everything you've ranked, with a match % and a "because you liked X" reason for each pick.
-- **Search**: finds titles by name, director or network, genre, tag, year or acronym (`lotr`, `gotg`). You can also browse by genre.
-- **My List**: your ranked list with scores, plus a watchlist. Export, import and reset live here.
-- iOS-style UI: large titles, blurred bars, bottom sheets you can drag to dismiss, segmented controls. Supports dark mode and safe areas.
-- Fully offline. There are no external APIs, and your data is kept in `localStorage`.
+- **Search**: finds titles by name, director or network, genre, tag, year or acronym (`lotr`, `gotg`). You can also browse by genre. Each result has separate **Save** (watchlist) and **Rate** buttons.
+- **Taste Map**: a graph of all 21 genres. Genres that often go together sit close to each other, node size shows how much you've ranked in each, and lines show genres you've watched together. Tap a genre to see your top titles, picks to go deeper, and your blind spots.
+- **Together**: load other people's backup files to get picks that nobody in the group has ranked, with toggles to filter by genre.
+- **My List**: your ranked list with scores, plus a watchlist.
+- **Profile** (the avatar, top right): stats, plus export, import and reset.
+- Figma-inspired UI: Inter, flat surfaces with 1px borders, blue selection, and a dotted canvas. Supports dark mode and safe areas.
+- No API calls at runtime, and your data is kept in `localStorage`. Poster images load from Wikimedia; when they can't load (for example offline), you see generated art instead.
 
 ## Run
 
@@ -33,6 +36,12 @@ Title|Year|M or T|Genre,Genre|tag,tag|Director or Network
 ```
 
 After you edit it, run `npm run catalog` to regenerate `src/data/catalog.json`. The script validates genres and rejects duplicate titles. The current catalog has about 930 titles and takes up about 155 KB.
+
+Then run `npm run images` to find images for any new titles. It looks up each title's Wikipedia article, checks the article's short description to confirm it's the right film or series and year, and stores the article's lead image URL (usually the poster or title card) in `src/data/images.json`. This step needs network access, but the app itself makes no API calls. Use `npm run images -- --all` to look up every title again. Currently 919 of 926 titles have an image.
+
+## Watching together
+
+Everyone exports a backup from their profile and sends the file to one person, who adds the files on the Together tab. Titles that anyone has ranked or marked "Not interested" are left out. Each remaining title is scored with the normal recommender for each person. A title's group score is half the average of those scores and half the lowest one, so a pick that only one person loves won't win. Titles on someone's watchlist get a boost.
 
 ## How recommendations work
 

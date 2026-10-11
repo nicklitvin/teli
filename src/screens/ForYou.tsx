@@ -26,6 +26,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
     return (
       <Screen title="For You" active={active}>
         <div className="hero-card">
+          <div className="shapes" aria-hidden="true"><i /><i /><i /><i /></div>
           <h2>Rank what you watch.</h2>
           <p>No star ratings to agonize over. Tell us if you liked it, then pick between two titles a few times — Teli works out the score.</p>
           <ol className="steps">
@@ -33,7 +34,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
             <li><span>2</span>Liked it, fine, or didn't like it</li>
             <li><span>3</span>Compare it to your other picks</li>
           </ol>
-          <button className="secondary-btn" onClick={onSearch}><SearchIcon size={18} /> Search the library</button>
+          <button className="primary-btn" onClick={onSearch}><SearchIcon size={16} /> Search the library</button>
         </div>
         <SectionHeader title="Seen any of these?" subtitle="Tap one to rate it" />
         <div className="grid">
@@ -60,12 +61,6 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
 
   return (
     <Screen title="For You" active={active}>
-      {count < 5 && (
-        <div className="tip">
-          <strong>{5 - count} more to go.</strong> Rate a few more titles and your picks get much sharper.
-        </div>
-      )}
-
       {top.length > 0 && (
         <>
           <SectionHeader title="Top Picks" subtitle="Based on everything you've ranked" />
@@ -112,7 +107,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
           <button key={t.id} className="card card-md" onClick={() => nav.openRate(t.id)}>
             <Poster t={t} size="md" />
             <span className="card-title">{t.title}</span>
-            <span className="card-sub accent">+ Rate</span>
+            <span className="card-sub accent">Rate it</span>
           </button>
         ))}
       </Shelf>

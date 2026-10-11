@@ -1,7 +1,7 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import type { MediaType } from '../types';
 import { BY_ID } from '../lib/catalog';
-import { emptyData, sanitize, useStore } from '../lib/store';
+import { useStore } from '../lib/store';
 import { BookmarkIcon, ListIcon } from '../components/Icons';
 import { Empty, Screen, Segmented, TitleRow } from '../components/ui';
 
@@ -9,10 +9,9 @@ type View = 'ranked' | 'watchlist';
 type Filter = 'all' | MediaType;
 
 export function MyList({ active, onSearch }: { active: boolean; onSearch: () => void }) {
-  const { data, ratings, replace } = useStore();
+  const { data, ratings } = useStore();
   const [view, setView] = useState<View>('ranked');
   const [filter, setFilter] = useState<Filter>('all');
-  const file = useRef<HTMLInputElement>(null);
 
   const ranked = useMemo(
     () => [...ratings.values()]
@@ -23,22 +22,6 @@ export function MyList({ active, onSearch }: { active: boolean; onSearch: () => 
   const watch = data.watchlist.map((id) => BY_ID.get(id)!).filter((t) => filter === 'all' || t.type === filter);
   const movieCount = [...ratings.values()].filter((r) => r.type === 'movie').length;
   const avg = ranked.length ? ranked.reduce((s, r) => s + r.score, 0) / ranked.length : 0;
-
-  const exportData = () => {
-    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
-    const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
-    a.download = `teli-backup-${new Date().toISOString().slice(0, 10)}.json`;
-    a.click();
-    setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-  };
-  const importData = async (f: File) => {
-    try {
-      replace(sanitize(JSON.parse(await f.text())));
-    } catch {
-      alert("That file couldn't be read as a Teli backup.");
-    }
-  };
 
   return (
     <Screen title="My List" active={active}>
@@ -79,16 +62,6 @@ export function MyList({ active, onSearch }: { active: boolean; onSearch: () => 
         <Empty icon={<BookmarkIcon size={34} />} title="Your watchlist is empty"
           body="Save titles you want to watch from search or any title page." />
       )}
-
-      <div className="footer-actions">
-        <button className="text-btn" onClick={exportData}>Export data</button>
-        <button className="text-btn" onClick={() => file.current?.click()}>Import</button>
-        <button className="text-btn danger" onClick={() => {
-          if (confirm('Erase all rankings and your watchlist?')) replace(emptyData());
-        }}>Reset</button>
-        <input ref={file} type="file" accept="application/json,.json" hidden
-          onChange={(e) => { const f = e.target.files?.[0]; if (f) importData(f); e.target.value = ''; }} />
-      </div>
     </Screen>
   );
 }

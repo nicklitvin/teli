@@ -1,7 +1,9 @@
 import raw from '../data/catalog.json';
+import images from '../data/images.json';
 import type { Title } from '../types';
 
-export const CATALOG = raw as Title[];
+const IMAGES = images as unknown as Record<string, Title['image']>;
+export const CATALOG: Title[] = (raw as Title[]).map((t) => (IMAGES[t.id] ? { ...t, image: IMAGES[t.id] } : t));
 export const BY_ID = new Map(CATALOG.map((t) => [t.id, t]));
 /** Position in the catalog file — used as a weak popularity prior. */
 export const ORDER = new Map(CATALOG.map((t, i) => [t.id, i]));
@@ -13,11 +15,11 @@ export const GENRES: string[] = (() => {
 })();
 
 export const GENRE_COLORS: Record<string, string> = {
-  Action: '#FF3B30', Adventure: '#FF9500', Animation: '#FFCC00', Comedy: '#FF2D55',
-  Crime: '#5856D6', Documentary: '#8E8E93', Drama: '#007AFF', Family: '#34C759',
-  Fantasy: '#AF52DE', History: '#A2845E', Horror: '#1C1C1E', Music: '#FF6482',
-  Musical: '#E85D9A', Mystery: '#30B0C7', Reality: '#FF9F0A', Romance: '#FF375F',
-  'Sci-Fi': '#32ADE6', Sports: '#00C7BE', Thriller: '#3A3A8C', War: '#6E6E52', Western: '#C1803A',
+  Action: '#F24822', Adventure: '#FF8C1A', Animation: '#FFC700', Comedy: '#FF7262',
+  Crime: '#5551FF', Documentary: '#8C8C8C', Drama: '#0D99FF', Family: '#0ACF83',
+  Fantasy: '#A259FF', History: '#B07B4F', Horror: '#9B2148', Music: '#FF4FB8',
+  Musical: '#D96BE0', Mystery: '#1ABCFE', Reality: '#FFA629', Romance: '#FF5C8A',
+  'Sci-Fi': '#00B8A9', Sports: '#14AE5C', Thriller: '#4B3FB8', War: '#7A8A3A', Western: '#C9772F',
 };
 
 // Recognizable titles used to bootstrap a brand-new user's ratings.

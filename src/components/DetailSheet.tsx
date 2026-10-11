@@ -31,12 +31,14 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
   return (
     <div className="detail" key={id}>
       <div className="detail-hero" style={{ ['--hue' as string]: art.hue }}>
-        <div className="detail-hero-bg" style={{ background: art.background }} />
+        <div className="detail-hero-bg" style={{ background: art.background }}>
+          {t.image && <img src={t.image[0]} alt="" decoding="async" onError={(e) => e.currentTarget.remove()} />}
+        </div>
         <div className="sheet-toolbar over">
           {canGoBack ? (
-            <button className="icon-btn glass" onClick={onBack} aria-label="Back"><ChevronLeft size={20} /></button>
+            <button className="icon-btn glass" onClick={onBack} aria-label="Back"><ChevronLeft size={18} /></button>
           ) : <span />}
-          <button className="icon-btn glass" onClick={onClose} aria-label="Close"><XIcon size={18} /></button>
+          <button className="icon-btn glass" onClick={onClose} aria-label="Close"><XIcon size={16} /></button>
         </div>
         <div className="detail-head">
           <Poster t={t} size="xl" />
@@ -63,17 +65,17 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
         <div className="actions">
           {!r && (
             <button className="primary-btn" onClick={() => nav.openRate(id)}>
-              <StarIcon size={18} /> Rate it
+              <StarIcon size={16} /> Rate it
             </button>
           )}
           {!r && (
             <button className={`secondary-btn ${saved ? 'on' : ''}`} onClick={() => toggleWatchlist(id)}>
-              <BookmarkIcon size={18} filled={saved} /> {saved ? 'Saved' : 'Watchlist'}
+              <BookmarkIcon size={16} filled={saved} /> {saved ? 'Saved' : 'Watchlist'}
             </button>
           )}
           {r && (
             <button className="secondary-btn danger" onClick={() => unrate(id)}>
-              <TrashIcon size={18} /> Remove rating
+              <TrashIcon size={16} /> Remove rating
             </button>
           )}
         </div>
