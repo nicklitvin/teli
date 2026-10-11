@@ -116,22 +116,82 @@ export function genreStats(ratings: Map<string, Rating>): Map<string, GenreStat>
   return m;
 }
 
-/** Genre pairs you've watched together, e.g. Crime + Drama from Breaking Bad. */
-export function yourEdges(ratings: Map<string, Rating>): Map<string, number> {
-  const m = new Map<string, number>();
-  for (const id of ratings.keys()) {
-    const gs = BY_ID.get(id)!.genres;
-    gs.forEach((g, i) => gs.slice(i + 1).forEach((h) => m.set(pairKey(g, h), (m.get(pairKey(g, h)) ?? 0) + 1)));
-  }
-  return m;
-}
-
 export const exploredCount = (ratings: Map<string, Rating>) =>
   new Set([...ratings.keys()].flatMap((id) => BY_ID.get(id)!.genres)).size;
 
-/** Genres most often paired with `g`, strongest first. */
-export function neighbors(g: string, limit = 5): string[] {
-  return EDGES.filter((e) => e.a === g || e.b === g).slice(0, limit).map((e) => (e.a === g ? e.b : e.a));
+export interface Bubble { genre: string; x: number; y: number; r: number }
+
+/**
+ * Packs genre bubbles into a tight cluster. Each starts at its spot on the catalog map, so related
+ * genres end up side by side, then gravity pulls everything in while collisions keep bubbles apart.
+ */
+export function bubbleLayout(sizes: { genre: string; r: number }[]): { bubbles: Bubble[]; box: [number, number, number, number] } {
+  const nodes = sizes.map(({ genre, r }) => {
+    const p = POSITIONS.get(genre)!;
+    return { genre, r, x: (p.x - MAP_W / 2) * 0.8, y: (p.y - MAP_H / 2) * 0.8 };
+  });
+  const idx = new Map(nodes.map((n, i) => [n.genre, i]));
+  const links = EDGES.filter((e) => idx.has(e.a) && idx.has(e.b));
+  const GAP = 5;
+  const steps = 360;
+  for (let it = 0; it < steps; it++) {
+    const alpha = Math.max(0, 1 - it / (steps - 60)); // the last 60 steps only settle collisions
+    for (const n of nodes) {
+      n.x -= n.x * 0.05 * alpha;
+      n.y -= n.y * 0.07 * alpha; // squash vertically: the canvas is wider than tall
+    }
+    for (const e of links) {
+      const a = nodes[idx.get(e.a)!];
+      const b = nodes[idx.get(e.b)!];
+      const dx = b.x - a.x;
+      const dy = b.y - a.y;
+      const d = Math.max(Math.hypot(dx, dy), 0.1);
+      const k = ((d - a.r - b.r - GAP) / d) * 0.04 * e.w * alpha;
+      if (k <= 0) continue;
+      a.x += dx * k; a.y += dy * k;
+      b.x -= dx * k; b.y -= dy * k;
+    }
+    for (let pass = 0; pass < 3; pass++) {
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const a = nodes[i];
+          const b = nodes[j];
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const d = Math.max(Math.hypot(dx, dy), 0.1);
+          const overlap = a.r + b.r + GAP - d;
+          if (overlap <= 0) continue;
+          // The smaller bubble gives way more, so big genres stay near the middle.
+          const wa = b.r / (a.r + b.r);
+          a.x -= (dx / d) * overlap * wa; a.y -= (dy / d) * overlap * wa;
+          b.x += (dx / d) * overlap * (1 - wa); b.y += (dy / d) * overlap * (1 - wa);
+        }
+      }
+    }
+  }
+  const x0 = Math.min(...nodes.map((n) => n.x - n.r));
+  const x1 = Math.max(...nodes.map((n) => n.x + n.r));
+  const y0 = Math.min(...nodes.map((n) => n.y - n.r));
+  const y1 = Math.max(...nodes.map((n) => n.y + n.r));
+  return { bubbles: nodes, box: [x0, y0, x1 - x0, y1 - y0] };
+}
+
+/** Unexplored genres ranked by how close they sit to what you already watch, with the reason why. */
+export function nextGenres(stats: Map<string, GenreStat>): { genre: string; via: string[] }[] {
+  const out: { genre: string; via: string[]; score: number }[] = [];
+  for (const s of stats.values()) {
+    if (s.rated.length) continue;
+    const links = EDGES
+      .filter((e) => e.a === s.genre || e.b === s.genre)
+      .map((e) => {
+        const other = e.a === s.genre ? e.b : e.a;
+        return { other, v: e.w * Math.sqrt(stats.get(other)!.rated.length) };
+      })
+      .filter((l) => l.v > 0)
+      .sort((a, b) => b.v - a.v);
+    out.push({ genre: s.genre, via: links.slice(0, 2).map((l) => l.other), score: links.reduce((n, l) => n + l.v, 0) });
+  }
+  return out.sort((a, b) => b.score - a.score);
 }
 
 export const genreTitles = (g: string): Title[] => CATALOG.filter((t) => t.genres.includes(g));

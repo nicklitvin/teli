@@ -1,44 +1,43 @@
-import { useMemo } from 'react';
-import { BY_ID, CATALOG, STARTERS } from '../lib/catalog';
-import { recommend, similarTitles } from '../lib/recommend';
+import { useMemo, useState } from 'react';
+import type { MediaType } from '../types';
+import { CATALOG, STARTERS, metaLine } from '../lib/catalog';
+import { recommend, type Rec } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { SearchIcon } from '../components/Icons';
-import { Poster } from '../components/Poster';
-import { PosterCard, Screen, SectionHeader, Shelf, TitleRow } from '../components/ui';
+import { Poster, posterArt } from '../components/Poster';
+import { Screen, SectionHeader, Segmented, TitleRow } from '../components/ui';
+
+type Filter = 'all' | MediaType;
+const STEP = 8;
 
 export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
   const nav = useNav();
   const dismissed = useMemo(() => new Set(data.dismissed), [data.dismissed]);
   const recs = useMemo(() => recommend(ratings, dismissed), [ratings, dismissed]);
-  const count = ratings.size;
+  const [filter, setFilter] = useState<Filter>('all');
+  const [limit, setLimit] = useState(STEP);
 
-  // Popular titles you haven't touched yet — fuel for more ratings.
-  const unseen = useMemo(() => {
-    const skip = (id: string) => ratings.has(id) || dismissed.has(id) || data.watchlist.includes(id);
-    const starters = STARTERS.filter((t) => !skip(t.id));
-    const rest = CATALOG.filter((t) => !skip(t.id) && !starters.includes(t));
-    return [...starters, ...rest].slice(0, 18);
-  }, [ratings, dismissed, data.watchlist]);
+  // Well-known titles to rate first, for someone who hasn't ranked anything yet.
+  const starters = useMemo(() => {
+    const skip = (id: string) => dismissed.has(id) || data.watchlist.includes(id);
+    const first = STARTERS.filter((t) => !skip(t.id));
+    return [...first, ...CATALOG.filter((t) => !skip(t.id) && !first.includes(t))].slice(0, 9);
+  }, [dismissed, data.watchlist]);
 
-  if (count === 0) {
+  if (ratings.size === 0) {
     return (
       <Screen title="For You" active={active}>
         <div className="hero-card">
           <div className="shapes" aria-hidden="true"><i /><i /><i /><i /></div>
           <h2>Rank what you watch.</h2>
-          <p>No star ratings to agonize over. Tell us if you liked it, then pick between two titles a few times — Teli works out the score.</p>
-          <ol className="steps">
-            <li><span>1</span>Pick something you've seen</li>
-            <li><span>2</span>Liked it, fine, or didn't like it</li>
-            <li><span>3</span>Compare it to your other picks</li>
-          </ol>
+          <p>Say if you liked it, then pick between two titles. Teli works out the scores and finds what to watch next.</p>
           <button className="primary-btn" onClick={onSearch}><SearchIcon size={16} /> Search the library</button>
         </div>
         <SectionHeader title="Seen any of these?" subtitle="Tap one to rate it" />
         <div className="grid">
-          {unseen.slice(0, 12).map((t) => (
+          {starters.map((t) => (
             <button key={t.id} className="grid-item" onClick={() => nav.openRate(t.id)}>
               <Poster t={t} size="md" />
               <span className="card-title">{t.title}</span>
@@ -49,87 +48,53 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
     );
   }
 
-  const top = recs.slice(0, 10);
-  const topIds = new Set(top.map((r) => r.title.id));
-  const movies = recs.filter((r) => r.title.type === 'movie' && !topIds.has(r.title.id)).slice(0, 6);
-  const shows = recs.filter((r) => r.title.type === 'tv' && !topIds.has(r.title.id)).slice(0, 6);
-  const favorites = [...ratings.values()]
-    .filter((r) => r.sentiment === 'liked')
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 3)
-    .map((r) => BY_ID.get(r.id)!);
+  const [top, ...rest] = recs;
+  const more = rest.filter((r) => filter === 'all' || r.title.type === filter);
 
   return (
     <Screen title="For You" active={active}>
-      {top.length > 0 && (
-        <>
-          <SectionHeader title="Top Picks" subtitle="Based on everything you've ranked" />
-          <Shelf>
-            {top.map((r) => (
-              <PosterCard key={r.title.id} t={r.title} size="lg"
-                caption={<><span className="match">{r.match}% match</span>{r.because && ` · like ${r.because.title}`}</>} />
-            ))}
-          </Shelf>
-        </>
-      )}
+      {top && <Featured rec={top} onOpen={() => nav.openDetail(top.title.id)} />}
 
-      {favorites.map((f) => (
-        <BecauseShelf key={f.id} id={f.id} title={f.title} exclude={ratings} dismissed={dismissed} />
-      ))}
-
-      {movies.length > 0 && (
+      {more.length > 0 && (
         <>
-          <SectionHeader title="Movies for You" />
+          <SectionHeader title="More for you" />
+          <div className="filter-bar">
+            <Segmented<Filter> value={filter} onChange={(f) => { setFilter(f); setLimit(STEP); }}
+              options={[{ value: 'all', label: 'All' }, { value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]} />
+          </div>
           <div className="list">
-            {movies.map((r) => (
+            {more.slice(0, limit).map((r) => (
               <TitleRow key={r.title.id} t={r.title} accessory={<span className="match-pill">{r.match}%</span>}
                 detail={r.because ? `Because you liked ${r.because.title}` : undefined} />
             ))}
           </div>
+          {more.length > limit && (
+            <button className="secondary-btn more" onClick={() => setLimit((n) => n + STEP)}>Show more</button>
+          )}
         </>
       )}
-
-      {shows.length > 0 && (
-        <>
-          <SectionHeader title="Shows for You" />
-          <div className="list">
-            {shows.map((r) => (
-              <TitleRow key={r.title.id} t={r.title} accessory={<span className="match-pill">{r.match}%</span>}
-                detail={r.because ? `Because you liked ${r.because.title}` : undefined} />
-            ))}
-          </div>
-        </>
-      )}
-
-      <SectionHeader title="Keep ranking" subtitle="Seen these? Tap to rate" />
-      <Shelf>
-        {unseen.map((t) => (
-          <button key={t.id} className="card card-md" onClick={() => nav.openRate(t.id)}>
-            <Poster t={t} size="md" />
-            <span className="card-title">{t.title}</span>
-            <span className="card-sub accent">Rate it</span>
-          </button>
-        ))}
-      </Shelf>
     </Screen>
   );
 }
 
-function BecauseShelf({ id, title, exclude, dismissed }: {
-  id: string;
-  title: string;
-  exclude: Map<string, unknown>;
-  dismissed: Set<string>;
-}) {
-  const items = useMemo(() => {
-    const skip = new Set([...exclude.keys(), ...dismissed]);
-    return similarTitles(id, skip, 12, 0.25);
-  }, [id, exclude, dismissed]);
-  if (items.length < 3) return null;
+/** The single best pick, shown big with its artwork behind it. */
+function Featured({ rec, onOpen }: { rec: Rec; onOpen: () => void }) {
+  const t = rec.title;
   return (
-    <>
-      <SectionHeader title={`Because you liked ${title}`} />
-      <Shelf>{items.map((t) => <PosterCard key={t.id} t={t} />)}</Shelf>
-    </>
+    <button className="feature" onClick={onOpen}>
+      <div className="feature-bg" style={{ background: posterArt(t).background }} aria-hidden="true">
+        {t.image && <img src={t.image[0]} alt="" decoding="async" onError={(e) => e.currentTarget.remove()} />}
+      </div>
+      <Poster t={t} size="xl" />
+      <div className="feature-info">
+        <span className="eyebrow">Top pick for you</span>
+        <h2>{t.title}</h2>
+        <p>{metaLine(t)}</p>
+        <p className="feature-why">
+          <span className="match-pill">{rec.match}% match</span>
+          {rec.because && <span>Because you liked {rec.because.title}</span>}
+        </p>
+      </div>
+    </button>
   );
 }

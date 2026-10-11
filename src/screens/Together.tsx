@@ -23,9 +23,14 @@ export function Together({ active }: { active: boolean }) {
     ...group.people.map((p, i) => toMember(p.name.trim() || `Friend ${i + 1}`, p.data)),
   ], [group, data]);
   const picks = useMemo(() => (members.length ? groupPicks(members) : []), [members]);
-  const shown = picks.filter((p) =>
-    (filter === 'all' || p.title.type === filter) &&
-    (!genres.size || p.title.genres.some((g) => genres.has(g))));
+  const ofType = useMemo(() => picks.filter((p) => filter === 'all' || p.title.type === filter), [picks, filter]);
+  const shown = ofType.filter((p) => !genres.size || p.title.genres.some((g) => genres.has(g)));
+  // Only offer genres that actually show up in the group's picks, most common first.
+  const genreOptions = useMemo(() => {
+    const n = new Map<string, number>();
+    for (const p of ofType.slice(0, 150)) for (const g of p.title.genres) n.set(g, (n.get(g) ?? 0) + 1);
+    return GENRES.filter((g) => n.has(g) || genres.has(g)).sort((a, b) => (n.get(b) ?? 0) - (n.get(a) ?? 0));
+  }, [ofType, genres]);
 
   const addFiles = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = [...(e.target.files ?? [])];
@@ -100,13 +105,13 @@ export function Together({ active }: { active: boolean }) {
       {enough ? (
         <>
           <div className="filter-bar stacked spaced">
-            <Segmented<Filter> value={filter} onChange={setFilter}
+            <Segmented<Filter> value={filter} onChange={(f) => { setFilter(f); setLimit(25); }}
               options={[{ value: 'all', label: 'All' }, { value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]} />
           </div>
-          <div className="genre-toggles" role="group" aria-label="Genres">
-            <button className={`chip toggle ${genres.size ? '' : 'on'}`} style={{ ['--c' as string]: 'var(--text)' }}
+          <div className="genre-scroll" role="group" aria-label="Genres">
+            <button className={`chip toggle any ${genres.size ? '' : 'on'}`}
               onClick={() => setGenres(new Set())} aria-pressed={!genres.size}>Any genre</button>
-            {GENRES.map((g) => (
+            {genreOptions.map((g) => (
               <button key={g} className={`chip toggle ${genres.has(g) ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
                 onClick={() => toggleGenre(g)} aria-pressed={genres.has(g)}>{g}</button>
             ))}

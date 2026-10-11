@@ -10,10 +10,10 @@ The score comes from where the title lands. Each reaction has its own band (like
 
 ## Features
 
-- **For You**: content-based recommendations from everything you've ranked, with a match % and a "because you liked X" reason for each pick.
+- **For You**: one top pick, then a single list of recommendations you can narrow to movies or shows. Each has a match % and a "because you liked X" reason.
 - **Search**: finds titles by name, director or network, genre, tag, year or acronym (`lotr`, `gotg`). You can also browse by genre. Each result has separate **Save** (watchlist) and **Rate** buttons.
-- **Taste Map**: a graph of all 21 genres. Genres that often go together sit close to each other, node size shows how much you've ranked in each, and lines show genres you've watched together. Tap a genre to see your top titles, picks to go deeper, and your blind spots.
-- **Together**: load other people's backup files to get picks that nobody in the group has ranked, with toggles to filter by genre.
+- **Taste Map**: your genres as a cluster of bubbles, sized by how much you've ranked in each, with related genres packed next to each other. Tap a bubble to see your average score, top titles and picks to go deeper. "Explore next" suggests the unexplored genres closest to your taste.
+- **Together**: load other people's backup files to get picks that nobody in the group has ranked, filtered by type and by genre (a single scrolling row of the genres in your picks).
 - **My List**: your ranked list with scores, plus a watchlist.
 - **Profile** (the avatar, top right): stats, plus export, import and reset.
 - Figma-inspired UI: Inter, flat surfaces with 1px borders, blue selection, and a dotted canvas. Supports dark mode and safe areas.
