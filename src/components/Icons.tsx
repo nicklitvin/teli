@@ -112,3 +112,6 @@ export const GearIcon = (p: P) => (
   </Svg>
 );
 export const FilterIcon = (p: P) => <Svg {...p}><path d="M4 6h16M7 12h10M10 18h4" /></Svg>;
+export const ShareIcon = (p: P) => (
+  <Svg {...p}><path d="M12 15V3M8 7l4-4 4 4" /><path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7" /></Svg>
+);

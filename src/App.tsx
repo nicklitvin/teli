@@ -3,6 +3,7 @@ import { DetailSheet } from './components/DetailSheet';
 import { PlanetIcon, RocketIcon, SearchIcon, UserIcon, UsersIcon } from './components/Icons';
 import { RateFlow } from './components/RateFlow';
 import { Sheet } from './components/Sheet';
+import { cloudEnabled, takeInvite } from './lib/cloud';
 import { NavCtx, type Nav } from './nav';
 import { ForYou } from './screens/ForYou';
 import { Profile } from './screens/Profile';
@@ -20,8 +21,11 @@ const TABS: { id: Tab; label: string; Icon: typeof SearchIcon }[] = [
   { id: 'profile', label: 'Profile', Icon: UserIcon },
 ];
 
+// Opened from a crew invite link: start on the Crew tab with the code filled in.
+const INVITE = cloudEnabled ? takeInvite() : null;
+
 export default function App() {
-  const [tab, setTab] = useState<Tab>('foryou');
+  const [tab, setTab] = useState<Tab>(INVITE ? 'together' : 'foryou');
   const [searchFocus, setSearchFocus] = useState(0);
 
   // Detail sheets form a stack so "More like this" can drill in and back out.
@@ -73,7 +77,7 @@ export default function App() {
         <ForYou active={tab === 'foryou'} onSearch={goSearch} />
         <Search active={tab === 'search'} focusKey={searchFocus} />
         <TasteMap active={tab === 'map'} />
-        <Together active={tab === 'together'} />
+        <Together active={tab === 'together'} invite={INVITE} />
         <Profile active={tab === 'profile'} onSearch={goSearch} />
 
         <nav className="tabbar">

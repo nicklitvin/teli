@@ -738,3 +738,26 @@ h1, h2, h3, p { margin: 0; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---------- Cloud crew ---------- */
+.crew-box {
+  display: flex; flex-direction: column; gap: 10px; margin: 0 var(--gutter) 12px; padding: 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.crew-box .note { margin: 0; }
+.crew-row { display: flex; align-items: center; gap: 8px; }
+.crew-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.crew-label { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }
+.crew-code { font-family: var(--font-display); font-size: 22px; font-weight: 700; letter-spacing: 0.12em; }
+.crew-input {
+  flex: 1; min-width: 0; height: 42px; padding: 0 14px; border-radius: 999px; font: inherit; font-size: 16px;
+  letter-spacing: 0.1em; text-transform: uppercase; color: var(--text);
+  background: var(--bg-2); border: 1px solid var(--border-hi);
+}
+.crew-input::placeholder { letter-spacing: 0; text-transform: none; color: var(--text-2); }
+.crew-input:focus { outline: none; border-color: var(--accent); }
+.crew-sync { font-size: 12px; color: var(--liked); display: flex; align-items: center; gap: 6px; }
+.crew-sync::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.crew-sync.syncing { color: var(--text-2); }
+.crew-sync.offline { color: var(--disliked); }
+.primary-btn:disabled, .secondary-btn:disabled { opacity: 0.5; cursor: default; }

@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { MediaType } from '../types';
 import { GENRES, metaLine } from '../lib/catalog';
+import { CrewError, cleanCode, cloudEnabled, inviteLink, useCloudCrew, validCode } from '../lib/cloud';
 import { groupPicks, loadGroup, nameFromFile, saveGroup, toMember, type GroupPick, type GroupState, type SeenMode } from '../lib/group';
 import { parseBackup, rankedCount, useStore } from '../lib/store';
-import { UploadIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
+import { useNav } from '../nav';
+import { ShareIcon, UploadIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
 import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
@@ -21,8 +23,20 @@ function pickDetail(p: GroupPick) {
   return metaLine(p.title);
 }
 
-export function Together({ active }: { active: boolean }) {
+/** "just now", "5m ago", "3h ago", "2d ago". */
+function ago(iso: string) {
+  const s = (Date.now() - Date.parse(iso)) / 1000;
+  if (!(s >= 60)) return 'just now';
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+const friendName = (name: string, i: number) => name.trim() || `Friend ${i + 1}`;
+
+export function Together({ active, invite }: { active: boolean; invite: string | null }) {
   const { data } = useStore();
+  const cloud = useCloudCrew(data, active);
   const [group, setGroup] = useState<GroupState>(loadGroup);
   const [filter, setFilter] = useState<Filter>('all');
   const [genre, setGenre] = useState<string | null>(null);
@@ -32,10 +46,12 @@ export function Together({ active }: { active: boolean }) {
 
   useEffect(() => saveGroup(group), [group]);
 
+  // You, then your cloud crew (re-fetched whenever someone's ratings change), then any backups added by hand.
   const members = useMemo(() => [
     ...(group.includeMe ? [toMember('You', data)] : []),
-    ...group.people.map((p, i) => toMember(p.name.trim() || `Friend ${i + 1}`, p.data)),
-  ], [group, data]);
+    ...cloud.members.map((m, i) => toMember(friendName(m.name, i), m.data)),
+    ...group.people.map((p, i) => toMember(friendName(p.name, cloud.members.length + i), p.data)),
+  ], [group, data, cloud.members]);
   const picks = useMemo(() => (members.length ? groupPicks(members, seen) : []), [members, seen]);
   const ofType = useMemo(() => picks.filter((p) => filter === 'all' || p.title.type === filter), [picks, filter]);
   const shown = ofType.filter((p) => !genre || p.title.genres.includes(genre));
@@ -69,10 +85,14 @@ export function Together({ active }: { active: boolean }) {
 
   return (
     <Screen title="Crew" active={active}>
+      {cloudEnabled && <CrewBox cloud={cloud} invite={invite} />}
       <div className="list people">
         <div className="person">
           <span className="avatar sm"><UserIcon size={14} /></span>
-          <span className="person-name">You</span>
+          {cloudEnabled ? (
+            <input className="person-input" value={cloud.name} placeholder="Your name" maxLength={40}
+              onChange={(e) => cloud.setName(e.target.value)} aria-label="Your name, as your crew sees it" />
+          ) : <span className="person-name">You</span>}
           <span className="person-sub">{rankedCount(data)} ranked</span>
           <label className="switch">
             <input type="checkbox" checked={group.includeMe}
@@ -81,24 +101,38 @@ export function Together({ active }: { active: boolean }) {
             <span className="visually-hidden">Include you</span>
           </label>
         </div>
-        {group.people.map((p, i) => (
-          <div className="person" key={p.id}>
+        {cloud.members.map((m, i) => (
+          <div className="person" key={m.id}>
             <span className="avatar sm" style={{ ['--c' as string]: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
-              {(p.name.trim() || `F${i + 1}`).charAt(0).toUpperCase()}
+              {friendName(m.name, i).charAt(0).toUpperCase()}
             </span>
-            <input className="person-input" value={p.name} placeholder={`Friend ${i + 1}`} maxLength={40}
-              onChange={(e) => rename(p.id, e.target.value)} aria-label="Name" />
-            <span className="person-sub">{rankedCount(p.data)} ranked</span>
-            <button className="icon-btn ghost" onClick={() => remove(p.id)} aria-label={`Remove ${p.name || `Friend ${i + 1}`}`}>
-              <XIcon size={14} />
-            </button>
+            <span className="person-name">{friendName(m.name, i)}</span>
+            <span className="person-sub">{rankedCount(m.data)} ranked · {ago(m.updatedAt)}</span>
           </div>
         ))}
-        <label className="person add">
-          <UploadIcon size={17} />
-          <span>Add a friend's backup</span>
-          <input type="file" multiple className="visually-hidden" onChange={addFiles} />
-        </label>
+        {group.people.map((p, j) => {
+          const i = cloud.members.length + j;
+          return (
+            <div className="person" key={p.id}>
+              <span className="avatar sm" style={{ ['--c' as string]: AVATAR_COLORS[i % AVATAR_COLORS.length] }}>
+                {friendName(p.name, i).charAt(0).toUpperCase()}
+              </span>
+              <input className="person-input" value={p.name} placeholder={`Friend ${i + 1}`} maxLength={40}
+                onChange={(e) => rename(p.id, e.target.value)} aria-label="Name" />
+              <span className="person-sub">{rankedCount(p.data)} ranked</span>
+              <button className="icon-btn ghost" onClick={() => remove(p.id)} aria-label={`Remove ${friendName(p.name, i)}`}>
+                <XIcon size={14} />
+              </button>
+            </div>
+          );
+        })}
+        {!cloudEnabled && (
+          <label className="person add">
+            <UploadIcon size={17} />
+            <span>Add a friend's backup</span>
+            <input type="file" multiple className="visually-hidden" onChange={addFiles} />
+          </label>
+        )}
       </div>
       {errors.length > 0 && (
         <p className="note error" role="status">Skipped {errors.join(', ')}: not a Teli backup.</p>
@@ -126,11 +160,95 @@ export function Together({ active }: { active: boolean }) {
             <Empty icon={<UsersIcon size={30} />} title="Nothing matches" body="Try another genre or Seen setting." />
           )}
         </>
+      ) : cloud.code ? (
+        <Empty icon={<UsersIcon size={30} />} title="Waiting for your crew"
+          body={`Share code ${cloud.code}. Picks for all of you show up as soon as someone joins.`} />
       ) : (
         <Empty icon={<UsersIcon size={30} />} title="Watch together"
-          body="Add a friend's backup to see picks none of you have seen. They export it from Profile → ⚙." />
+          body={cloudEnabled
+            ? 'Start a crew and share the code. Everyone’s ratings stay in sync, and picks update as they rate.'
+            : 'Add a friend’s backup to see picks none of you have seen. They export it from Profile → ⚙.'} />
       )}
     </Screen>
+  );
+}
+
+/** Start or join a cloud crew; once in one, its code, an invite button and whether it's in sync. */
+function CrewBox({ cloud, invite }: { cloud: ReturnType<typeof useCloudCrew>; invite: string | null }) {
+  const nav = useNav();
+  const [code, setCode] = useState(invite ?? '');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState(false);
+
+  const run = async (f: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await f();
+    } catch (e) {
+      if (e instanceof CrewError) setError(e.message);
+      else {
+        console.error(e);
+        setError('Couldn’t reach the crew server. Try again in a moment.');
+      }
+    } finally {
+      setBusy(false);
+      setLeaving(false);
+    }
+  };
+
+  const share = async () => {
+    const url = inviteLink(cloud.code!);
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: 'Join my Teli crew', text: `Join my Teli crew with code ${cloud.code}`, url });
+      } catch {
+        /* closed the share sheet */
+      }
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      nav.notify('Invite link copied');
+    } catch {
+      nav.notify(`Your crew code is ${cloud.code}`);
+    }
+  };
+
+  if (cloud.code) {
+    const sync = cloud.status === 'offline' ? 'Can’t reach the server · showing the last update'
+      : cloud.checkedAt ? 'Up to date' : 'Syncing…';
+    return (
+      <div className="crew-box">
+        <div className="crew-row">
+          <div className="crew-id">
+            <span className="crew-label">Crew code</span>
+            <span className="crew-code">{cloud.code}</span>
+          </div>
+          <button className="secondary-btn small" onClick={share}><ShareIcon size={14} /> Invite</button>
+          <button className={`secondary-btn small ${leaving ? 'danger' : ''}`} disabled={busy}
+            onClick={() => (leaving ? run(cloud.leave) : setLeaving(true))}>
+            {leaving ? 'Leave?' : 'Leave'}
+          </button>
+        </div>
+        <p className={`crew-sync ${cloud.status}`}>{sync}</p>
+        {error && <p className="note error" role="status">{error}</p>}
+      </div>
+    );
+  }
+
+  const clean = cleanCode(code);
+  return (
+    <div className="crew-box">
+      <button className="primary-btn" disabled={busy} onClick={() => run(cloud.start)}>Start a crew</button>
+      <form className="crew-row" onSubmit={(e) => { e.preventDefault(); if (validCode(clean)) void run(() => cloud.join(clean)); }}>
+        <input className="crew-input" value={clean} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"
+          aria-label="Crew code" autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="go" />
+        <button className="secondary-btn" type="submit" disabled={busy || !validCode(clean)}>Join</button>
+      </form>
+      {error && <p className="note error" role="status">{error}</p>}
+    </div>
   );
 }
 
