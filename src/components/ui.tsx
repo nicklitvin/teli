@@ -44,10 +44,10 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 }
 
 /**
- * Tabs for a list plus two small tools: a genre filter and (optionally) a search box.
- * Each tool opens under the row; an active genre stays visible as a removable chip.
+ * Tabs for a list plus two small tools: a filter panel (genre, plus an optional extra choice) and
+ * an optional search box. Each opens under the row; active filters stay visible as removable chips.
  */
-export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder }: {
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option }: {
   tab: T;
   tabs: { value: T; label: string }[];
   onTab: (t: T) => void;
@@ -57,8 +57,11 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   query?: string;
   onQuery?: (q: string) => void;
   placeholder?: string;
+  /** An extra single-choice filter shown above the genres; anything but `initial` counts as active. */
+  option?: { label: string; value: string; initial: string; choices: { value: string; label: string }[]; onChange: (v: string) => void };
 }) {
   const [open, setOpen] = useState<'search' | 'genre' | null>(null);
+  const optionOn = !!option && option.value !== option.initial;
   const toggle = (k: 'search' | 'genre') => setOpen((o) => (o === k ? null : k));
   return (
     <div className="tools">
@@ -70,8 +73,8 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
             <SearchIcon size={17} />
           </button>
         )}
-        <button className={`icon-btn tool ${open === 'genre' || genre ? 'on' : ''}`} onClick={() => toggle('genre')}
-          aria-expanded={open === 'genre'} aria-label="Filter by genre">
+        <button className={`icon-btn tool ${open === 'genre' || genre || optionOn ? 'on' : ''}`} onClick={() => toggle('genre')}
+          aria-expanded={open === 'genre'} aria-label="Filters">
           <FilterIcon size={17} />
         </button>
       </div>
@@ -86,20 +89,44 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
         </label>
       )}
       {open === 'genre' ? (
-        <div className="genre-wrap" role="group" aria-label="Genres">
-          <button className={`chip toggle any ${genre ? '' : 'on'}`} onClick={() => { onGenre(null); setOpen(null); }}
-            aria-pressed={!genre}>Any genre</button>
-          {genres.map((g) => (
-            <button key={g} className={`chip toggle ${genre === g ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
-              onClick={() => { onGenre(genre === g ? null : g); setOpen(null); }} aria-pressed={genre === g}>{g}</button>
-          ))}
+        <div className="filter-panel">
+          {option && (
+            <div className="filter-group" role="group" aria-label={option.label}>
+              <p className="filter-label">{option.label}</p>
+              <div className="genre-wrap">
+                {option.choices.map((c) => (
+                  <button key={c.value} className={`chip toggle any ${option.value === c.value ? 'on' : ''}`}
+                    onClick={() => option.onChange(c.value)} aria-pressed={option.value === c.value}>{c.label}</button>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="filter-group" role="group" aria-label="Genres">
+            {option && <p className="filter-label">Genre</p>}
+            <div className="genre-wrap">
+              <button className={`chip toggle any ${genre ? '' : 'on'}`} onClick={() => { onGenre(null); setOpen(null); }}
+                aria-pressed={!genre}>Any genre</button>
+              {genres.map((g) => (
+                <button key={g} className={`chip toggle ${genre === g ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
+                  onClick={() => { onGenre(genre === g ? null : g); setOpen(null); }} aria-pressed={genre === g}>{g}</button>
+              ))}
+            </div>
+          </div>
         </div>
-      ) : genre && (
+      ) : (genre || optionOn) && (
         <div className="genre-wrap">
-          <button className="chip removable" style={{ ['--c' as string]: GENRE_COLORS[genre] }} onClick={() => onGenre(null)}
-            aria-label={`Remove ${genre} filter`}>
-            {genre} <XIcon size={12} strokeWidth={3} />
-          </button>
+          {option && optionOn && (
+            <button className="chip removable" style={{ ['--c' as string]: 'var(--accent-2)' }} onClick={() => option.onChange(option.initial)}
+              aria-label={`Remove ${option.label} filter`}>
+              {option.choices.find((c) => c.value === option.value)?.label} <XIcon size={12} strokeWidth={3} />
+            </button>
+          )}
+          {genre && (
+            <button className="chip removable" style={{ ['--c' as string]: GENRE_COLORS[genre] }} onClick={() => onGenre(null)}
+              aria-label={`Remove ${genre} filter`}>
+              {genre} <XIcon size={12} strokeWidth={3} />
+            </button>
+          )}
         </div>
       )}
     </div>

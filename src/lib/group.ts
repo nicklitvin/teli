@@ -23,17 +23,22 @@ export interface GroupPick {
   per: { name: string; match: number | null }[];
   /** Members who already have it on their watchlist. */
   wanted: string[];
+  /** Members who have ranked it, with their score. */
+  seenBy: { name: string; score: number }[];
 }
+
+/** Which titles to consider: ones nobody has ranked, ones some (not all) of you have, or both. */
+export type SeenMode = 'none' | 'some' | 'either';
 
 export const toMember = (name: string, data: Data): Member => ({ name, data, ratings: computeRatings(data) });
 
 /**
- * Titles nobody in the group has ranked, scored for everyone at once. Each member's taste is
- * scored with the normal recommender, then combined so one person loving a title can't outvote
- * the others: half the average, half the least-happy member.
+ * Titles scored for everyone at once. Each member's taste is scored with the normal recommender
+ * (or, for a title they've ranked, their own score), then combined so one person loving a title
+ * can't outvote the others: half the average, half the least-happy member. Titles everyone has
+ * ranked are always left out; `seen` picks between unseen titles, ones some of you have seen, or both.
  */
-export function groupPicks(members: Member[]): GroupPick[] {
-  const watched = new Set(members.flatMap((m) => [...m.ratings.keys()]));
+export function groupPicks(members: Member[], seen: SeenMode = 'none'): GroupPick[] {
   const dismissed = new Set(members.flatMap((m) => m.data.dismissed));
   const tasters = members.filter((m) => m.ratings.size);
   const fits = tasters.map((m) => {
@@ -44,9 +49,15 @@ export function groupPicks(members: Member[]): GroupPick[] {
 
   const out: (GroupPick & { score: number })[] = [];
   for (const t of CATALOG) {
-    if (watched.has(t.id) || dismissed.has(t.id)) continue;
+    if (dismissed.has(t.id)) continue;
+    const seenBy = members.filter((m) => m.ratings.has(t.id));
+    if (seenBy.length === members.length || (seen === 'none' && seenBy.length) || (seen === 'some' && !seenBy.length)) continue;
     const wanted = members.filter((m) => m.data.watchlist.includes(t.id)).map((m) => m.name);
-    const vals = fits.map((f) => f.get(t.id) ?? 0);
+    // Someone who ranked it counts by how much they liked it: 3 or lower is a no, 10 a full yes.
+    const vals = tasters.map((m, i) => {
+      const r = m.ratings.get(t.id);
+      return r ? Math.max(0, Math.min(1, (r.score - 3) / 7)) : fits[i].get(t.id) ?? 0;
+    });
     if (!wanted.length && !vals.some((v) => v > 0)) continue;
     const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
     const min = vals.length ? Math.min(...vals) : 0;
@@ -56,6 +67,7 @@ export function groupPicks(members: Member[]): GroupPick[] {
       score,
       match: 0,
       wanted,
+      seenBy: seenBy.map((m) => ({ name: m.name, score: m.ratings.get(t.id)!.score })),
       per: tasters.map((m, i) => ({ name: m.name, match: vals[i] > 0 ? Math.round(55 + 44 * vals[i]) : null })),
     });
   }

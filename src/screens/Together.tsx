@@ -1,18 +1,32 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { MediaType } from '../types';
 import { GENRES, metaLine } from '../lib/catalog';
-import { groupPicks, loadGroup, nameFromFile, saveGroup, toMember, type GroupState } from '../lib/group';
+import { groupPicks, loadGroup, nameFromFile, saveGroup, toMember, type GroupPick, type GroupState, type SeenMode } from '../lib/group';
 import { parseBackup, rankedCount, useStore } from '../lib/store';
 import { UploadIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
 import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
 
+const SEEN: { value: SeenMode; label: string }[] = [
+  { value: 'none', label: 'New to everyone' },
+  { value: 'some', label: 'Seen by some' },
+  { value: 'either', label: 'Seen or not' },
+];
+
+/** One line under a pick: who has seen it (with their score), who wants to, or the usual details. */
+function pickDetail(p: GroupPick) {
+  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${s.score.toFixed(1)})`).join(', ')}`;
+  if (p.wanted.length) return `On ${p.wanted.map((n) => (n === 'You' ? 'your' : `${n}'s`)).join(' & ')} watchlist`;
+  return metaLine(p.title);
+}
+
 export function Together({ active }: { active: boolean }) {
   const { data } = useStore();
   const [group, setGroup] = useState<GroupState>(loadGroup);
   const [filter, setFilter] = useState<Filter>('all');
   const [genre, setGenre] = useState<string | null>(null);
+  const [seen, setSeen] = useState<SeenMode>('none');
   const [errors, setErrors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
 
@@ -22,7 +36,7 @@ export function Together({ active }: { active: boolean }) {
     ...(group.includeMe ? [toMember('You', data)] : []),
     ...group.people.map((p, i) => toMember(p.name.trim() || `Friend ${i + 1}`, p.data)),
   ], [group, data]);
-  const picks = useMemo(() => (members.length ? groupPicks(members) : []), [members]);
+  const picks = useMemo(() => (members.length ? groupPicks(members, seen) : []), [members, seen]);
   const ofType = useMemo(() => picks.filter((p) => filter === 'all' || p.title.type === filter), [picks, filter]);
   const shown = ofType.filter((p) => !genre || p.title.genres.includes(genre));
   // Only offer genres that actually show up in the group's picks, most common first.
@@ -94,13 +108,14 @@ export function Together({ active }: { active: boolean }) {
         <>
           <ListTools<Filter> tab={filter} onTab={(f) => { setFilter(f); setLimit(25); }}
             tabs={[{ value: 'all', label: 'All' }, { value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]}
-            genre={genre} genres={genreOptions} onGenre={(g) => { setGenre(g); setLimit(25); }} />
+            genre={genre} genres={genreOptions} onGenre={(g) => { setGenre(g); setLimit(25); }}
+            option={{ label: 'Seen', value: seen, initial: 'none', choices: SEEN, onChange: (v) => { setSeen(v as SeenMode); setLimit(25); } }} />
           {shown.length ? (
             <>
               <Cards>
                 {shown.slice(0, limit).map((p) => (
                   <TitleRow key={p.title.id} t={p.title} accessory={<span className="match-pill">{p.match}%</span>}
-                    detail={p.wanted.length ? `On ${p.wanted.map((n) => (n === 'You' ? 'your' : `${n}'s`)).join(' & ')} watchlist` : metaLine(p.title)} />
+                    detail={pickDetail(p)} />
                 ))}
               </Cards>
               {shown.length > limit && (
@@ -108,7 +123,7 @@ export function Together({ active }: { active: boolean }) {
               )}
             </>
           ) : (
-            <Empty icon={<UsersIcon size={30} />} title="Nothing matches" body="Try another genre." />
+            <Empty icon={<UsersIcon size={30} />} title="Nothing matches" body="Try another genre or Seen setting." />
           )}
         </>
       ) : (
