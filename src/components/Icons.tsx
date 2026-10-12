@@ -77,3 +77,30 @@ export const UsersIcon = (p: P) => (
     <path d="M15.5 5.6a3.2 3.2 0 010 5.8M17.5 14a6 6 0 013.5 5.5" />
   </Svg>
 );
+export const RocketIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M14.5 4.5c2.6-1.4 5-1.6 6-1.5.1 1 0 3.4-1.5 6l-6.3 6.3-4.5-4.5z" />
+    <path d="M8.6 10.4L5 10l2.6-3.1 3.6.4M13.6 15.4l.4 3.6 3.1-2.6-.4-3.6" />
+    <path d="M6.5 16.5c-1.2.2-2.4 1.9-2.5 3.5 1.6-.1 3.3-1.3 3.5-2.5" />
+    <circle cx="15.8" cy="8.2" r="1.4" />
+  </Svg>
+);
+export const PlanetIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="6" />
+    <path d="M17.6 8.6c2.9-1.3 4.8-1.5 5.2-.8.7 1.3-3.6 4.9-9.6 8.1s-11.3 4.8-12 3.5c-.4-.7.9-2.2 3.4-4.1" />
+  </Svg>
+);
+export const OrbitIcon = (p: P) => (
+  <Svg {...p}>
+    <circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none" />
+    <ellipse cx="12" cy="12" rx="9.5" ry="4.2" transform="rotate(-30 12 12)" />
+    <circle cx="19.6" cy="6.9" r="1.7" fill="currentColor" stroke="none" />
+  </Svg>
+);
+export const BookIcon = (p: P) => (
+  <Svg {...p}>
+    <path d="M5 18.5V6a2 2 0 012-2h12v13H7.2A2.2 2.2 0 005 19.2 1.8 1.8 0 006.8 21H19" />
+    <path d="M9 8.5h6" />
+  </Svg>
+);

@@ -1,10 +1,14 @@
 import raw from '../data/catalog.json';
 import images from '../data/images.json';
+import aliases from '../data/aliases.json';
 import type { Title } from '../types';
 
 const IMAGES = images as unknown as Record<string, Title['image']>;
 export const CATALOG: Title[] = (raw as Title[]).map((t) => (IMAGES[t.id] ? { ...t, image: IMAGES[t.id] } : t));
 export const BY_ID = new Map(CATALOG.map((t) => [t.id, t]));
+const ALIASES = aliases as Record<string, string>;
+/** Ids of duplicate entries that were merged away point at the entry that was kept. */
+export const resolveId = (id: string) => ALIASES[id] ?? id;
 /** Position in the catalog file — used as a weak popularity prior. */
 export const ORDER = new Map(CATALOG.map((t, i) => [t.id, i]));
 

@@ -1,22 +1,37 @@
-import { useState, type ReactNode } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import type { Title } from '../types';
 import { metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { ChevronRight, UserIcon } from './Icons';
+import { UserIcon } from './Icons';
 import { Poster, ScoreBadge } from './Poster';
 
 /** A tab's scroll container with a compact top bar; the avatar opens profile & settings. */
-export function Screen({ title, active, children }: { title: string; active: boolean; children: ReactNode }) {
+export function Screen({ title, active, children, actions, className = '', scrollRef, onScroll }: {
+  title: string;
+  active: boolean;
+  children: ReactNode;
+  /** Extra controls in the top bar, before the avatar. */
+  actions?: ReactNode;
+  className?: string;
+  scrollRef?: Ref<HTMLDivElement>;
+  onScroll?: (el: HTMLDivElement) => void;
+}) {
   const nav = useNav();
   const [scrolled, setScrolled] = useState(false);
   return (
-    <div className="screen" hidden={!active} onScroll={(e) => setScrolled(e.currentTarget.scrollTop > 2)}>
+    <div className={`screen ${className}`} hidden={!active} ref={scrollRef} onScroll={(e) => {
+      setScrolled(e.currentTarget.scrollTop > 2);
+      onScroll?.(e.currentTarget);
+    }}>
       <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
         <h1>{title}</h1>
-        <button className="avatar" onClick={nav.openProfile} aria-label="Profile and settings">
-          <UserIcon size={17} />
-        </button>
+        <span className="topbar-actions">
+          {actions}
+          <button className="avatar" onClick={nav.openProfile} aria-label="Profile and settings">
+            <UserIcon size={17} />
+          </button>
+        </span>
       </header>
       {children}
     </div>
@@ -54,31 +69,43 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
   );
 }
 
-/** `accessory` sits inside the tap target; `actions` are separate buttons at the end of the row. */
-export function TitleRow({ t, rank, detail, accessory, actions }: {
+/**
+ * A title as a wide image card: the art fills it and the name, a line of detail and a score tag
+ * sit over the bottom. `accessory` replaces the score tag; `actions` are buttons in the top corner.
+ */
+export function TitleRow({ t, rank, detail, accessory, actions, readOnly }: {
   t: Title;
   rank?: number;
   detail?: ReactNode;
   accessory?: ReactNode;
   actions?: ReactNode;
+  /** Not a link to the title page (e.g. inside the profile sheet). */
+  readOnly?: boolean;
 }) {
   const { ratings } = useStore();
   const nav = useNav();
   const r = ratings.get(t.id);
+  const tag = accessory ?? (r ? <ScoreBadge rating={r} size="lg" /> : null);
   return (
-    <div className="row">
-      <button className="row-main" onClick={() => nav.openDetail(t.id)}>
-        {rank !== undefined && <span className="row-rank">{rank}</span>}
-        <Poster t={t} size="sm" />
-        <span className="row-text">
-          <span className="row-title">{t.title}</span>
-          <span className="row-sub">{detail ?? metaLine(t)}</span>
+    <div className="tcard">
+      <Poster t={t} size="fill" cover />
+      {!readOnly && <button className="tcard-hit" onClick={() => nav.openDetail(t.id)} aria-label={`${t.title}, ${t.year}`} />}
+      {rank !== undefined && <span className="tcard-rank">#{rank}</span>}
+      {actions && <span className="tcard-actions">{actions}</span>}
+      <span className="tcard-info">
+        <span className="tcard-text">
+          <span className="tcard-title">{t.title}</span>
+          <span className="tcard-sub">{detail ?? metaLine(t)}</span>
         </span>
-        {accessory ?? (r ? <ScoreBadge rating={r} /> : !actions && <ChevronRight size={16} className="row-chevron" />)}
-      </button>
-      {actions && <span className="row-actions">{actions}</span>}
+        {tag && <span className="tcard-tag">{tag}</span>}
+      </span>
     </div>
   );
+}
+
+/** A grid of title cards: one column on phones, two on wider screens. */
+export function Cards({ children }: { children: ReactNode }) {
+  return <div className="cards">{children}</div>;
 }
 
 export function PosterCard({ t, size = 'md', caption }: { t: Title; size?: 'md' | 'lg'; caption?: ReactNode }) {

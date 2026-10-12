@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { DetailSheet } from './components/DetailSheet';
-import { ListIcon, MapIcon, SearchIcon, SparklesIcon, UsersIcon } from './components/Icons';
+import { BookIcon, PlanetIcon, RocketIcon, SearchIcon, UsersIcon } from './components/Icons';
 import { ProfileSheet } from './components/ProfileSheet';
 import { RateFlow } from './components/RateFlow';
 import { Sheet } from './components/Sheet';
@@ -14,11 +14,11 @@ import { Together } from './screens/Together';
 type Tab = 'foryou' | 'search' | 'map' | 'together' | 'list';
 
 const TABS: { id: Tab; label: string; Icon: typeof SearchIcon }[] = [
-  { id: 'foryou', label: 'For You', Icon: SparklesIcon },
+  { id: 'foryou', label: 'For You', Icon: RocketIcon },
   { id: 'search', label: 'Search', Icon: SearchIcon },
-  { id: 'map', label: 'Taste Map', Icon: MapIcon },
-  { id: 'together', label: 'Together', Icon: UsersIcon },
-  { id: 'list', label: 'My List', Icon: ListIcon },
+  { id: 'map', label: 'Galaxy', Icon: PlanetIcon },
+  { id: 'together', label: 'Crew', Icon: UsersIcon },
+  { id: 'list', label: 'Logbook', Icon: BookIcon },
 ];
 
 export default function App() {

@@ -10,13 +10,13 @@ The score comes from where the title lands. Each reaction has its own band (like
 
 ## Features
 
-- **For You**: swipe through your top 8 picks, then a single list of recommendations you can narrow to movies or shows. Each has a match % and a "because you liked X" reason.
+- **For You**: a full-screen feed of recommendations, one per screen. Each card shows the poster, a match %, a "because you liked X" reason, and buttons to rate it, save it or hide it. The **Discover** tag in the top bar switches the feed to well-known titles from genres and themes you haven't ranked anything in yet, rotating between them so it isn't one genre in a row.
 - **Search**: finds titles by name, director or network, genre, tag, year or acronym (`lotr`, `gotg`). You can also browse by genre. Each result has separate **Save** (watchlist) and **Rate** buttons.
-- **Taste Map**: switch between **genres, themes, decades and creators** (directors and networks). Everything you've explored is a bubble on a dark screening-room canvas, sized by how much you've ranked, filled with the poster of a favourite and labelled with your average score. Groups you haven't touched sit in a "Not explored yet" area below. Tap any of them for your top titles and picks to go deeper, or titles to start with.
-- **Together**: load other people's backup files to get picks that nobody in the group has ranked, filtered by type and by genre (a single scrolling row of the genres in your picks).
-- **My List**: your ranked list with scores, plus a watchlist.
+- **Galaxy** (taste map): switch between **genres, themes, decades and creators** (directors and networks). Everything you've explored is a planet in orbit, sized by how much you've ranked, surfaced with the poster of a favourite and labelled with your average score; the selected one gets a ring. Groups you haven't touched are dim "Uncharted" planets below. Tap any of them for your top titles and picks to explore further, or titles to start with.
+- **Crew**: load other people's backup files to get picks that nobody in the group has ranked, filtered by type and by genre (a single scrolling row of the genres in your picks).
+- **Logbook**: your ranked list with scores, plus a watchlist.
 - **Profile** (the avatar, top right): stats, titles you marked "Not interested" (with a Show again button), plus export, import and reset.
-- Figma-inspired UI: Inter, flat surfaces with 1px borders, blue selection, and a dotted canvas. Supports dark mode and safe areas.
+- Space-exploration look: a starfield with nebula glows, glass panels, a violet-to-teal accent, Space Grotesk headings over Inter text. Every list of titles is a big image card with the name and your score over the bottom. Respects safe areas and reduced motion.
 - No API calls at runtime, and your data is kept in `localStorage`. Poster images load from Wikimedia; when they can't load (for example offline), you see generated art instead.
 
 ## Run
@@ -40,13 +40,13 @@ Lines in `catalog.txt` look like this:
 Title|Year|M or T|Genre,Genre|tag,tag|Director or Network
 ```
 
-Run `npm run catalog` to merge both into `src/data/catalog.json` (about 2.2 MB). It validates genres, rejects duplicates, and skips Wikidata titles that are already in `catalog.txt`.
+Run `npm run catalog` to merge both into `src/data/catalog.json` (about 2.2 MB). It validates genres, rejects duplicates, and skips Wikidata titles that are already in `catalog.txt`. Wikidata titles that share a Wikipedia image with an earlier title (Se7en / Seven) are merged into it, and `src/data/aliases.json` maps the dropped ids so saved rankings follow.
 
 Then run `npm run images` to find images for any new titles. It looks up each title's Wikipedia article, checks the article's short description to confirm it's the right film or series and year, and stores the article's lead image URL (usually the poster or title card) in `src/data/images.json`. Titles from Wikidata already know their article, so they skip the guessing. This step needs network access, but the app itself makes no API calls. Use `npm run images -- --all` to look up every title again.
 
 ## Watching together
 
-Everyone exports a backup from their profile and sends the file to one person, who adds the files on the Together tab. Titles that anyone has ranked or marked "Not interested" are left out. Each remaining title is scored with the normal recommender for each person. A title's group score is half the average of those scores and half the lowest one, so a pick that only one person loves won't win. Titles on someone's watchlist get a boost.
+Everyone exports a backup from their profile and sends the file to one person, who adds the files on the Crew tab. Titles that anyone has ranked or marked "Not interested" are left out. Each remaining title is scored with the normal recommender for each person. A title's group score is half the average of those scores and half the lowest one, so a pick that only one person loves won't win. Titles on someone's watchlist get a boost.
 
 ## How recommendations work
 

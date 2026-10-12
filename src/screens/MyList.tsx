@@ -2,8 +2,8 @@ import { useMemo, useState } from 'react';
 import type { MediaType } from '../types';
 import { BY_ID } from '../lib/catalog';
 import { useStore } from '../lib/store';
-import { BookmarkIcon, ListIcon } from '../components/Icons';
-import { Empty, Screen, Segmented, TitleRow } from '../components/ui';
+import { BookIcon, BookmarkIcon } from '../components/Icons';
+import { Cards, Empty, Screen, Segmented, TitleRow } from '../components/ui';
 
 type View = 'ranked' | 'watchlist';
 type Filter = 'all' | MediaType;
@@ -24,7 +24,7 @@ export function MyList({ active, onSearch }: { active: boolean; onSearch: () => 
   const avg = ranked.length ? ranked.reduce((s, r) => s + r.score, 0) / ranked.length : 0;
 
   return (
-    <Screen title="My List" active={active}>
+    <Screen title="Logbook" active={active}>
       <div className="stats">
         <div><strong>{movieCount}</strong><span>Movies</span></div>
         <div><strong>{ratings.size - movieCount}</strong><span>Shows</span></div>
@@ -47,17 +47,17 @@ export function MyList({ active, onSearch }: { active: boolean; onSearch: () => 
         ranked.length ? (
           <>
             <p className="list-caption">{ranked.length} ranked · average {avg.toFixed(1)}</p>
-            <div className="list">
+            <Cards>
               {ranked.map((r, i) => <TitleRow key={r.id} t={BY_ID.get(r.id)!} rank={i + 1} />)}
-            </div>
+            </Cards>
           </>
         ) : (
-          <Empty icon={<ListIcon size={34} />} title="Nothing ranked yet"
-            body="Rate something you've watched and it'll show up here, ordered by your score."
+          <Empty icon={<BookIcon size={34} />} title="Your logbook is empty"
+            body="Rate something you've watched and it'll be logged here, ordered by your score."
             action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
         )
       ) : watch.length ? (
-        <div className="list">{watch.map((t) => <TitleRow key={t.id} t={t} />)}</div>
+        <Cards>{watch.map((t) => <TitleRow key={t.id} t={t} />)}</Cards>
       ) : (
         <Empty icon={<BookmarkIcon size={34} />} title="Your watchlist is empty"
           body="Save titles you want to watch from search or any title page." />

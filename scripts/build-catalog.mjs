@@ -1,6 +1,6 @@
 // Compiles data/catalog.txt (hand-written) plus data/wikidata.json (from `npm run wikidata`)
 // into src/data/catalog.json. Hand-written entries win when both have the same title.
-import { readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -98,12 +98,28 @@ try {
 } catch {
   console.log('No data/wikidata.json yet: run `npm run wikidata` to add thousands more titles.');
 }
+// Two entries with the same Wikipedia image are the same title under different names
+// (Se7en / Seven, Kill Bill: Vol. 1 / Volume 1), so the later one is dropped. Its id is kept
+// as an alias, so rankings saved under it move to the surviving entry.
+const IMAGES_FILE = join(root, 'src/data/images.json');
+const images = existsSync(IMAGES_FILE) ? JSON.parse(readFileSync(IMAGES_FILE, 'utf8')) : {};
+const byImage = new Map();
+for (const t of out) if (images[t.id] && !byImage.has(images[t.id][0])) byImage.set(images[t.id][0], t.id);
+const aliases = {};
+
 for (const w of wd) {
   if (w.year > new Date().getFullYear()) continue; // announced, not out yet
+  if (/\bseason \d+$/i.test(w.title)) continue; // single seasons of a show
+  const same = images[w.id] && byImage.get(images[w.id][0]);
+  if (same) {
+    if (same !== w.id) aliases[w.id] = same;
+    continue;
+  }
   // Shows are often dated by their pilot on Wikidata (Columbo: 1968 vs 1971), so allow more slack.
   if ((byTitle.get(key(w)) ?? []).some((y) => Math.abs(y - w.year) <= (w.type === 'tv' ? 3 : 1))) continue;
   if (ids.has(w.id)) continue;
   ids.add(w.id);
+  if (images[w.id]) byImage.set(images[w.id][0], w.id);
   out.push({
     id: w.id,
     title: w.title,
@@ -118,5 +134,7 @@ for (const w of wd) {
 // One title per line keeps diffs readable without bloating the file.
 const json = '[\n' + out.map((t) => JSON.stringify(t)).join(',\n') + '\n]\n';
 writeFileSync(join(root, 'src/data/catalog.json'), json);
+writeFileSync(join(root, 'src/data/aliases.json'), JSON.stringify(aliases, null, 1) + '\n');
 const movies = out.filter((t) => t.type === 'movie').length;
+console.log(`Merged ${Object.keys(aliases).length} duplicates into existing titles`);
 console.log(`Wrote ${out.length} titles (${curated} hand-written, ${out.length - curated} from Wikidata; ${movies} movies, ${out.length - movies} shows), ${(json.length / 1024).toFixed(1)} KB`);

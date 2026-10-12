@@ -4,7 +4,7 @@ import { GENRES, GENRE_COLORS } from '../lib/catalog';
 import { groupPicks, loadGroup, nameFromFile, saveGroup, toMember, type GroupState } from '../lib/group';
 import { parseBackup, rankedCount, useStore } from '../lib/store';
 import { UploadIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
-import { Empty, Screen, SectionHeader, Segmented, TitleRow } from '../components/ui';
+import { Cards, Empty, Screen, SectionHeader, Segmented, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
 
@@ -61,9 +61,9 @@ export function Together({ active }: { active: boolean }) {
   const enough = members.length >= 2;
 
   return (
-    <Screen title="Together" active={active}>
+    <Screen title="Crew" active={active}>
       <p className="map-summary">
-        Add other people's Teli backups to find things <b>none of you</b> have watched yet, picked to suit everyone.
+        Bring your crew aboard: add their Teli backups to find things <b>none of you</b> have watched yet, picked to suit everyone.
       </p>
 
       <div className="list people">
@@ -121,7 +121,7 @@ export function Together({ active }: { active: boolean }) {
             subtitle={`${shown.length} titles none of you have ranked`} />
           {shown.length ? (
             <>
-              <div className="list">
+              <Cards>
                 {shown.slice(0, limit).map((p) => (
                   <TitleRow key={p.title.id} t={p.title}
                     accessory={<span className="match-pill">{p.match}%</span>}
@@ -129,7 +129,7 @@ export function Together({ active }: { active: boolean }) {
                       ? `Watchlisted by ${p.wanted.map((n) => (n === 'You' ? 'you' : n)).join(', ')}`
                       : p.per.map((x) => `${x.name} ${x.match ?? '–'}`).join(' · ')} />
                 ))}
-              </div>
+              </Cards>
               {shown.length > limit && (
                 <button className="secondary-btn more" onClick={() => setLimit((n) => n + 25)}>Show more</button>
               )}
@@ -140,7 +140,7 @@ export function Together({ active }: { active: boolean }) {
           )}
         </>
       ) : (
-        <Empty icon={<UsersIcon size={30} />} title="Add someone to watch with"
+        <Empty icon={<UsersIcon size={30} />} title="Assemble your crew"
           body={group.includeMe ? 'Load at least one other backup to see group picks.' : 'Load at least two backups, or include yourself.'} />
       )}
     </Screen>

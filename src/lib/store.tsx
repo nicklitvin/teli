@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { MediaType, Rating, Sentiment } from '../types';
-import { BY_ID } from './catalog';
+import { BY_ID, resolveId } from './catalog';
 import { SENTIMENTS, scoreFor } from './ranking';
 
 type Buckets = Record<Sentiment, string[]>;
@@ -31,7 +31,7 @@ export function sanitize(x: unknown): Data {
     for (const s of SENTIMENTS) {
       const arr = src.ranks?.[type]?.[s];
       if (!Array.isArray(arr)) continue;
-      d.ranks[type][s] = arr.filter((id): id is string => {
+      d.ranks[type][s] = arr.map((id) => (typeof id === 'string' ? resolveId(id) : id)).filter((id): id is string => {
         if (typeof id !== 'string' || seen.has(id) || BY_ID.get(id)?.type !== type) return false;
         seen.add(id);
         return true;
@@ -39,7 +39,9 @@ export function sanitize(x: unknown): Data {
     }
   }
   const ids = (a: unknown) =>
-    Array.isArray(a) ? [...new Set(a.filter((id): id is string => typeof id === 'string' && BY_ID.has(id)))] : [];
+    Array.isArray(a)
+      ? [...new Set(a.filter((id): id is string => typeof id === 'string').map(resolveId).filter((id) => BY_ID.has(id)))]
+      : [];
   d.watchlist = ids(src.watchlist).filter((id) => !seen.has(id));
   d.dismissed = ids(src.dismissed);
   return d;

@@ -6,7 +6,7 @@ import { useStore } from '../lib/store';
 import { UNIVERSE, bubbleLayout, groupStats, groupTitles, keysOf, type Dimension, type GroupStat } from '../lib/taste';
 import { useNav } from '../nav';
 import { Poster, ScoreBadge } from '../components/Poster';
-import { Screen, SectionHeader, Segmented, Shelf, TitleRow } from '../components/ui';
+import { Cards, Screen, SectionHeader, Segmented, Shelf, TitleRow } from '../components/ui';
 
 const DIMS: { value: Dimension; label: string; noun: string }[] = [
   { value: 'genres', label: 'Genres', noun: 'genres' },
@@ -82,7 +82,7 @@ export function TasteMap({ active }: { active: boolean }) {
     return m;
   }, [layout, stats]);
   const [bx, by, bw, bh] = layout.box;
-  const PAD = 16;
+  const PAD = 26; // room for the ring around the selected planet
   const vw = Math.max(bw + PAD * 2, MIN_W);
   const vh = bh + PAD * 2;
   const vx = bx + bw / 2 - vw / 2;
@@ -92,7 +92,7 @@ export function TasteMap({ active }: { active: boolean }) {
   const next = useMemo(() => {
     if (!selected) return [];
     const fromRecs = recs.filter((r) => keysOf(dim, r.title).includes(selected)).map((r) => r.title);
-    // Unexplored groups have no signal yet, so fall back to the group's best-known titles.
+    // Uncharted groups have no signal yet, so fall back to the group's best-known titles.
     const seen = new Set(fromRecs.map((t) => t.id));
     const known = groupTitles(dim, selected).filter((t) => !ratings.has(t.id) && !dismissed.has(t.id) && !seen.has(t.id));
     return [...fromRecs, ...known].slice(0, 12);
@@ -103,7 +103,7 @@ export function TasteMap({ active }: { active: boolean }) {
   const overall = rankedIn ? explored.reduce((n, s) => n + s.avg * s.rated.length, 0) / rankedIn : 0;
 
   return (
-    <Screen title="Taste Map" active={active}>
+    <Screen title="Galaxy" active={active}>
       <div className="filter-bar">
         <Segmented<Dimension> value={dim} onChange={setDim} options={DIMS} />
       </div>
@@ -111,23 +111,37 @@ export function TasteMap({ active }: { active: boolean }) {
       <div className="theater">
         <div className="theater-head">
           <strong>{coveredCount}<span>/{UNIVERSE[dim].length}</span></strong>
-          <p>{noun} explored</p>
+          <p>{noun} charted</p>
         </div>
 
         {layout.bubbles.length > 0 ? (
           <svg viewBox={`${vx} ${by - PAD} ${vw} ${vh}`} role="group" aria-label={`Your ${noun}, average ${overall.toFixed(1)}`}>
+            <defs>
+              <radialGradient id="planet-shade" cx="34%" cy="28%" r="78%">
+                <stop offset="0" stopColor="#fff" stopOpacity="0.22" />
+                <stop offset="0.38" stopColor="#000" stopOpacity="0.12" />
+                <stop offset="0.8" stopColor="#000" stopOpacity="0.62" />
+                <stop offset="1" stopColor="#000" stopOpacity="0.82" />
+              </radialGradient>
+              <filter id="atmosphere" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="6" />
+              </filter>
+            </defs>
+            {[0.62, 0.9, 1.18].map((k) => (
+              <ellipse key={k} className="orbit" cx={bx + bw / 2} cy={by + bh / 2} rx={(bw / 2) * k + 10} ry={(bh / 2) * k + 6} />
+            ))}
             {layout.bubbles.map((b, i) => (
               <BubbleNode key={b.name} b={b} s={stats.get(b.name)!} cover={covers.get(b.name)} i={i} color={colorOf(dim, b.name)}
                 on={selected === b.name} onPick={() => pick(b.name)} />
             ))}
           </svg>
         ) : (
-          <p className="theater-empty">Rate a few titles and your {dim === 'makers' ? 'creators' : dim} light up here.</p>
+          <p className="theater-empty">Rate a few titles and your first planets appear here.</p>
         )}
 
         {missing.length > 0 && (
           <div className="unexplored">
-            <p className="unexplored-label">Not explored yet · {missing.length}</p>
+            <p className="unexplored-label">Uncharted · {missing.length}</p>
             <div className="unexplored-grid">
               {missing.slice(0, MAX_MISSING).map((k) => (
                 <button key={k} className={`ghost-dot ${selected === k ? 'on' : ''}`} style={{ ['--c' as string]: colorOf(dim, k) }}
@@ -151,7 +165,7 @@ export function TasteMap({ active }: { active: boolean }) {
               <p>
                 {sel.rated.length
                   ? `${sel.rated.length} ranked · ${Math.round((sel.rated.length / ratings.size) * 100)}% of your list`
-                  : 'Not explored yet'}
+                  : 'Uncharted: you haven’t ranked anything here yet'}
               </p>
             </div>
             {sel.rated.length > 0 && <ScoreBadge rating={{ score: sel.avg, sentiment: sentimentOf(sel.avg) }} />}
@@ -166,15 +180,15 @@ export function TasteMap({ active }: { active: boolean }) {
       {sel && sel.rated.length > 0 && (
         <>
           <SectionHeader title="Your top" />
-          <div className="list">
+          <Cards>
             {sel.rated.slice(0, 3).map((r, i) => <TitleRow key={r.id} t={BY_ID.get(r.id)!} rank={i + 1} />)}
-          </div>
+          </Cards>
         </>
       )}
 
       {sel && next.length > 0 && (
         <>
-          <SectionHeader title={sel.rated.length ? 'Go deeper' : 'Start here'}
+          <SectionHeader title={sel.rated.length ? 'Explore further' : 'Make first landing'}
             subtitle={sel.rated.length ? undefined : 'Seen any of these? Tap to rate'} />
           <Shelf>
             {next.map((t) => (
@@ -191,7 +205,7 @@ export function TasteMap({ active }: { active: boolean }) {
   );
 }
 
-/** One explored group: the poster of your favourite title in it, its name and your average score. */
+/** One explored group as a planet: your favourite title in it for a surface, its name and your average score. */
 function BubbleNode({ b, s, cover, i, color, on, onPick }: {
   b: { name: string; x: number; y: number; r: number };
   s: GroupStat;
@@ -201,25 +215,32 @@ function BubbleNode({ b, s, cover, i, color, on, onPick }: {
   on: boolean;
   onPick: () => void;
 }) {
-  const ls = lines(b.name);
+  // Themes are stored lowercase ("heist", "ai"); show them like names.
+  const ls = lines(b.name.length <= 2 ? b.name.toUpperCase() : b.name[0].toUpperCase() + b.name.slice(1));
   const longest = Math.max(...ls.map((l) => l.length));
   const fs = Math.max(8.5, Math.min(13, 6 + b.r / 7, (b.r * 1.6) / (longest * 0.58)));
   const lh = fs * 1.1;
   const top = -((ls.length - 1) * lh) / 2 - fs * 0.55;
   const clip = `clip-${i}-${b.name.replace(/[^a-z0-9]/gi, '')}`;
+  const rx = b.r * 1.55;
+  const ry = b.r * 0.36;
   return (
     <g className={`bubble ${on ? 'on' : ''}`} transform={`translate(${b.x} ${b.y})`} style={{ ['--c' as string]: color }}
       role="button" tabIndex={0} aria-pressed={on} aria-label={`${b.name}: ${s.rated.length} ranked, average ${s.avg.toFixed(1)}`}
       onClick={onPick} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick()}>
       <g className="pop" style={{ animationDelay: `${i * 30}ms` }}>
+        <circle r={b.r + 2} className="atmosphere" filter="url(#atmosphere)" />
+        {on && <ellipse className="saturn back" rx={rx} ry={ry} transform="rotate(-16)" />}
         <clipPath id={clip}><circle r={b.r} /></clipPath>
         <circle r={b.r} className="base" />
         {cover && (
           <image href={cover.image![0]} x={-b.r} y={-b.r} width={b.r * 2} height={b.r * 2}
             preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clip})`} />
         )}
-        <circle r={b.r} className="shade" />
-        <circle r={b.r} className="ring" />
+        <circle r={b.r} className="tint" />
+        <circle r={b.r} className="shade" fill="url(#planet-shade)" />
+        <circle r={b.r} className="rim" />
+        {on && <path className="saturn" d={`M ${-rx} 0 A ${rx} ${ry} 0 0 0 ${rx} 0`} transform="rotate(-16)" />}
         <text className="name" style={{ fontSize: fs }}>
           {ls.map((l, j) => <tspan key={j} x={0} y={top + j * lh} dy="0.35em">{l}</tspan>)}
         </text>

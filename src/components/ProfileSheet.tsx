@@ -1,9 +1,9 @@
 import { useState, type ChangeEvent } from 'react';
-import { BY_ID, GENRES, metaLine } from '../lib/catalog';
+import { BY_ID, GENRES } from '../lib/catalog';
 import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
 import { exploredCount } from '../lib/taste';
 import { CheckIcon, DownloadIcon, EyeSlashIcon, TrashIcon, UploadIcon, UserIcon, XIcon } from './Icons';
-import { Poster } from './Poster';
+import { Cards, TitleRow } from './ui';
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
@@ -67,35 +67,25 @@ export function ProfileSheet({ onClose }: { onClose: () => void }) {
       <div className="profile-head">
         <span className="avatar avatar-lg"><UserIcon size={30} /></span>
         <h2>Your profile</h2>
-        <p>Saved on this device only</p>
+        <p>Explorer log · saved on this device only</p>
       </div>
 
       <div className="stats">
         <div><strong>{movies}</strong><span>Movies</span></div>
         <div><strong>{ratings.size - movies}</strong><span>Shows</span></div>
         <div><strong>{data.watchlist.length}</strong><span>Watchlist</span></div>
-        <div><strong>{explored}<small>/{GENRES.length}</small></strong><span>Genres</span></div>
+        <div><strong>{explored}<small>/{GENRES.length}</small></strong><span>Planets</span></div>
       </div>
 
       <h3 className="panel-label">Not interested</h3>
       {hidden.length ? (
         <>
-          <div className="list">
+          <Cards>
             {(allHidden ? hidden : hidden.slice(0, 5)).map((t) => (
-              <div className="row hidden-row" key={t.id}>
-                <div className="row-main static">
-                  <Poster t={t} size="sm" />
-                  <span className="row-text">
-                    <span className="row-title">{t.title}</span>
-                    <span className="row-sub">{metaLine(t)}</span>
-                  </span>
-                </div>
-                <span className="row-actions">
-                  <button className="secondary-btn small" onClick={() => toggleDismissed(t.id)}>Show again</button>
-                </span>
-              </div>
+              <TitleRow key={t.id} t={t} readOnly
+                actions={<button className="secondary-btn small glass" onClick={() => toggleDismissed(t.id)}>Show again</button>} />
             ))}
-          </div>
+          </Cards>
           {hidden.length > 5 && (
             <button className="text-btn subtle center" onClick={() => setAllHidden((v) => !v)}>
               {allHidden ? 'Show fewer' : `Show all ${hidden.length}`}

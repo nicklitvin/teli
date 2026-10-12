@@ -5,7 +5,7 @@ import { search } from '../lib/search';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { BookmarkIcon, SearchIcon, XIcon } from '../components/Icons';
-import { Empty, Screen, Segmented, TitleRow } from '../components/ui';
+import { Cards, Empty, Screen, Segmented, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
 
@@ -50,11 +50,12 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
 
       {browsing ? (
         <>
-          <h2 className="browse-title">Browse by genre</h2>
+          <h2 className="browse-title">Visit a genre</h2>
           <div className="genre-grid">
             {GENRES.map((g) => (
               <button key={g} className="genre-tile" style={{ ['--c' as string]: GENRE_COLORS[g] ?? '#8E8E93' }}
                 onClick={() => setGenre(g)}>
+                <i className="planet" aria-hidden="true" />
                 {g}
               </button>
             ))}
@@ -72,14 +73,14 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
             )}
           </div>
           {results.length ? (
-            <div className="list">
+            <Cards>
               {results.map((t) => {
                 const saved = data.watchlist.includes(t.id);
                 return (
                   <TitleRow key={t.id} t={t}
                     actions={ratings.has(t.id) ? undefined : (
                       <>
-                        <button className={`icon-btn bookmark ${saved ? 'on' : ''}`} onClick={() => toggleWatchlist(t.id)}
+                        <button className={`icon-btn glass ${saved ? 'on' : ''}`} onClick={() => toggleWatchlist(t.id)}
                           aria-label={saved ? 'Remove from watchlist' : 'Save to watchlist'} aria-pressed={saved}>
                           <BookmarkIcon size={17} filled={saved} />
                         </button>
@@ -88,7 +89,7 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
                     )} />
                 );
               })}
-            </div>
+            </Cards>
           ) : (
             <Empty icon={<SearchIcon size={34} />} title="No results" body={`Nothing matches “${q}”. Try a title, director, or genre.`} />
           )}
