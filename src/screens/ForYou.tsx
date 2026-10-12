@@ -3,7 +3,7 @@ import { CATALOG, STARTERS, metaLine } from '../lib/catalog';
 import { discover, recommend, type Rec } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { BookmarkIcon, EyeSlashIcon, OrbitIcon, SearchIcon, StarIcon } from '../components/Icons';
+import { BookmarkIcon, EyeSlashIcon, OrbitIcon, RocketIcon, SearchIcon, StarIcon } from '../components/Icons';
 import { Poster } from '../components/Poster';
 import { Screen, SectionHeader } from '../components/ui';
 
@@ -69,7 +69,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
       }}>
       <div className="feed-float">
         <button className={`discover-tag ${discovering ? 'on' : ''}`} onClick={switchMode} aria-pressed={discovering}>
-          <OrbitIcon size={15} /> Discover
+          <RocketIcon size={15} /> Discover
         </button>
       </div>
       {feed.slice(0, limit).map((r) => (

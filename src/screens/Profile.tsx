@@ -4,7 +4,7 @@ import { BY_ID, GENRES } from '../lib/catalog';
 import { normalize } from '../lib/search';
 import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
 import {
-  BookIcon, CheckIcon, DownloadIcon, EyeSlashIcon, GearIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
+  BookIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
 } from '../components/Icons';
 import { Cards, Empty, ListTools, PosterCard, Screen, SectionHeader, Shelf, TitleRow } from '../components/ui';
 
@@ -16,6 +16,7 @@ const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
   const [settings, setSettings] = useState(false);
+  const [hiddenPage, setHiddenPage] = useState(false);
   const [tab, setTab] = useState<MediaType>('movie');
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState('');
@@ -36,6 +37,14 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   const saved = data.watchlist.map((id) => BY_ID.get(id)!).filter((t) => t.type === tab);
   const noun = tab === 'movie' ? 'movies' : 'shows';
 
+  if (hiddenPage) {
+    return (
+      <Screen title="Not interested" active={active} className="profile">
+        <HiddenTitles onBack={() => setHiddenPage(false)} />
+      </Screen>
+    );
+  }
+
   return (
     <Screen title="Profile" active={active} className="profile">
       <div className="profile-head">
@@ -50,7 +59,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
         </button>
       </div>
 
-      {settings && <Settings />}
+      {settings && <Settings onHidden={() => setHiddenPage(true)} />}
 
       {ratings.size ? (
         <>
@@ -88,12 +97,38 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   );
 }
 
-/** Backups: export, import (replaces everything) and reset, each confirmed first. */
-function Settings() {
-  const { data, replace, toggleDismissed } = useStore();
-  const [pending, setPending] = useState<Pending | null>(null);
-  const [showHidden, setShowHidden] = useState(false);
+/** Titles you marked "Not interested", on a page of their own, each with a way back into your picks. */
+function HiddenTitles({ onBack }: { onBack: () => void }) {
+  const { data, toggleDismissed } = useStore();
   const hidden = [...data.dismissed].reverse().map((id) => BY_ID.get(id)).filter((t) => !!t);
+  return (
+    <>
+      <div className="subpage-head">
+        <button className="icon-btn" onClick={onBack} aria-label="Back to your logbook"><ChevronLeft size={18} /></button>
+        <div>
+          <h2>Not interested</h2>
+          <p>{hidden.length ? `${plural(hidden.length, 'title')} kept out of your picks` : 'Nothing hidden'}</p>
+        </div>
+      </div>
+      {hidden.length ? (
+        <Cards>
+          {hidden.map((t) => (
+            <TitleRow key={t.id} t={t}
+              actions={<button className="secondary-btn small glass" onClick={() => toggleDismissed(t.id)}>Show again</button>} />
+          ))}
+        </Cards>
+      ) : (
+        <Empty icon={<EyeSlashIcon size={30} />} title="Nothing hidden" body="Titles you mark “Not interested” land here." />
+      )}
+    </>
+  );
+}
+
+/** Backups: export, import (replaces everything) and reset, each confirmed first. Also the way into hidden titles. */
+function Settings({ onHidden }: { onHidden: () => void }) {
+  const { data, replace } = useStore();
+  const [pending, setPending] = useState<Pending | null>(null);
+  const hiddenCount = data.dismissed.length;
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
 
   const exportData = () => {
@@ -150,21 +185,12 @@ function Settings() {
           <TrashIcon size={18} />
           <span><strong>Reset everything</strong><small>Erase all rankings, watchlist and hidden titles</small></span>
         </button>
-        <button className="setting" onClick={() => setShowHidden((v) => !v)} aria-expanded={showHidden} disabled={!hidden.length}>
+        <button className="setting" onClick={onHidden}>
           <EyeSlashIcon size={18} />
-          <span><strong>Not interested</strong><small>{hidden.length ? `${plural(hidden.length, 'hidden title')}: tap to review` : 'Nothing hidden'}</small></span>
+          <span><strong>Not interested</strong><small>{hiddenCount ? plural(hiddenCount, 'hidden title') : 'Nothing hidden'}</small></span>
+          <ChevronRight size={16} className="setting-go" />
         </button>
       </div>
-      {showHidden && hidden.length > 0 && (
-        <div className="hidden-titles">
-          <Cards>
-            {hidden.map((t) => (
-              <TitleRow key={t.id} t={t}
-                actions={<button className="secondary-btn small glass" onClick={() => toggleDismissed(t.id)}>Show again</button>} />
-            ))}
-          </Cards>
-        </div>
-      )}
 
       {pending && (
         <div className={`confirm ${pending.kind === 'reset' ? 'danger' : ''}`} role="alertdialog" aria-label="Confirm">
