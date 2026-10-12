@@ -1,23 +1,40 @@
-import { useState, type ChangeEvent } from 'react';
-import type { MediaType, Rating } from '../types';
-import { BY_ID } from '../lib/catalog';
+import { useMemo, useState, type ChangeEvent } from 'react';
+import type { MediaType } from '../types';
+import { BY_ID, GENRES } from '../lib/catalog';
+import { normalize } from '../lib/search';
 import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
-import { BookIcon, CheckIcon, DownloadIcon, GearIcon, TrashIcon, UploadIcon, UserIcon } from '../components/Icons';
-import { Cards, Empty, PosterCard, Screen, SectionHeader, Shelf, TitleRow } from '../components/ui';
+import {
+  BookIcon, CheckIcon, DownloadIcon, EyeSlashIcon, GearIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
+} from '../components/Icons';
+import { Cards, Empty, ListTools, PosterCard, Screen, SectionHeader, Shelf, TitleRow } from '../components/ui';
 
 type Pending = { kind: 'import'; data: Data; name: string } | { kind: 'reset' };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
-const PREVIEW = 5;
 
-/** Your logbook: movies and shows each ranked by score, then your watchlist. Backups sit behind the gear. */
+/** Your logbook: movies or shows ranked by score, with genre and search filters. Backups and hidden titles sit behind the gear. */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
-  const { data, ratings, toggleDismissed } = useStore();
+  const { data, ratings } = useStore();
   const [settings, setSettings] = useState(false);
-  const [showHidden, setShowHidden] = useState(false);
+  const [tab, setTab] = useState<MediaType>('movie');
+  const [genre, setGenre] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
 
-  const watch = data.watchlist.map((id) => BY_ID.get(id)!);
-  const hidden = [...data.dismissed].reverse().map((id) => BY_ID.get(id)).filter((t) => !!t);
+  // Numbers are your overall rank in movies or shows, so they stay put while filtering.
+  const list = useMemo(
+    () => [...ratings.values()].filter((r) => r.type === tab)
+      .sort((a, b) => b.score - a.score || a.rank - b.rank)
+      .map((r, i) => ({ r, t: BY_ID.get(r.id)!, n: i + 1 })),
+    [ratings, tab],
+  );
+  const genres = GENRES.filter((g) => list.some((x) => x.t.genres.includes(g)));
+  const q = normalize(query.trim());
+  const shown = list.filter((x) => (!genre || x.t.genres.includes(genre))
+    && (!q || normalize(`${x.t.title} ${x.t.creator} ${x.t.year}`).includes(q)));
+  const filtering = !!genre || !!q;
+  const avg = list.length ? list.reduce((s, x) => s + x.r.score, 0) / list.length : 0;
+  const saved = data.watchlist.map((id) => BY_ID.get(id)!).filter((t) => t.type === tab);
+  const noun = tab === 'movie' ? 'movies' : 'shows';
 
   return (
     <Screen title="Profile" active={active} className="profile">
@@ -28,7 +45,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
           <p>{plural(ratings.size, 'title')} ranked · saved on this device</p>
         </div>
         <button className={`icon-btn ${settings ? 'on' : ''}`} onClick={() => setSettings((v) => !v)}
-          aria-expanded={settings} aria-label="Backup and settings">
+          aria-expanded={settings} aria-label="Settings">
           <GearIcon size={18} />
         </button>
       </div>
@@ -37,66 +54,46 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
 
       {ratings.size ? (
         <>
-          <RankedGroup type="movie" ratings={ratings} />
-          <RankedGroup type="tv" ratings={ratings} />
+          <ListTools<MediaType> tab={tab} onTab={(t) => { setTab(t); setGenre(null); }}
+            tabs={[{ value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]}
+            genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery} placeholder={`Search your ${noun}`} />
+          {list.length ? (
+            shown.length ? (
+              <>
+                <p className="list-caption">
+                  {filtering ? `${shown.length} of ${list.length} ${noun}` : `${list.length} ranked · average ${avg.toFixed(1)}`}
+                </p>
+                <Cards>{shown.map((x) => <TitleRow key={x.r.id} t={x.t} rank={x.n} />)}</Cards>
+              </>
+            ) : (
+              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ranked ${noun} match that filter.`} />
+            )
+          ) : (
+            <Empty icon={<BookIcon size={30} />} title={`No ${noun} yet`} body={`Rate a few ${noun} and they'll be ranked here.`}
+              action={<button className="primary-btn" onClick={onSearch}>Find {noun}</button>} />
+          )}
+          {!filtering && saved.length > 0 && (
+            <>
+              <SectionHeader title="Watchlist" subtitle={plural(saved.length, tab === 'movie' ? 'movie' : 'show')} />
+              <Shelf>{saved.map((t) => <PosterCard key={t.id} t={t} caption={String(t.year)} />)}</Shelf>
+            </>
+          )}
         </>
       ) : (
         <Empty icon={<BookIcon size={34} />} title="Your logbook is empty"
           body="Rate something you've watched and it'll be logged here, ordered by your score."
           action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
       )}
-
-      {watch.length > 0 && (
-        <>
-          <SectionHeader title="Watchlist" subtitle={plural(watch.length, 'title')} />
-          <Shelf>{watch.map((t) => <PosterCard key={t.id} t={t} caption={String(t.year)} />)}</Shelf>
-        </>
-      )}
-
-      {hidden.length > 0 && (
-        <div className="hidden-titles">
-          <button className="text-btn subtle center" onClick={() => setShowHidden((v) => !v)} aria-expanded={showHidden}>
-            {showHidden ? 'Close' : `${plural(hidden.length, 'title')} marked not interested`}
-          </button>
-          {showHidden && (
-            <Cards>
-              {hidden.map((t) => (
-                <TitleRow key={t.id} t={t}
-                  actions={<button className="secondary-btn small glass" onClick={() => toggleDismissed(t.id)}>Show again</button>} />
-              ))}
-            </Cards>
-          )}
-        </div>
-      )}
     </Screen>
-  );
-}
-
-/** One numbered list (movies or shows), best first; long lists open the rest on request. */
-function RankedGroup({ type, ratings }: { type: MediaType; ratings: Map<string, Rating> }) {
-  const [all, setAll] = useState(false);
-  const list = [...ratings.values()].filter((r) => r.type === type).sort((a, b) => b.score - a.score || a.rank - b.rank);
-  if (!list.length) return null;
-  const avg = list.reduce((s, r) => s + r.score, 0) / list.length;
-  return (
-    <>
-      <SectionHeader title={type === 'movie' ? 'Movies' : 'Shows'} subtitle={`${list.length} ranked · average ${avg.toFixed(1)}`} />
-      <Cards>
-        {(all ? list : list.slice(0, PREVIEW)).map((r, i) => <TitleRow key={r.id} t={BY_ID.get(r.id)!} rank={i + 1} />)}
-      </Cards>
-      {list.length > PREVIEW && (
-        <button className="secondary-btn more" onClick={() => setAll((v) => !v)}>
-          {all ? 'Show top 5' : `Show all ${list.length}`}
-        </button>
-      )}
-    </>
   );
 }
 
 /** Backups: export, import (replaces everything) and reset, each confirmed first. */
 function Settings() {
-  const { data, replace } = useStore();
+  const { data, replace, toggleDismissed } = useStore();
   const [pending, setPending] = useState<Pending | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+  const hidden = [...data.dismissed].reverse().map((id) => BY_ID.get(id)).filter((t) => !!t);
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
 
   const exportData = () => {
@@ -153,7 +150,21 @@ function Settings() {
           <TrashIcon size={18} />
           <span><strong>Reset everything</strong><small>Erase all rankings, watchlist and hidden titles</small></span>
         </button>
+        <button className="setting" onClick={() => setShowHidden((v) => !v)} aria-expanded={showHidden} disabled={!hidden.length}>
+          <EyeSlashIcon size={18} />
+          <span><strong>Not interested</strong><small>{hidden.length ? `${plural(hidden.length, 'hidden title')}: tap to review` : 'Nothing hidden'}</small></span>
+        </button>
       </div>
+      {showHidden && hidden.length > 0 && (
+        <div className="hidden-titles">
+          <Cards>
+            {hidden.map((t) => (
+              <TitleRow key={t.id} t={t}
+                actions={<button className="secondary-btn small glass" onClick={() => toggleDismissed(t.id)}>Show again</button>} />
+            ))}
+          </Cards>
+        </div>
+      )}
 
       {pending && (
         <div className={`confirm ${pending.kind === 'reset' ? 'danger' : ''}`} role="alertdialog" aria-label="Confirm">

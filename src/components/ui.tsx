@@ -1,8 +1,9 @@
-import type { ReactNode, Ref } from 'react';
+import { useState, type ReactNode, type Ref } from 'react';
 import type { Title } from '../types';
-import { metaLine } from '../lib/catalog';
+import { GENRE_COLORS, metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
+import { FilterIcon, SearchIcon, XIcon } from './Icons';
 import { Poster, ScoreBadge } from './Poster';
 
 /** A tab's scroll container. There's no top bar: content starts under the status bar. */
@@ -38,6 +39,69 @@ export function Segmented<T extends string>({ value, options, onChange }: {
           {o.label}
         </button>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Tabs for a list plus two small tools: a genre filter and (optionally) a search box.
+ * Each tool opens under the row; an active genre stays visible as a removable chip.
+ */
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder }: {
+  tab: T;
+  tabs: { value: T; label: string }[];
+  onTab: (t: T) => void;
+  genre: string | null;
+  genres: string[];
+  onGenre: (g: string | null) => void;
+  query?: string;
+  onQuery?: (q: string) => void;
+  placeholder?: string;
+}) {
+  const [open, setOpen] = useState<'search' | 'genre' | null>(null);
+  const toggle = (k: 'search' | 'genre') => setOpen((o) => (o === k ? null : k));
+  return (
+    <div className="tools">
+      <div className="tools-row">
+        <Segmented<T> value={tab} options={tabs} onChange={onTab} />
+        {onQuery && (
+          <button className={`icon-btn tool ${open === 'search' || query ? 'on' : ''}`} onClick={() => toggle('search')}
+            aria-expanded={open === 'search'} aria-label="Search this list">
+            <SearchIcon size={17} />
+          </button>
+        )}
+        <button className={`icon-btn tool ${open === 'genre' || genre ? 'on' : ''}`} onClick={() => toggle('genre')}
+          aria-expanded={open === 'genre'} aria-label="Filter by genre">
+          <FilterIcon size={17} />
+        </button>
+      </div>
+      {onQuery && (open === 'search' || query) && (
+        <label className="search-field slim">
+          <SearchIcon size={16} />
+          <input type="search" autoFocus value={query} placeholder={placeholder ?? 'Search'} onChange={(e) => onQuery(e.target.value)}
+            enterKeyHint="search" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+          {query && (
+            <button className="clear-btn" onClick={() => onQuery('')} aria-label="Clear"><XIcon size={12} strokeWidth={3} /></button>
+          )}
+        </label>
+      )}
+      {open === 'genre' ? (
+        <div className="genre-wrap" role="group" aria-label="Genres">
+          <button className={`chip toggle any ${genre ? '' : 'on'}`} onClick={() => { onGenre(null); setOpen(null); }}
+            aria-pressed={!genre}>Any genre</button>
+          {genres.map((g) => (
+            <button key={g} className={`chip toggle ${genre === g ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
+              onClick={() => { onGenre(genre === g ? null : g); setOpen(null); }} aria-pressed={genre === g}>{g}</button>
+          ))}
+        </div>
+      ) : genre && (
+        <div className="genre-wrap">
+          <button className="chip removable" style={{ ['--c' as string]: GENRE_COLORS[genre] }} onClick={() => onGenre(null)}
+            aria-label={`Remove ${genre} filter`}>
+            {genre} <XIcon size={12} strokeWidth={3} />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
 import type { MediaType } from '../types';
-import { GENRES, GENRE_COLORS } from '../lib/catalog';
+import { GENRES, metaLine } from '../lib/catalog';
 import { groupPicks, loadGroup, nameFromFile, saveGroup, toMember, type GroupState } from '../lib/group';
 import { parseBackup, rankedCount, useStore } from '../lib/store';
 import { UploadIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
-import { Cards, Empty, Screen, SectionHeader, Segmented, TitleRow } from '../components/ui';
+import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
 
@@ -12,7 +12,7 @@ export function Together({ active }: { active: boolean }) {
   const { data } = useStore();
   const [group, setGroup] = useState<GroupState>(loadGroup);
   const [filter, setFilter] = useState<Filter>('all');
-  const [genres, setGenres] = useState<Set<string>>(new Set());
+  const [genre, setGenre] = useState<string | null>(null);
   const [errors, setErrors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
 
@@ -24,13 +24,13 @@ export function Together({ active }: { active: boolean }) {
   ], [group, data]);
   const picks = useMemo(() => (members.length ? groupPicks(members) : []), [members]);
   const ofType = useMemo(() => picks.filter((p) => filter === 'all' || p.title.type === filter), [picks, filter]);
-  const shown = ofType.filter((p) => !genres.size || p.title.genres.some((g) => genres.has(g)));
+  const shown = ofType.filter((p) => !genre || p.title.genres.includes(genre));
   // Only offer genres that actually show up in the group's picks, most common first.
   const genreOptions = useMemo(() => {
     const n = new Map<string, number>();
     for (const p of ofType.slice(0, 150)) for (const g of p.title.genres) n.set(g, (n.get(g) ?? 0) + 1);
-    return GENRES.filter((g) => n.has(g) || genres.has(g)).sort((a, b) => (n.get(b) ?? 0) - (n.get(a) ?? 0));
-  }, [ofType, genres]);
+    return GENRES.filter((g) => n.has(g) || g === genre).sort((a, b) => (n.get(b) ?? 0) - (n.get(a) ?? 0));
+  }, [ofType, genre]);
 
   const addFiles = async (e: ChangeEvent<HTMLInputElement>) => {
     const files = [...(e.target.files ?? [])];
@@ -51,21 +51,10 @@ export function Together({ active }: { active: boolean }) {
   const rename = (id: string, name: string) =>
     setGroup((g) => ({ ...g, people: g.people.map((p) => (p.id === id ? { ...p, name } : p)) }));
   const remove = (id: string) => setGroup((g) => ({ ...g, people: g.people.filter((p) => p.id !== id) }));
-  const toggleGenre = (g: string) => setGenres((s) => {
-    const n = new Set(s);
-    if (n.has(g)) n.delete(g);
-    else n.add(g);
-    return n;
-  });
-
   const enough = members.length >= 2;
 
   return (
     <Screen title="Crew" active={active}>
-      <p className="map-summary">
-        Bring your crew aboard: add their Teli backups to find things <b>none of you</b> have watched yet, picked to suit everyone.
-      </p>
-
       <div className="list people">
         <div className="person">
           <span className="avatar sm"><UserIcon size={14} /></span>
@@ -93,41 +82,25 @@ export function Together({ active }: { active: boolean }) {
         ))}
         <label className="person add">
           <UploadIcon size={17} />
-          <span>Add people from backup files</span>
+          <span>Add a friend's backup</span>
           <input type="file" multiple className="visually-hidden" onChange={addFiles} />
         </label>
       </div>
-      <p className="hint">Each person exports a backup from their Profile tab (the gear) and sends you the file. You can pick several at once.</p>
       {errors.length > 0 && (
         <p className="note error" role="status">Skipped {errors.join(', ')}: not a Teli backup.</p>
       )}
 
       {enough ? (
         <>
-          <div className="filter-bar stacked spaced">
-            <Segmented<Filter> value={filter} onChange={(f) => { setFilter(f); setLimit(25); }}
-              options={[{ value: 'all', label: 'All' }, { value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]} />
-          </div>
-          <div className="genre-scroll" role="group" aria-label="Genres">
-            <button className={`chip toggle any ${genres.size ? '' : 'on'}`}
-              onClick={() => setGenres(new Set())} aria-pressed={!genres.size}>Any genre</button>
-            {genreOptions.map((g) => (
-              <button key={g} className={`chip toggle ${genres.has(g) ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
-                onClick={() => toggleGenre(g)} aria-pressed={genres.has(g)}>{g}</button>
-            ))}
-          </div>
-
-          <SectionHeader title={`Picks for ${members.length} people`}
-            subtitle={`${shown.length} titles none of you have ranked`} />
+          <ListTools<Filter> tab={filter} onTab={(f) => { setFilter(f); setLimit(25); }}
+            tabs={[{ value: 'all', label: 'All' }, { value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]}
+            genre={genre} genres={genreOptions} onGenre={(g) => { setGenre(g); setLimit(25); }} />
           {shown.length ? (
             <>
               <Cards>
                 {shown.slice(0, limit).map((p) => (
-                  <TitleRow key={p.title.id} t={p.title}
-                    accessory={<span className="match-pill">{p.match}%</span>}
-                    detail={p.wanted.length
-                      ? `Watchlisted by ${p.wanted.map((n) => (n === 'You' ? 'you' : n)).join(', ')}`
-                      : p.per.map((x) => `${x.name} ${x.match ?? '–'}`).join(' · ')} />
+                  <TitleRow key={p.title.id} t={p.title} accessory={<span className="match-pill">{p.match}%</span>}
+                    detail={p.wanted.length ? `On ${p.wanted.map((n) => (n === 'You' ? 'your' : `${n}'s`)).join(' & ')} watchlist` : metaLine(p.title)} />
                 ))}
               </Cards>
               {shown.length > limit && (
@@ -135,13 +108,12 @@ export function Together({ active }: { active: boolean }) {
               )}
             </>
           ) : (
-            <Empty icon={<UsersIcon size={30} />} title="Nothing matches"
-              body="Try turning on more genres, or switch between movies and shows." />
+            <Empty icon={<UsersIcon size={30} />} title="Nothing matches" body="Try another genre." />
           )}
         </>
       ) : (
-        <Empty icon={<UsersIcon size={30} />} title="Assemble your crew"
-          body={group.includeMe ? 'Load at least one other backup to see group picks.' : 'Load at least two backups, or include yourself.'} />
+        <Empty icon={<UsersIcon size={30} />} title="Watch together"
+          body="Add a friend's backup to see picks none of you have seen. They export it from Profile → ⚙." />
       )}
     </Screen>
   );

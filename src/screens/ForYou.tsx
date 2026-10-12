@@ -72,8 +72,8 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
           <OrbitIcon size={15} /> Discover
         </button>
       </div>
-      {feed.slice(0, limit).map((r, i) => (
-        <Reel key={`${mode}-${r.title.id}`} rec={r} rank={i + 1} discovering={discovering} />
+      {feed.slice(0, limit).map((r) => (
+        <Reel key={`${mode}-${r.title.id}`} rec={r} discovering={discovering} />
       ))}
       {limit >= feed.length && (
         <div className="reel reel-end">
@@ -90,7 +90,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
 }
 
 /** One recommendation, filling the screen: art behind, details and actions over the bottom. */
-function Reel({ rec, rank, discovering }: { rec: Rec; rank: number; discovering: boolean }) {
+function Reel({ rec, discovering }: { rec: Rec; discovering: boolean }) {
   const { data, toggleWatchlist, toggleDismissed } = useStore();
   const nav = useNav();
   const t = rec.title;
@@ -103,11 +103,6 @@ function Reel({ rec, rank, discovering }: { rec: Rec; rank: number; discovering:
     <article className={`reel ${discovering ? 'discovering' : ''}`} aria-label={t.title}>
       <Poster t={t} size="fill" />
       <button className="reel-hit" onClick={() => nav.openDetail(t.id)} aria-label={`${t.title}: details`} />
-      <div className="reel-top">
-        <span className="reel-eyebrow">
-          {discovering ? <><OrbitIcon size={13} /> Uncharted</> : rank === 1 ? 'Top pick for you' : `Pick #${rank}`}
-        </span>
-      </div>
       <div className="reel-info">
         <div className="frontier">
           {discovering
