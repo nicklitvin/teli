@@ -30,7 +30,7 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
   );
 
   return (
-    <Screen title="Search" active={active}>
+    <Screen title="Search" active={active} className="search">
       <div className="search-bar">
         <label className={`search-field ${focused ? 'focused' : ''}`}>
           <SearchIcon size={17} />

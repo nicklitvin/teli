@@ -1,38 +1,23 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import type { ReactNode, Ref } from 'react';
 import type { Title } from '../types';
 import { metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { UserIcon } from './Icons';
 import { Poster, ScoreBadge } from './Poster';
 
-/** A tab's scroll container with a compact top bar; the avatar opens profile & settings. */
-export function Screen({ title, active, children, actions, className = '', scrollRef, onScroll }: {
+/** A tab's scroll container. There's no top bar: content starts under the status bar. */
+export function Screen({ title, active, children, className = '', scrollRef, onScroll }: {
+  /** Read out by screen readers only. */
   title: string;
   active: boolean;
   children: ReactNode;
-  /** Extra controls in the top bar, before the avatar. */
-  actions?: ReactNode;
   className?: string;
   scrollRef?: Ref<HTMLDivElement>;
   onScroll?: (el: HTMLDivElement) => void;
 }) {
-  const nav = useNav();
-  const [scrolled, setScrolled] = useState(false);
   return (
-    <div className={`screen ${className}`} hidden={!active} ref={scrollRef} onScroll={(e) => {
-      setScrolled(e.currentTarget.scrollTop > 2);
-      onScroll?.(e.currentTarget);
-    }}>
-      <header className={`topbar ${scrolled ? 'scrolled' : ''}`}>
-        <h1>{title}</h1>
-        <span className="topbar-actions">
-          {actions}
-          <button className="avatar" onClick={nav.openProfile} aria-label="Profile and settings">
-            <UserIcon size={17} />
-          </button>
-        </span>
-      </header>
+    <div className={`screen ${className}`} hidden={!active} ref={scrollRef} onScroll={(e) => onScroll?.(e.currentTarget)}>
+      <h1 className="visually-hidden">{title}</h1>
       {children}
     </div>
   );

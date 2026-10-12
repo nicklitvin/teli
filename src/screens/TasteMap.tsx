@@ -5,6 +5,7 @@ import { recommend } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { UNIVERSE, bubbleLayout, groupStats, groupTitles, keysOf, type Dimension, type GroupStat } from '../lib/taste';
 import { useNav } from '../nav';
+import { ChevronDown } from '../components/Icons';
 import { Poster, ScoreBadge } from '../components/Poster';
 import { Cards, Screen, SectionHeader, Segmented, Shelf, TitleRow } from '../components/ui';
 
@@ -35,7 +36,6 @@ function lines(label: string): string[] {
 }
 
 const MAX_BUBBLES = 18;
-const MAX_MISSING = 14;
 const MIN_W = 340;
 
 export function TasteMap({ active }: { active: boolean }) {
@@ -44,6 +44,7 @@ export function TasteMap({ active }: { active: boolean }) {
   const [dim, setDim] = useState<Dimension>('genres');
   const [picked, setPicked] = useState<Record<Dimension, string | null>>({ genres: null, themes: null, decades: null, makers: null });
   const panelRef = useRef<HTMLDivElement>(null);
+  const [showMissing, setShowMissing] = useState(false);
 
   const stats = useMemo(() => groupStats(dim, ratings), [dim, ratings]);
   const explored = useMemo(
@@ -56,9 +57,11 @@ export function TasteMap({ active }: { active: boolean }) {
 
   const selected = picked[dim] ?? explored[0]?.name ?? null;
   const sel = selected ? stats.get(selected) ?? null : null;
-  const pick = (k: string, scroll = false) => {
+  // Picking a planet nudges its stats into view. Uncharted planets live in a drawer, which closes on pick.
+  const pick = (k: string) => {
     setPicked((p) => ({ ...p, [dim]: k }));
-    if (scroll) requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    setShowMissing(false);
+    requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
   };
 
   const layout = useMemo(() => {
@@ -112,7 +115,27 @@ export function TasteMap({ active }: { active: boolean }) {
         <div className="theater-head">
           <strong>{coveredCount}<span>/{UNIVERSE[dim].length}</span></strong>
           <p>{noun} charted</p>
+          {missing.length > 0 && (
+            <button className={`uncharted-btn ${showMissing ? 'on' : ''}`} onClick={() => setShowMissing((v) => !v)}
+              aria-expanded={showMissing}>
+              {missing.length} uncharted <ChevronDown size={13} strokeWidth={2.5} />
+            </button>
+          )}
         </div>
+
+        {showMissing && (
+          <div className="unexplored">
+            <div className="unexplored-grid">
+              {missing.map((k) => (
+                <button key={k} className={`ghost-dot ${selected === k ? 'on' : ''}`} style={{ ['--c' as string]: colorOf(dim, k) }}
+                  onClick={() => pick(k)}>
+                  <i />
+                  <span>{k}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
 
         {layout.bubbles.length > 0 ? (
           <svg viewBox={`${vx} ${by - PAD} ${vw} ${vh}`} role="group" aria-label={`Your ${noun}, average ${overall.toFixed(1)}`}>
@@ -139,21 +162,6 @@ export function TasteMap({ active }: { active: boolean }) {
           <p className="theater-empty">Rate a few titles and your first planets appear here.</p>
         )}
 
-        {missing.length > 0 && (
-          <div className="unexplored">
-            <p className="unexplored-label">Uncharted · {missing.length}</p>
-            <div className="unexplored-grid">
-              {missing.slice(0, MAX_MISSING).map((k) => (
-                <button key={k} className={`ghost-dot ${selected === k ? 'on' : ''}`} style={{ ['--c' as string]: colorOf(dim, k) }}
-                  onClick={() => pick(k, true)}>
-                  <i />
-                  <span>{k}</span>
-                </button>
-              ))}
-            </div>
-            {missing.length > MAX_MISSING && <p className="unexplored-more">and {missing.length - MAX_MISSING} more</p>}
-          </div>
-        )}
       </div>
 
       {sel && (

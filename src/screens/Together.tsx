@@ -97,7 +97,7 @@ export function Together({ active }: { active: boolean }) {
           <input type="file" multiple className="visually-hidden" onChange={addFiles} />
         </label>
       </div>
-      <p className="hint">Each person exports a backup from their profile (top-right avatar) and sends you the file. You can pick several at once.</p>
+      <p className="hint">Each person exports a backup from their Profile tab (the gear) and sends you the file. You can pick several at once.</p>
       {errors.length > 0 && (
         <p className="note error" role="status">Skipped {errors.join(', ')}: not a Teli backup.</p>
       )}

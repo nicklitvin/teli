@@ -59,19 +59,19 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
     setMode(next);
     setLimit(PAGE);
     scroller.current?.scrollTo({ top: 0 });
-    nav.notify(next === 'discover' ? 'Discover on: genres and themes you haven’t explored' : 'Back to your usual picks');
+    nav.notify(next === 'discover' ? 'Discover on: genres and themes new to you' : 'Back to your usual picks');
   };
 
   return (
     <Screen title={discovering ? 'Discover' : 'For You'} active={active} className="feed" scrollRef={scroller}
       onScroll={(el) => {
         if (el.scrollTop + el.clientHeight * 2.5 > el.scrollHeight) setLimit((n) => Math.min(n + PAGE, feed.length));
-      }}
-      actions={
+      }}>
+      <div className="feed-float">
         <button className={`discover-tag ${discovering ? 'on' : ''}`} onClick={switchMode} aria-pressed={discovering}>
           <OrbitIcon size={15} /> Discover
         </button>
-      }>
+      </div>
       {feed.slice(0, limit).map((r, i) => (
         <Reel key={`${mode}-${r.title.id}`} rec={r} rank={i + 1} discovering={discovering} />
       ))}
@@ -107,12 +107,13 @@ function Reel({ rec, rank, discovering }: { rec: Rec; rank: number; discovering:
         <span className="reel-eyebrow">
           {discovering ? <><OrbitIcon size={13} /> Uncharted</> : rank === 1 ? 'Top pick for you' : `Pick #${rank}`}
         </span>
-        {!discovering && <span className="match-pill">{rec.match}% match</span>}
       </div>
       <div className="reel-info">
-        {discovering && rec.frontier && (
-          <div className="frontier">{rec.frontier.map((f) => <span key={f}>{f}</span>)}</div>
-        )}
+        <div className="frontier">
+          {discovering
+            ? rec.frontier?.map((f) => <span key={f}>{f}</span>)
+            : <span className="match-pill">{rec.match}% match</span>}
+        </div>
         <h2>{t.title}</h2>
         <p>{metaLine(t, 3)}</p>
         {!discovering && rec.because && <p className="reel-why">Because you liked {rec.because.title}</p>}

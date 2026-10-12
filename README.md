@@ -10,12 +10,11 @@ The score comes from where the title lands. Each reaction has its own band (like
 
 ## Features
 
-- **For You**: a full-screen feed of recommendations, one per screen. Each card shows the poster, a match %, a "because you liked X" reason, and buttons to rate it, save it or hide it. The **Discover** tag in the top bar switches the feed to well-known titles from genres and themes you haven't ranked anything in yet, rotating between them so it isn't one genre in a row.
+- **For You**: a full-screen feed of recommendations, one per screen, edge to edge. Each card shows the poster, a match %, a "because you liked X" reason, and buttons to rate it, save it or hide it. The **Discover** tag in the top corner switches the feed to well-known titles from genres and themes you haven't ranked anything in yet, rotating between them so it isn't one genre in a row.
 - **Search**: finds titles by name, director or network, genre, tag, year or acronym (`lotr`, `gotg`). You can also browse by genre. Each result has separate **Save** (watchlist) and **Rate** buttons.
-- **Galaxy** (taste map): switch between **genres, themes, decades and creators** (directors and networks). Everything you've explored is a planet in orbit, sized by how much you've ranked, surfaced with the poster of a favourite and labelled with your average score; the selected one gets a ring. Groups you haven't touched are dim "Uncharted" planets below. Tap any of them for your top titles and picks to explore further, or titles to start with.
+- **Galaxy** (taste map): switch between **genres, themes, decades and creators** (directors and networks). Everything you've explored is a planet in orbit, sized by how much you've ranked, surfaced with the poster of a favourite and labelled with your average score; the selected one gets a ring. Groups you haven't touched are dim planets in the "uncharted" drawer next to the count. Tap any of them for your top titles and picks to explore further, or titles to start with.
 - **Crew**: load other people's backup files to get picks that nobody in the group has ranked, filtered by type and by genre (a single scrolling row of the genres in your picks).
-- **Logbook**: your ranked list with scores, plus a watchlist.
-- **Profile** (the avatar, top right): stats, titles you marked "Not interested" (with a Show again button), plus export, import and reset.
+- **Profile**: your logbook. Stats, your ranked list with scores, your watchlist, and titles you marked "Not interested" (with a Show again button). The gear holds export, import and reset.
 - Space-exploration look: a starfield with nebula glows, glass panels, a violet-to-teal accent, Space Grotesk headings over Inter text. Every list of titles is a big image card with the name and your score over the bottom. Respects safe areas and reduced motion.
 - No API calls at runtime, and your data is kept in `localStorage`. Poster images load from Wikimedia; when they can't load (for example offline), you see generated art instead.
 
@@ -46,7 +45,7 @@ Then run `npm run images` to find images for any new titles. It looks up each ti
 
 ## Watching together
 
-Everyone exports a backup from their profile and sends the file to one person, who adds the files on the Crew tab. Titles that anyone has ranked or marked "Not interested" are left out. Each remaining title is scored with the normal recommender for each person. A title's group score is half the average of those scores and half the lowest one, so a pick that only one person loves won't win. Titles on someone's watchlist get a boost.
+Everyone exports a backup from their Profile tab (the gear) and sends the file to one person, who adds the files on the Crew tab. Titles that anyone has ranked or marked "Not interested" are left out. Each remaining title is scored with the normal recommender for each person. A title's group score is half the average of those scores and half the lowest one, so a pick that only one person loves won't win. Titles on someone's watchlist get a boost.
 
 ## How recommendations work
 
