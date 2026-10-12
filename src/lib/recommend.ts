@@ -100,14 +100,59 @@ export function recommend(ratings: Map<string, Rating>, dismissed: Set<string>, 
   return out;
 }
 
+/** A number in [0, 1) fixed for a seed and title, so a feed keeps its order when one title drops out of it. */
+function jitter(seed: number, id: string): number {
+  let h = (2166136261 ^ seed) >>> 0;
+  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619);
+  h = Math.imul(h ^ (h >>> 16), 0x85ebca6b);
+  h = Math.imul(h ^ (h >>> 13), 0xc2b2ae35);
+  return ((h ^ (h >>> 16)) >>> 0) / 2 ** 32;
+}
+
+/** A fresh seed for `shuffle` and `discover`. */
+export const newSeed = () => Math.floor(Math.random() * 2 ** 32);
+
+const MIX = 150;
+
+/**
+ * Your picks in a new order for each seed. Strong matches still lead, but every score is nudged up
+ * or down by up to half, and titles picked because of the same favorite, by the same director or
+ * network, or sharing a main genre with the last few shown, are pushed back so the feed keeps changing subject.
+ */
+export function shuffle(recs: Rec[], seed: number): Rec[] {
+  const left = recs.slice(0, MIX).map((r) => ({ r, s: r.score * (0.5 + jitter(seed, r.title.id)) }));
+  const because = new Map<string, number>();
+  const creators = new Map<string, number>();
+  const out: Rec[] = [];
+  while (left.length) {
+    const recent = out.slice(-3).map((r) => r.title.genres[0]);
+    let best = 0;
+    let bestScore = -1;
+    left.forEach((x, i) => {
+      let s = x.s * 0.6 ** (because.get(x.r.because?.id ?? '') ?? 0) * 0.6 ** (creators.get(x.r.title.creator) ?? 0);
+      if (recent.includes(x.r.title.genres[0])) s *= 0.75;
+      if (s > bestScore) {
+        bestScore = s;
+        best = i;
+      }
+    });
+    const [{ r }] = left.splice(best, 1);
+    if (r.because) because.set(r.because.id, (because.get(r.because.id) ?? 0) + 1);
+    if (r.title.creator) creators.set(r.title.creator, (creators.get(r.title.creator) ?? 0) + 1);
+    out.push(r);
+  }
+  return [...out, ...recs.slice(MIX)];
+}
+
 const THEMES = new Set(UNIVERSE.themes);
 
 /**
  * Discover mode: well-known titles from genres and themes you haven't ranked anything in.
  * Your taste still breaks ties, so the first Western you're shown is one you're likely to enjoy,
- * and the feed rotates through frontiers instead of showing five Westerns in a row.
+ * and the feed rotates through frontiers instead of showing five Westerns in a row. The seed
+ * shakes up the order, so each visit starts somewhere different.
  */
-export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, recs: Rec[]): Rec[] {
+export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, recs: Rec[], seed = 0): Rec[] {
   if (!ratings.size) return [];
   const seenGenres = new Map<string, number>();
   const seenThemes = new Set<string>();
@@ -132,7 +177,8 @@ export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, r
     const novelty = newGenres.length + 0.6 * newThemes.length + 0.5 * (1 - familiar);
     const known = 1 - ORDER.get(t.id)! / N;
     const f = Math.max(0, (fit.get(t.id) ?? 0) / maxFit);
-    const score = novelty * (0.15 + known * known) * (0.6 + 0.8 * f) * (t.image ? 1 : 0.5);
+    const luck = 0.5 + jitter(seed, t.id);
+    const score = novelty * (0.15 + known * known) * (0.6 + 0.8 * f) * (t.image ? 1 : 0.5) * luck;
     pool.push({ title: t, score, match: Math.round(55 + 44 * Math.min(1, f)), frontier: [...newGenres, ...newThemes].slice(0, 3) });
   }
   pool.sort((a, b) => b.score - a.score);

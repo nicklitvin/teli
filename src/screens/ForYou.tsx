@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { CATALOG, STARTERS, metaLine } from '../lib/catalog';
-import { discover, recommend, type Rec } from '../lib/recommend';
+import { discover, newSeed, recommend, shuffle, type Rec } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { BookmarkIcon, EyeSlashIcon, OrbitIcon, RocketIcon, SearchIcon, StarIcon } from '../components/Icons';
@@ -16,9 +16,11 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   const dismissed = useMemo(() => new Set(data.dismissed), [data.dismissed]);
   const recs = useMemo(() => recommend(ratings, dismissed), [ratings, dismissed]);
   const [mode, setMode] = useState<Mode>('picks');
-  const frontier = useMemo(
-    () => (mode === 'discover' ? discover(ratings, dismissed, recs) : []),
-    [mode, ratings, dismissed, recs],
+  // A new seed on every load and every switch between picks and Discover, so the feed isn't the same each time.
+  const [seed, setSeed] = useState(newSeed);
+  const feed = useMemo(
+    () => (mode === 'discover' ? discover(ratings, dismissed, recs, seed) : shuffle(recs, seed)),
+    [mode, ratings, dismissed, recs, seed],
   );
   const [limit, setLimit] = useState(PAGE);
   const scroller = useRef<HTMLDivElement>(null);
@@ -53,10 +55,10 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   }
 
   const discovering = mode === 'discover';
-  const feed = discovering ? frontier : recs;
   const switchMode = () => {
     const next = discovering ? 'picks' : 'discover';
     setMode(next);
+    setSeed(newSeed());
     setLimit(PAGE);
     scroller.current?.scrollTo({ top: 0 });
     nav.notify(next === 'discover' ? 'Discover on: genres and themes new to you' : 'Back to your usual picks');
@@ -73,7 +75,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
         </button>
       </div>
       {feed.slice(0, limit).map((r) => (
-        <Reel key={`${mode}-${r.title.id}`} rec={r} discovering={discovering} />
+        <Reel key={`${mode}-${seed}-${r.title.id}`} rec={r} discovering={discovering} />
       ))}
       {limit >= feed.length && (
         <div className="reel reel-end">
