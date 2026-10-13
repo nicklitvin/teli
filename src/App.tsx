@@ -3,7 +3,7 @@ import { DetailSheet } from './components/DetailSheet';
 import { PlanetIcon, RocketIcon, SearchIcon, UserIcon, UsersIcon } from './components/Icons';
 import { RateFlow } from './components/RateFlow';
 import { Sheet } from './components/Sheet';
-import { cloudEnabled, takeInvite } from './lib/cloud';
+import { takeInvite } from './lib/cloud';
 import { NavCtx, type Nav } from './nav';
 import { ForYou } from './screens/ForYou';
 import { Profile } from './screens/Profile';
@@ -22,7 +22,7 @@ const TABS: { id: Tab; label: string; Icon: typeof SearchIcon }[] = [
 ];
 
 // Opened from a crew invite link: start on the Crew tab with the code filled in.
-const INVITE = cloudEnabled ? takeInvite() : null;
+const INVITE = takeInvite();
 
 export default function App() {
   const [tab, setTab] = useState<Tab>(INVITE ? 'together' : 'foryou');

@@ -11,7 +11,6 @@ import { sanitize, type Data } from './store';
 
 const SB_URL = import.meta.env.VITE_SUPABASE_URL as string | undefined;
 const SB_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined;
-export const cloudEnabled = !!(SB_URL && SB_KEY);
 
 const TABLE = 'crew_members';
 const POLL_MS = 15_000;
@@ -37,6 +36,7 @@ let ready: Promise<{ sb: SupabaseClient; uid: string }> | null = null;
 /** The client, loaded only when a crew is used, signed in anonymously so this device has a member id. */
 function connect() {
   ready ??= (async () => {
+    if (!SB_URL || !SB_KEY) throw new CrewError('Crews aren’t connected yet. Add the Supabase URL and key to turn them on.');
     const { createClient } = await import('@supabase/supabase-js');
     const sb = createClient(SB_URL!, SB_KEY!);
     const { data } = await sb.auth.getSession();
@@ -167,7 +167,7 @@ export function useCloudCrew(data: Data, active: boolean) {
   // A failed upload tries again a little later. (`body` stands in for `name` and `data`.)
   const body = JSON.stringify({ name: name.trim(), data });
   useEffect(() => {
-    if (!cloudEnabled || !code || body === saved.sent) return;
+    if (!code || body === saved.sent) return;
     let again: ReturnType<typeof setTimeout> | undefined;
     const t = setTimeout(async () => {
       try {
@@ -186,7 +186,7 @@ export function useCloudCrew(data: Data, active: boolean) {
 
   // Poll while the Crew tab is on screen.
   useEffect(() => {
-    if (!cloudEnabled || !code || !active) return;
+    if (!code || !active) return;
     let timer: ReturnType<typeof setTimeout> | undefined;
     let stopped = false;
     const tick = () => {

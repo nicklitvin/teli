@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { MediaType } from '../types';
 import { GENRES, metaLine } from '../lib/catalog';
-import { CrewError, cleanCode, cloudEnabled, inviteLink, useCloudCrew, validCode } from '../lib/cloud';
-import { groupPicks, loadGroup, nameFromFile, saveGroup, toMember, type GroupPick, type GroupState, type SeenMode } from '../lib/group';
-import { parseBackup, rankedCount, useStore } from '../lib/store';
+import { CrewError, cleanCode, inviteLink, useCloudCrew, validCode } from '../lib/cloud';
+import { groupPicks, loadGroup, saveGroup, toMember, type GroupPick, type GroupState, type SeenMode } from '../lib/group';
+import { rankedCount, useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { ShareIcon, UploadIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
+import { ShareIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
 import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
@@ -41,12 +41,11 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   const [filter, setFilter] = useState<Filter>('all');
   const [genre, setGenre] = useState<string | null>(null);
   const [seen, setSeen] = useState<SeenMode>('none');
-  const [errors, setErrors] = useState<string[]>([]);
   const [limit, setLimit] = useState(25);
 
   useEffect(() => saveGroup(group), [group]);
 
-  // You, then your cloud crew (re-fetched whenever someone's ratings change), then any backups added by hand.
+  // You, then your crew (re-fetched whenever someone's ratings change), then any backup files added before crews synced.
   const members = useMemo(() => [
     ...(group.includeMe ? [toMember('You', data)] : []),
     ...cloud.members.map((m, i) => toMember(friendName(m.name, i), m.data)),
@@ -62,22 +61,6 @@ export function Together({ active, invite }: { active: boolean; invite: string |
     return GENRES.filter((g) => n.has(g) || g === genre).sort((a, b) => (n.get(b) ?? 0) - (n.get(a) ?? 0));
   }, [ofType, genre]);
 
-  const addFiles = async (e: ChangeEvent<HTMLInputElement>) => {
-    const files = [...(e.target.files ?? [])];
-    e.target.value = '';
-    const bad: string[] = [];
-    const added: GroupState['people'] = [];
-    for (const f of files) {
-      try {
-        added.push({ id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`, name: nameFromFile(f.name), data: parseBackup(await f.text()) });
-      } catch {
-        bad.push(f.name);
-      }
-    }
-    setErrors(bad);
-    if (added.length) setGroup((g) => ({ ...g, people: [...g.people, ...added] }));
-  };
-
   const rename = (id: string, name: string) =>
     setGroup((g) => ({ ...g, people: g.people.map((p) => (p.id === id ? { ...p, name } : p)) }));
   const remove = (id: string) => setGroup((g) => ({ ...g, people: g.people.filter((p) => p.id !== id) }));
@@ -85,14 +68,12 @@ export function Together({ active, invite }: { active: boolean; invite: string |
 
   return (
     <Screen title="Crew" active={active}>
-      {cloudEnabled && <CrewBox cloud={cloud} invite={invite} />}
+      <CrewBox cloud={cloud} invite={invite} />
       <div className="list people">
         <div className="person">
           <span className="avatar sm"><UserIcon size={14} /></span>
-          {cloudEnabled ? (
-            <input className="person-input" value={cloud.name} placeholder="Your name" maxLength={40}
-              onChange={(e) => cloud.setName(e.target.value)} aria-label="Your name, as your crew sees it" />
-          ) : <span className="person-name">You</span>}
+          <input className="person-input" value={cloud.name} placeholder="Your name" maxLength={40}
+            onChange={(e) => cloud.setName(e.target.value)} aria-label="Your name, as your crew sees it" />
           <span className="person-sub">{rankedCount(data)} ranked</span>
           <label className="switch">
             <input type="checkbox" checked={group.includeMe}
@@ -126,17 +107,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
             </div>
           );
         })}
-        {!cloudEnabled && (
-          <label className="person add">
-            <UploadIcon size={17} />
-            <span>Add a friend's backup</span>
-            <input type="file" multiple className="visually-hidden" onChange={addFiles} />
-          </label>
-        )}
       </div>
-      {errors.length > 0 && (
-        <p className="note error" role="status">Skipped {errors.join(', ')}: not a Teli backup.</p>
-      )}
 
       {enough ? (
         <>
@@ -165,9 +136,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
           body={`Share code ${cloud.code}. Picks for all of you show up as soon as someone joins.`} />
       ) : (
         <Empty icon={<UsersIcon size={30} />} title="Watch together"
-          body={cloudEnabled
-            ? 'Start a crew and share the code. Everyone’s ratings stay in sync, and picks update as they rate.'
-            : 'Add a friend’s backup to see picks none of you have seen. They export it from Profile → ⚙.'} />
+          body="Start a crew and share the code. Everyone’s ratings stay in sync, and picks update as they rate." />
       )}
     </Screen>
   );
