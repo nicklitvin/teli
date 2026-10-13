@@ -3,39 +3,55 @@ import type { MediaType } from '../types';
 import { BY_ID, GENRES } from '../lib/catalog';
 import { normalize } from '../lib/search';
 import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
+import { useNav } from '../nav';
 import {
-  BookIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
+  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
 } from '../components/Icons';
-import { Cards, Empty, ListTools, PosterCard, Screen, SectionHeader, Shelf, TitleRow } from '../components/ui';
+import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Pending = { kind: 'import'; data: Data; name: string } | { kind: 'reset' };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-/** Your logbook: movies or shows ranked by score, with genre and search filters. Backups and hidden titles sit behind the gear. */
+type Tab = MediaType | 'watchlist';
+
+const TABS: { value: Tab; label: string }[] = [
+  { value: 'movie', label: 'Movies' },
+  { value: 'tv', label: 'Shows' },
+  { value: 'watchlist', label: 'Watchlist' },
+];
+
+/**
+ * Your logbook: movies or shows ranked by score, plus your watchlist, each with genre and search filters.
+ * Backups and hidden titles sit behind the gear.
+ */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
   const [settings, setSettings] = useState(false);
   const [hiddenPage, setHiddenPage] = useState(false);
-  const [tab, setTab] = useState<MediaType>('movie');
+  const [tab, setTab] = useState<Tab>('movie');
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
   // Numbers are your overall rank in movies or shows, so they stay put while filtering.
+  // The watchlist has no numbers and shows what you saved most recently first.
   const list = useMemo(
-    () => [...ratings.values()].filter((r) => r.type === tab)
-      .sort((a, b) => b.score - a.score || a.rank - b.rank)
-      .map((r, i) => ({ r, t: BY_ID.get(r.id)!, n: i + 1 })),
-    [ratings, tab],
+    () => (tab === 'watchlist'
+      ? data.watchlist.map((id) => ({ id, t: BY_ID.get(id)!, n: undefined as number | undefined }))
+      : [...ratings.values()].filter((r) => r.type === tab)
+        .sort((a, b) => b.score - a.score || a.rank - b.rank)
+        .map((r, i) => ({ id: r.id, t: BY_ID.get(r.id)!, n: i + 1 as number | undefined }))),
+    [ratings, data.watchlist, tab],
   );
   const genres = GENRES.filter((g) => list.some((x) => x.t.genres.includes(g)));
   const q = normalize(query.trim());
   const shown = list.filter((x) => (!genre || x.t.genres.includes(genre))
     && (!q || normalize(`${x.t.title} ${x.t.creator} ${x.t.year}`).includes(q)));
   const filtering = !!genre || !!q;
-  const avg = list.length ? list.reduce((s, x) => s + x.r.score, 0) / list.length : 0;
-  const saved = data.watchlist.map((id) => BY_ID.get(id)!).filter((t) => t.type === tab);
-  const noun = tab === 'movie' ? 'movies' : 'shows';
+  const scores = list.map((x) => ratings.get(x.id)?.score ?? 0);
+  const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  const watching = tab === 'watchlist';
+  const noun = tab === 'movie' ? 'movies' : tab === 'tv' ? 'shows' : 'saved titles';
 
   if (hiddenPage) {
     return (
@@ -61,31 +77,33 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
 
       {settings && <Settings onHidden={() => setHiddenPage(true)} />}
 
-      {ratings.size ? (
+      {ratings.size || data.watchlist.length ? (
         <>
-          <ListTools<MediaType> tab={tab} onTab={(t) => { setTab(t); setGenre(null); }}
-            tabs={[{ value: 'movie', label: 'Movies' }, { value: 'tv', label: 'Shows' }]}
+          <ListTools<Tab> tab={tab} onTab={(t) => { setTab(t); setGenre(null); }} tabs={TABS}
             genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery} placeholder={`Search your ${noun}`} />
           {list.length ? (
             shown.length ? (
               <>
                 <p className="list-caption">
-                  {filtering ? `${shown.length} of ${list.length} ${noun}` : `${list.length} ranked · average ${avg.toFixed(1)}`}
+                  {filtering ? `${shown.length} of ${list.length} ${noun}`
+                    : watching ? plural(list.length, 'title') + ' to watch'
+                    : `${list.length} ranked · average ${avg.toFixed(1)}`}
                 </p>
-                <Cards>{shown.map((x) => <TitleRow key={x.r.id} t={x.t} rank={x.n} />)}</Cards>
+                <Cards>
+                  {shown.map((x) => (
+                    <TitleRow key={x.id} t={x.t} rank={x.n} actions={watching ? <Unsave id={x.id} title={x.t.title} /> : undefined} />
+                  ))}
+                </Cards>
               </>
             ) : (
-              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ranked ${noun} match that filter.`} />
+              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ${watching ? 'saved titles' : `ranked ${noun}`} match that filter.`} />
             )
+          ) : watching ? (
+            <Empty icon={<BookmarkIcon size={30} />} title="Nothing saved yet" body="Tap Save on anything you want to watch and it’ll wait here."
+              action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
           ) : (
             <Empty icon={<BookIcon size={30} />} title={`No ${noun} yet`} body={`Rate a few ${noun} and they'll be ranked here.`}
               action={<button className="primary-btn" onClick={onSearch}>Find {noun}</button>} />
-          )}
-          {!filtering && saved.length > 0 && (
-            <>
-              <SectionHeader title="Watchlist" subtitle={plural(saved.length, tab === 'movie' ? 'movie' : 'show')} />
-              <Shelf>{saved.map((t) => <PosterCard key={t.id} t={t} caption={String(t.year)} />)}</Shelf>
-            </>
           )}
         </>
       ) : (
@@ -94,6 +112,21 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
           action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
       )}
     </Screen>
+  );
+}
+
+/** Takes a title off your watchlist, with an undo. */
+function Unsave({ id, title }: { id: string; title: string }) {
+  const { toggleWatchlist } = useStore();
+  const nav = useNav();
+  return (
+    <button className="icon-btn glass" aria-label={`Remove ${title} from your watchlist`}
+      onClick={() => {
+        toggleWatchlist(id);
+        nav.notify(`Removed ${title} from your watchlist`, () => toggleWatchlist(id));
+      }}>
+      <BookmarkIcon size={16} filled />
+    </button>
   );
 }
 
