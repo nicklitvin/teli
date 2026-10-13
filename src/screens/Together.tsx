@@ -67,8 +67,8 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   const enough = members.length >= 2;
 
   return (
-    <Screen title="Crew" active={active}>
-      <CrewBox cloud={cloud} invite={invite} />
+    <Screen title="Crew" active={active} className={cloud.code ? '' : 'crew-docked'}>
+      {cloud.code && <CrewBox cloud={cloud} invite={invite} />}
       <div className="list people">
         <div className="person">
           <span className="avatar sm"><UserIcon size={14} /></span>
@@ -138,11 +138,15 @@ export function Together({ active, invite }: { active: boolean; invite: string |
         <Empty icon={<UsersIcon size={30} />} title="Watch together"
           body="Start a crew and share the code. Everyone’s ratings stay in sync, and picks update as they rate." />
       )}
+      {!cloud.code && <CrewBox cloud={cloud} invite={invite} />}
     </Screen>
   );
 }
 
-/** Start or join a cloud crew; once in one, its code, an invite button and whether it's in sync. */
+/**
+ * Before you're in a crew: start or join, docked just above the tab bar within thumb reach.
+ * Once you're in one: its code, an invite button and whether it's in sync, at the top.
+ */
 function CrewBox({ cloud, invite }: { cloud: ReturnType<typeof useCloudCrew>; invite: string | null }) {
   const nav = useNav();
   const [code, setCode] = useState(invite ?? '');
@@ -209,14 +213,14 @@ function CrewBox({ cloud, invite }: { cloud: ReturnType<typeof useCloudCrew>; in
 
   const clean = cleanCode(code);
   return (
-    <div className="crew-box">
-      <button className="primary-btn" disabled={busy} onClick={() => run(cloud.start)}>Start a crew</button>
+    <div className="crew-dock">
+      {error && <p className="note error" role="status">{error}</p>}
       <form className="crew-row" onSubmit={(e) => { e.preventDefault(); if (validCode(clean)) void run(() => cloud.join(clean)); }}>
         <input className="crew-input" value={clean} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"
           aria-label="Crew code" autoCapitalize="characters" autoCorrect="off" spellCheck={false} enterKeyHint="go" />
         <button className="secondary-btn" type="submit" disabled={busy || !validCode(clean)}>Join</button>
       </form>
-      {error && <p className="note error" role="status">{error}</p>}
+      <button className="primary-btn" disabled={busy} onClick={() => run(cloud.start)}>Start a crew</button>
     </div>
   );
 }
