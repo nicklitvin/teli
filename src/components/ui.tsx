@@ -46,8 +46,9 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 /**
  * Tabs for a list plus two small tools: a filter panel (genre, plus an optional extra choice) and
  * an optional search box. Each opens under the row; active filters stay visible as removable chips.
+ * `extra` puts more buttons in the row, before search.
  */
-export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option }: {
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, extra }: {
   tab: T;
   tabs: { value: T; label: string }[];
   onTab: (t: T) => void;
@@ -59,6 +60,7 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   placeholder?: string;
   /** An extra single-choice filter shown above the genres; anything but `initial` counts as active. */
   option?: { label: string; value: string; initial: string; choices: { value: string; label: string }[]; onChange: (v: string) => void };
+  extra?: ReactNode;
 }) {
   const [open, setOpen] = useState<'search' | 'genre' | null>(null);
   const optionOn = !!option && option.value !== option.initial;
@@ -67,6 +69,7 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
     <div className="tools">
       <div className="tools-row">
         <Segmented<T> value={tab} options={tabs} onChange={onTab} />
+        {extra}
         {onQuery && (
           <button className={`icon-btn tool ${open === 'search' || query ? 'on' : ''}`} onClick={() => toggle('search')}
             aria-expanded={open === 'search'} aria-label="Search this list">

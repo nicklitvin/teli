@@ -13,35 +13,33 @@ type Pending = { kind: 'import'; data: Data; name: string } | { kind: 'reset' };
 
 const plural = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`;
 
-type Tab = MediaType | 'watchlist';
-
-const TABS: { value: Tab; label: string }[] = [
+const TABS: { value: MediaType; label: string }[] = [
   { value: 'movie', label: 'Movies' },
   { value: 'tv', label: 'Shows' },
-  { value: 'watchlist', label: 'Watchlist' },
 ];
 
 /**
- * Your logbook: movies or shows ranked by score, plus your watchlist, each with genre and search filters.
- * Backups and hidden titles sit behind the gear.
+ * Your logbook: movies or shows ranked by score, with genre and search filters. The bookmark button
+ * beside the filters swaps in your watchlist. Backups and hidden titles sit behind the gear.
  */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
   const [settings, setSettings] = useState(false);
   const [hiddenPage, setHiddenPage] = useState(false);
-  const [tab, setTab] = useState<Tab>('movie');
+  const [tab, setTab] = useState<MediaType>('movie');
+  const [watching, setWatching] = useState(false);
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
   // Numbers are your overall rank in movies or shows, so they stay put while filtering.
   // The watchlist has no numbers and shows what you saved most recently first.
   const list = useMemo(
-    () => (tab === 'watchlist'
-      ? data.watchlist.map((id) => ({ id, t: BY_ID.get(id)!, n: undefined as number | undefined }))
+    () => (watching
+      ? data.watchlist.map((id) => ({ id, t: BY_ID.get(id)!, n: undefined as number | undefined })).filter((x) => x.t.type === tab)
       : [...ratings.values()].filter((r) => r.type === tab)
         .sort((a, b) => b.score - a.score || a.rank - b.rank)
         .map((r, i) => ({ id: r.id, t: BY_ID.get(r.id)!, n: i + 1 as number | undefined }))),
-    [ratings, data.watchlist, tab],
+    [ratings, data.watchlist, tab, watching],
   );
   const genres = GENRES.filter((g) => list.some((x) => x.t.genres.includes(g)));
   const q = normalize(query.trim());
@@ -50,8 +48,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   const filtering = !!genre || !!q;
   const scores = list.map((x) => ratings.get(x.id)?.score ?? 0);
   const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
-  const watching = tab === 'watchlist';
-  const noun = tab === 'movie' ? 'movies' : tab === 'tv' ? 'shows' : 'saved titles';
+  const noun = tab === 'movie' ? 'movies' : 'shows';
 
   if (hiddenPage) {
     return (
@@ -79,14 +76,21 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
 
       {ratings.size || data.watchlist.length ? (
         <>
-          <ListTools<Tab> tab={tab} onTab={(t) => { setTab(t); setGenre(null); }} tabs={TABS}
-            genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery} placeholder={`Search your ${noun}`} />
+          <ListTools<MediaType> tab={tab} onTab={(t) => { setTab(t); setGenre(null); }} tabs={TABS}
+            genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery}
+            placeholder={`Search your ${watching ? 'saved ' : ''}${noun}`}
+            extra={
+              <button className={`icon-btn tool ${watching ? 'on' : ''}`} onClick={() => { setWatching((v) => !v); setGenre(null); }}
+                aria-pressed={watching} aria-label="Watchlist">
+                <BookmarkIcon size={17} filled={watching} />
+              </button>
+            } />
           {list.length ? (
             shown.length ? (
               <>
                 <p className="list-caption">
                   {filtering ? `${shown.length} of ${list.length} ${noun}`
-                    : watching ? plural(list.length, 'title') + ' to watch'
+                    : watching ? `${plural(list.length, tab === 'movie' ? 'movie' : 'show')} to watch`
                     : `${list.length} ranked · average ${avg.toFixed(1)}`}
                 </p>
                 <Cards>
@@ -96,11 +100,11 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
                 </Cards>
               </>
             ) : (
-              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ${watching ? 'saved titles' : `ranked ${noun}`} match that filter.`} />
+              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ${watching ? 'saved' : 'ranked'} ${noun} match that filter.`} />
             )
           ) : watching ? (
-            <Empty icon={<BookmarkIcon size={30} />} title="Nothing saved yet" body="Tap Save on anything you want to watch and it’ll wait here."
-              action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
+            <Empty icon={<BookmarkIcon size={30} />} title={`No ${noun} saved`} body={`Tap Save on any of the ${noun} you want to watch and they’ll wait here.`}
+              action={<button className="primary-btn" onClick={onSearch}>Find {noun}</button>} />
           ) : (
             <Empty icon={<BookIcon size={30} />} title={`No ${noun} yet`} body={`Rate a few ${noun} and they'll be ranked here.`}
               action={<button className="primary-btn" onClick={onSearch}>Find {noun}</button>} />
