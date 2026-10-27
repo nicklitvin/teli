@@ -1,14 +1,16 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { CATALOG, STARTERS, metaLine } from '../lib/catalog';
 import { discover, newSeed, recommend, shuffle, type Rec } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { BookmarkIcon, EyeSlashIcon, OrbitIcon, RocketIcon, SearchIcon, StarIcon } from '../components/Icons';
+import { BookmarkIcon, EyeSlashIcon, OrbitIcon, RocketIcon, SearchIcon, RefreshIcon, StarIcon } from '../components/Icons';
 import { Poster } from '../components/Poster';
 import { Screen, SectionHeader } from '../components/ui';
 
 type Mode = 'picks' | 'discover';
 const PAGE = 8;
+/** How far past the first card you pull (in px, after resistance) before letting go refreshes. */
+const PULL_AT = 70;
 
 export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
@@ -24,6 +26,73 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   );
   const [limit, setLimit] = useState(PAGE);
   const scroller = useRef<HTMLDivElement>(null);
+  const [pull, setPull] = useState(0);
+  const hasFeed = ratings.size > 0;
+
+  // Pulling down past the first card (or scrolling up past it with a wheel) deals a fresh feed.
+  const refresh = useRef(() => {});
+  refresh.current = () => {
+    setSeed(newSeed());
+    setLimit(PAGE);
+    scroller.current?.scrollTo({ top: 0 });
+    nav.notify(mode === 'discover' ? 'New frontiers charted' : 'Fresh picks');
+  };
+  useEffect(() => {
+    const el = scroller.current;
+    if (!el) return;
+    let startY: number | null = null;
+    let dist = 0;
+    let wheel = 0;
+    let wheelTimer: ReturnType<typeof setTimeout> | undefined;
+    const start = (e: TouchEvent) => {
+      startY = el.scrollTop <= 0 ? e.touches[0].clientY : null;
+      dist = 0;
+    };
+    const move = (e: TouchEvent) => {
+      if (startY === null) return;
+      const d = e.touches[0].clientY - startY;
+      if (d <= 0 || el.scrollTop > 0) {
+        startY = null;
+        dist = 0;
+        setPull(0);
+        return;
+      }
+      dist = Math.min(110, d * 0.5);
+      setPull(dist);
+    };
+    const end = () => {
+      if (startY !== null && dist >= PULL_AT) refresh.current();
+      startY = null;
+      dist = 0;
+      setPull(0);
+    };
+    const onWheel = (e: WheelEvent) => {
+      if (el.scrollTop > 0 || e.deltaY >= 0) {
+        wheel = 0;
+        return;
+      }
+      wheel -= e.deltaY;
+      clearTimeout(wheelTimer);
+      wheelTimer = setTimeout(() => { wheel = 0; }, 400);
+      if (wheel > 300) {
+        wheel = 0;
+        refresh.current();
+      }
+    };
+    el.addEventListener('touchstart', start, { passive: true });
+    el.addEventListener('touchmove', move, { passive: true });
+    el.addEventListener('touchend', end);
+    el.addEventListener('touchcancel', end);
+    el.addEventListener('wheel', onWheel, { passive: true });
+    return () => {
+      clearTimeout(wheelTimer);
+      el.removeEventListener('touchstart', start);
+      el.removeEventListener('touchmove', move);
+      el.removeEventListener('touchend', end);
+      el.removeEventListener('touchcancel', end);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, [hasFeed]);
 
   // Well-known titles to rate first, for someone who hasn't ranked anything yet.
   const starters = useMemo(() => {
@@ -70,6 +139,12 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
         if (el.scrollTop + el.clientHeight * 2.5 > el.scrollHeight) setLimit((n) => Math.min(n + PAGE, feed.length));
       }}>
       <div className="feed-float">
+        {pull > 0 && (
+          <span className={`pull-hint ${pull >= PULL_AT ? 'ready' : ''}`} style={{ ['--pull' as string]: `${pull}px` }} aria-hidden="true">
+            <RefreshIcon size={15} style={{ transform: `rotate(${(pull / PULL_AT) * 270}deg)` }} />
+            {pull >= PULL_AT ? 'Release for new picks' : 'Pull for new picks'}
+          </span>
+        )}
         <button className={`discover-tag ${discovering ? 'on' : ''}`} onClick={switchMode} aria-pressed={discovering}>
           <RocketIcon size={15} /> Discover
         </button>

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { useName } from './name';
 import { sanitize, type Data } from './store';
 
 /*
@@ -99,7 +100,6 @@ async function everyone(code: string): Promise<CloudMember[]> {
 
 interface Saved {
   code: string | null;
-  name: string;
   members: CloudMember[];
   /** What we last uploaded, so a reload doesn't re-send an unchanged backup. */
   sent: string;
@@ -111,7 +111,6 @@ function load(): Saved {
     if (raw && typeof raw === 'object') {
       return {
         code: typeof raw.code === 'string' && validCode(raw.code) ? raw.code : null,
-        name: typeof raw.name === 'string' ? raw.name.slice(0, 40) : '',
         members: Array.isArray(raw.members)
           ? raw.members.filter((m: Partial<CloudMember>) => m && typeof m.id === 'string')
             .map((m: CloudMember) => ({ id: m.id, name: String(m.name ?? ''), data: sanitize(m.data), updatedAt: String(m.updatedAt ?? '') }))
@@ -122,7 +121,7 @@ function load(): Saved {
   } catch {
     /* storage unavailable or corrupt — not in a crew */
   }
-  return { code: null, name: '', members: [], sent: '' };
+  return { code: null, members: [], sent: '' };
 }
 
 export type SyncStatus = 'idle' | 'syncing' | 'ok' | 'offline';
@@ -137,7 +136,8 @@ export function useCloudCrew(data: Data, active: boolean) {
   const [checkedAt, setCheckedAt] = useState<number | null>(null);
   const [retry, setRetry] = useState(0);
   const sig = useRef<string | null>(null);
-  const { code, name } = saved;
+  const name = useName();
+  const { code } = saved;
 
   useEffect(() => {
     try {
@@ -217,7 +217,6 @@ export function useCloudCrew(data: Data, active: boolean) {
     members: code ? saved.members : [],
     status,
     checkedAt,
-    setName: (n: string) => setSaved((v) => ({ ...v, name: n.slice(0, 40) })),
     async start() {
       let c = newCode();
       while (await crewSize(c)) c = newCode();

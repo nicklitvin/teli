@@ -6,8 +6,12 @@ import { useNav } from '../nav';
 import { FilterIcon, SearchIcon, XIcon } from './Icons';
 import { Poster, ScoreBadge } from './Poster';
 
-/** A tab's scroll container. There's no top bar: content starts under the status bar. */
-export function Screen({ title, active, children, className = '', scrollRef, onScroll }: {
+/**
+ * A tab's scroll container. There's no top bar: content starts under the status bar. `dock` is
+ * pinned above the tab bar, outside the scrolling area: iOS draws an input's caret in the wrong
+ * place when the input sits in a pinned element inside a scrolling one.
+ */
+export function Screen({ title, active, children, className = '', scrollRef, onScroll, dock }: {
   /** Read out by screen readers only. */
   title: string;
   active: boolean;
@@ -15,12 +19,16 @@ export function Screen({ title, active, children, className = '', scrollRef, onS
   className?: string;
   scrollRef?: Ref<HTMLDivElement>;
   onScroll?: (el: HTMLDivElement) => void;
+  dock?: ReactNode;
 }) {
   return (
-    <div className={`screen ${className}`} hidden={!active} ref={scrollRef} onScroll={(e) => onScroll?.(e.currentTarget)}>
-      <h1 className="visually-hidden">{title}</h1>
-      {children}
-    </div>
+    <>
+      <div className={`screen ${className}`} hidden={!active} ref={scrollRef} onScroll={(e) => onScroll?.(e.currentTarget)}>
+        <h1 className="visually-hidden">{title}</h1>
+        {children}
+      </div>
+      {dock && <div hidden={!active}>{dock}</div>}
+    </>
   );
 }
 
@@ -46,7 +54,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 /**
  * Tabs for a list plus two small tools: a filter panel (genre, plus an optional extra choice) and
  * an optional search box. Each opens under the row; active filters stay visible as removable chips.
- * `extra` puts more buttons in the row, before search.
+ * `extra` puts more buttons in the row, before the filter and search buttons.
  */
 export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, extra }: {
   tab: T;
@@ -70,16 +78,16 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
       <div className="tools-row">
         <Segmented<T> value={tab} options={tabs} onChange={onTab} />
         {extra}
+        <button className={`icon-btn tool ${open === 'genre' || genre || optionOn ? 'on' : ''}`} onClick={() => toggle('genre')}
+          aria-expanded={open === 'genre'} aria-label="Filters">
+          <FilterIcon size={17} />
+        </button>
         {onQuery && (
           <button className={`icon-btn tool ${open === 'search' || query ? 'on' : ''}`} onClick={() => toggle('search')}
             aria-expanded={open === 'search'} aria-label="Search this list">
             <SearchIcon size={17} />
           </button>
         )}
-        <button className={`icon-btn tool ${open === 'genre' || genre || optionOn ? 'on' : ''}`} onClick={() => toggle('genre')}
-          aria-expanded={open === 'genre'} aria-label="Filters">
-          <FilterIcon size={17} />
-        </button>
       </div>
       {onQuery && (open === 'search' || query) && (
         <label className="search-field slim">

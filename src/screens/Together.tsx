@@ -67,13 +67,14 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   const enough = members.length >= 2;
 
   return (
-    <Screen title="Crew" active={active} className={cloud.code ? '' : 'crew-docked'}>
+    <Screen title="Crew" active={active} className={cloud.code ? '' : 'crew-docked'}
+      dock={cloud.code ? undefined : <CrewBox cloud={cloud} invite={invite} />}>
       {cloud.code && <CrewBox cloud={cloud} invite={invite} />}
-      <div className="list people">
+      {/* Who's in: shown once you've started or joined a crew. */}
+      {(cloud.code || group.people.length > 0) && <div className="list people">
         <div className="person">
           <span className="avatar sm"><UserIcon size={14} /></span>
-          <input className="person-input" value={cloud.name} placeholder="Your name" maxLength={40}
-            onChange={(e) => cloud.setName(e.target.value)} aria-label="Your name, as your crew sees it" />
+          <span className="person-name">{cloud.name.trim() || 'You'}</span>
           <span className="person-sub">{rankedCount(data)} ranked</span>
           <label className="switch">
             <input type="checkbox" checked={group.includeMe}
@@ -107,7 +108,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
             </div>
           );
         })}
-      </div>
+      </div>}
 
       {enough ? (
         <>
@@ -138,7 +139,6 @@ export function Together({ active, invite }: { active: boolean; invite: string |
         <Empty icon={<UsersIcon size={30} />} title="Watch together"
           body="Start a crew and share the code. Everyone’s ratings stay in sync, and picks update as they rate." />
       )}
-      {!cloud.code && <CrewBox cloud={cloud} invite={invite} />}
     </Screen>
   );
 }
@@ -206,6 +206,7 @@ function CrewBox({ cloud, invite }: { cloud: ReturnType<typeof useCloudCrew>; in
           </button>
         </div>
         <p className={`crew-sync ${cloud.status}`}>{sync}</p>
+        {!cloud.name.trim() && <p className="crew-hint">Add your name in Profile → ⚙ so your crew knows it’s you.</p>}
         {error && <p className="note error" role="status">{error}</p>}
       </div>
     );

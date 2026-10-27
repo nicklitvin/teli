@@ -47,10 +47,12 @@ function scoreEntry(e: Entry, q: string, tokens: string[]): number {
   return 10 + s;
 }
 
-export function search(query: string, opts: { type?: MediaType; genre?: string } = {}, limit = 80): Title[] {
+/** Titles matching `query`, optionally only one type and only titles in any of `genres`. */
+export function search(query: string, opts: { type?: MediaType; genres?: string[] } = {}, limit = 80): Title[] {
   const q = normalize(query);
+  const genres = opts.genres ?? [];
   const filtered = INDEX.filter(
-    (e) => (!opts.type || e.t.type === opts.type) && (!opts.genre || e.t.genres.includes(opts.genre)),
+    (e) => (!opts.type || e.t.type === opts.type) && (!genres.length || genres.some((g) => e.t.genres.includes(g))),
   );
   if (!q) return filtered.slice(0, limit).map((e) => e.t);
   const tokens = q.split(' ');

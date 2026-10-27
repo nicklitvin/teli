@@ -1,6 +1,7 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
 import type { MediaType } from '../types';
 import { BY_ID, GENRES } from '../lib/catalog';
+import { setName, useName } from '../lib/name';
 import { normalize } from '../lib/search';
 import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
 import { useNav } from '../nav';
@@ -164,6 +165,7 @@ function HiddenTitles({ onBack }: { onBack: () => void }) {
 /** Backups: export, import (replaces everything) and reset, each confirmed first. Also the way into hidden titles. */
 function Settings({ onHidden }: { onHidden: () => void }) {
   const { data, replace } = useStore();
+  const name = useName();
   const [pending, setPending] = useState<Pending | null>(null);
   const hiddenCount = data.dismissed.length;
   const [note, setNote] = useState<{ text: string; error?: boolean } | null>(null);
@@ -209,6 +211,12 @@ function Settings({ onHidden }: { onHidden: () => void }) {
   return (
     <div className="settings-panel">
       <div className="list settings">
+        <label className="setting">
+          <UserIcon size={18} />
+          <span><strong>Your name</strong><small>Shown to your crew</small></span>
+          <input className="setting-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a name"
+            maxLength={40} autoComplete="nickname" enterKeyHint="done" />
+        </label>
         <button className="setting" onClick={exportData}>
           <DownloadIcon size={18} />
           <span><strong>Export backup</strong><small>Download your rankings and watchlist, or send it to your crew</small></span>
