@@ -4,23 +4,14 @@ export const VERDICTS: Verdict[] = ['good', 'mid', 'bad'];
 
 export const VERDICT_LABEL: Record<Verdict, string> = { good: 'Good', mid: 'Mid', bad: 'Bad' };
 
-/** Optional tags for what stood out. The upbeat ones come first. */
+/** Optional one-word tags for what stood out. */
 export const TAGS: { id: string; label: string }[] = [
-  { id: 'gripping', label: 'Gripping' },
-  { id: 'funny', label: 'Funny' },
-  { id: 'moving', label: 'Moving' },
-  { id: 'smart', label: 'Smart' },
-  { id: 'acting', label: 'Great acting' },
-  { id: 'visuals', label: 'Stunning visuals' },
-  { id: 'soundtrack', label: 'Great soundtrack' },
-  { id: 'comfort', label: 'Comfort watch' },
-  { id: 'scary', label: 'Scary' },
-  { id: 'slow', label: 'Slow' },
-  { id: 'long', label: 'Too long' },
-  { id: 'predictable', label: 'Predictable' },
-  { id: 'confusing', label: 'Confusing' },
-  { id: 'overhyped', label: 'Overhyped' },
-];
+  'silly', 'sad', 'quirky', 'slog', 'cozy', 'tense', 'funny', 'beautiful', 'hype', 'hopeful', 'creepy',
+].map((id) => ({ id, label: id[0].toUpperCase() + id.slice(1) }));
+/** Tags from the first tag list that have a close match in the current one. */
+export const OLD_TAGS: Record<string, string> = {
+  gripping: 'tense', comfort: 'cozy', scary: 'creepy', slow: 'slog', long: 'slog', visuals: 'beautiful', moving: 'sad',
+};
 export const TAG_LABEL = new Map(TAGS.map((t) => [t.id, t.label]));
 
 /** How strongly a rating pulls similar titles up (positive) or pushes them down (negative) in recommendations. */

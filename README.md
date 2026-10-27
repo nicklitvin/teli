@@ -3,7 +3,7 @@
 A Beli-style logbook for movies and TV. Rating something you've watched takes one page:
 
 1. Say whether it was **good**, **mid** or **bad**.
-2. Optionally tap any tags for what stood out (gripping, funny, too long, overhyped…).
+2. Optionally tap any one-word tags for what stood out (silly, sad, cozy, tense, creepy…).
 3. Tick **would watch again** if you would, then **Finish**.
 
 Ratings from the old ranking system (liked / fine / didn't like, ranked by comparison) carry over as good / mid / bad, marked as needing a review. On the first visit after the change, Teli explains the new system and offers to walk through them one by one (each can be skipped); a banner in the logbook picks the review back up later. Old backup files import the same way.

@@ -1,7 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Review, Title } from '../types';
 import { VERDICT_LABEL } from '../lib/rating';
-import { RefreshIcon } from './Icons';
 
 function hash(s: string) {
   let h = 2166136261;
@@ -87,7 +86,7 @@ function initials(title: string) {
   return words.slice(0, 2).map((w) => w.replace(/[^A-Za-z0-9]/g, '')[0] ?? '').join('').toUpperCase();
 }
 
-/** Your verdict as a colored tag, with a rewatch mark when you'd watch it again. Dashed while it still needs a review. */
+/** Your verdict as a colored tag. Dashed while it still needs a review. */
 export function VerdictBadge({ rating, size = 'md', className = '' }: {
   rating: Pick<Review, 'verdict' | 'again' | 'pending'>;
   size?: 'sm' | 'md' | 'lg';
@@ -97,7 +96,6 @@ export function VerdictBadge({ rating, size = 'md', className = '' }: {
   return (
     <span className={`score score-${size} v-${rating.verdict} ${rating.pending ? 'pending' : ''} ${className}`} role="img" aria-label={label}>
       {VERDICT_LABEL[rating.verdict]}
-      {rating.again && <RefreshIcon size={size === 'lg' ? 14 : size === 'md' ? 12 : 10} strokeWidth={2.6} />}
     </span>
   );
 }

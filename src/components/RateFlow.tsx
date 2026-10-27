@@ -4,7 +4,7 @@ import { BY_ID, metaLine } from '../lib/catalog';
 import { TAGS, VERDICTS, VERDICT_LABEL } from '../lib/rating';
 import { pendingIds, useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { CheckIcon, MehIcon, RefreshIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
+import { CheckIcon, MehIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
 import { Poster } from './Poster';
 
 const VERDICT_ICON: Record<Verdict, ReactNode> = {
@@ -129,7 +129,6 @@ function RatePage({ id, progress, onDone, onSkip, onClose }: {
           <input type="checkbox" checked={again} onChange={(e) => setAgain(e.target.checked)} />
           <span className="again-box" aria-hidden="true"><CheckIcon size={16} strokeWidth={3} /></span>
           <span className="again-text"><strong>Would watch again</strong><small>Rewatches show up as picks in your crew</small></span>
-          <RefreshIcon size={18} className="again-icon" />
         </label>
       </div>
 

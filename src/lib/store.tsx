@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Rating, Review, Verdict } from '../types';
 import { BY_ID, resolveId } from './catalog';
-import { TAG_LABEL, VERDICTS } from './rating';
+import { OLD_TAGS, TAG_LABEL, VERDICTS } from './rating';
 
 export interface Data {
   /** Your rating for each title you've watched. */
@@ -34,7 +34,7 @@ export function sanitize(x: unknown): Data {
       if (!v || !VERDICTS.includes(v.verdict as Verdict)) continue;
       add(id, {
         verdict: v.verdict!,
-        tags: Array.isArray(v.tags) ? [...new Set(v.tags.filter((t) => typeof t === 'string' && TAG_LABEL.has(t)))] : [],
+        tags: Array.isArray(v.tags) ? [...new Set(v.tags.map((t) => OLD_TAGS[t] ?? t).filter((t) => typeof t === 'string' && TAG_LABEL.has(t)))] : [],
         again: v.again === true,
         at: typeof v.at === 'number' && Number.isFinite(v.at) ? v.at : 0,
         ...(v.pending === true ? { pending: true } : {}),

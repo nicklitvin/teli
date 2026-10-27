@@ -17,9 +17,9 @@ const SEEN: { value: SeenMode; label: string }[] = [
   { value: 'rewatch', label: 'Rewatch favorites' },
 ];
 
-/** One line under a pick: who has seen it (with their verdict, ↻ if they'd watch it again), who wants to, or the usual details. */
+/** One line under a pick: who has seen it (with their verdict, and whether they'd watch it again), who wants to, or the usual details. */
 function pickDetail(p: GroupPick) {
-  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${s.verdict}${s.again ? ' ↻' : ''})`).join(', ')}`;
+  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${s.verdict}${s.again ? ', would rewatch' : ''})`).join(', ')}`;
   if (p.wanted.length) return `On ${p.wanted.map((n) => (n === 'You' ? 'your' : `${n}'s`)).join(' & ')} watchlist`;
   return metaLine(p.title);
 }
