@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
 import { BY_ID, CATALOG, GENRE_COLORS, typeLabel } from '../lib/catalog';
-import { SENTIMENT_LABEL } from '../lib/ranking';
+import { TAG_LABEL } from '../lib/rating';
 import { similarTitles } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { BookmarkIcon, ChevronLeft, EyeSlashIcon, StarIcon, TrashIcon, XIcon } from './Icons';
-import { Poster, ScoreBadge, posterArt } from './Poster';
+import { Poster, VerdictBadge, posterArt } from './Poster';
 import { PosterCard, SectionHeader, Shelf } from './ui';
 
 export function DetailSheet({ id, canGoBack, onBack, onClose }: {
@@ -53,12 +53,13 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
       <div className="detail-body">
         {r ? (
           <div className="your-score">
-            <ScoreBadge rating={r} size="lg" />
+            <VerdictBadge rating={r} size="lg" />
             <div className="your-score-text">
-              <strong>Your score</strong>
-              <span>{SENTIMENT_LABEL[r.sentiment]} · #{r.rank} of {r.total} {t.type === 'movie' ? 'movies' : 'shows'}</span>
+              <strong>{r.pending ? 'Needs a quick review' : 'Your take'}</strong>
+              <span>{r.pending ? 'Carried over from your old rankings'
+                : [r.again && 'Would watch again', ...r.tags.map((x) => TAG_LABEL.get(x))].filter(Boolean).join(' · ') || 'No tags added'}</span>
             </div>
-            <button className="text-btn" onClick={() => nav.openRate(id)}>Re-rank</button>
+            <button className="text-btn" onClick={() => nav.openRate(id)}>{r.pending ? 'Review' : 'Edit'}</button>
           </div>
         ) : null}
 

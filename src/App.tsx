@@ -4,6 +4,7 @@ import { PlanetIcon, RocketIcon, SearchIcon, UserIcon, UsersIcon } from './compo
 import { RateFlow } from './components/RateFlow';
 import { Sheet } from './components/Sheet';
 import { takeInvite } from './lib/cloud';
+import { pendingIds, useStore } from './lib/store';
 import { NavCtx, type Nav } from './nav';
 import { ForYou } from './screens/ForYou';
 import { Profile } from './screens/Profile';
@@ -33,7 +34,7 @@ export default function App() {
   const [detailOpen, setDetailOpen] = useState(false);
   const detailOpenRef = useRef(false);
 
-  const [rate, setRate] = useState<{ id: string; key: number } | null>(null);
+  const [rate, setRate] = useState<{ ids: string[]; intro?: boolean; key: number } | null>(null);
   const [rateOpen, setRateOpen] = useState(false);
   const [toast, setToast] = useState<{ text: string; undo?: () => void; key: number } | null>(null);
 
@@ -43,6 +44,10 @@ export default function App() {
     return () => clearTimeout(t);
   }, [toast]);
 
+  const { data } = useStore();
+  const dataRef = useRef(data);
+  dataRef.current = data;
+
   const nav = useMemo<Nav>(() => ({
     openDetail(id) {
       setStack((s) => (detailOpenRef.current ? [...s, id] : [id]));
@@ -50,13 +55,31 @@ export default function App() {
       setDetailOpen(true);
     },
     openRate(id) {
-      setRate({ id, key: Date.now() });
+      setRate({ ids: [id], key: Date.now() });
+      setRateOpen(true);
+    },
+    openReview(intro) {
+      const ids = pendingIds(dataRef.current);
+      if (!ids.length) return;
+      setRate({ ids, intro, key: Date.now() });
       setRateOpen(true);
     },
     notify(text, undo) {
       setToast({ text, undo, key: Date.now() });
     },
   }), []);
+
+  // Ratings carried over from the old rankings: ask once per visit to go through them again.
+  useEffect(() => {
+    if (!pendingIds(dataRef.current).length) return;
+    try {
+      if (sessionStorage.getItem('teli:review-asked')) return;
+      sessionStorage.setItem('teli:review-asked', '1');
+    } catch {
+      /* storage unavailable — ask anyway */
+    }
+    nav.openReview(true);
+  }, [nav]);
 
   const closeDetail = useCallback(() => {
     detailOpenRef.current = false;
@@ -97,7 +120,7 @@ export default function App() {
         )}
       </Sheet>
       <Sheet open={rateOpen} onClose={closeRate} z={60} label="Rate title">
-        {rate && <RateFlow key={rate.key} id={rate.id} onClose={closeRate} />}
+        {rate && <RateFlow key={rate.key} ids={rate.ids} intro={rate.intro} onClose={closeRate} />}
       </Sheet>
       {toast && (
         <div className="toast" key={toast.key} role="status">

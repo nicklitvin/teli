@@ -1,12 +1,14 @@
 import { useMemo, useRef, useState } from 'react';
-import type { Rating, Title } from '../types';
+import type { Title, Verdict } from '../types';
 import { BY_ID, GENRE_COLORS } from '../lib/catalog';
+import { NO_FILTER, VERDICTS, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
 import { recommend } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { UNIVERSE, bubbleLayout, groupStats, groupTitles, keysOf, type Dimension, type GroupStat } from '../lib/taste';
 import { useNav } from '../nav';
-import { ChevronDown } from '../components/Icons';
-import { Poster, ScoreBadge } from '../components/Poster';
+import { ChevronDown, FilterIcon } from '../components/Icons';
+import { Poster } from '../components/Poster';
+import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
 import { Cards, Screen, SectionHeader, Segmented, Shelf, TitleRow } from '../components/ui';
 
 const DIMS: { value: Dimension; label: string; noun: string }[] = [
@@ -24,7 +26,14 @@ const colorOf = (dim: Dimension, name: string) => {
   return PALETTE[h % PALETTE.length];
 };
 
-const sentimentOf = (avg: number): Rating['sentiment'] => (avg >= 6.8 ? 'liked' : avg >= 3.4 ? 'fine' : 'disliked');
+/** Your good / mid / bad split in a group, as a small bar. */
+function VerdictMix({ n }: { n: Record<Verdict, number> }) {
+  return (
+    <span className="mix" role="img" aria-label={verdictSummary(n)}>
+      {VERDICTS.filter((v) => n[v]).map((v) => <i key={v} className={`v-${v}`} style={{ flexGrow: n[v] }} />)}
+    </span>
+  );
+}
 
 /** Splits a label over at most two lines, breaking at the space nearest the middle. */
 function lines(label: string): string[] {
@@ -45,11 +54,19 @@ export function TasteMap({ active }: { active: boolean }) {
   const [picked, setPicked] = useState<Record<Dimension, string | null>>({ genres: null, themes: null, decades: null, makers: null });
   const panelRef = useRef<HTMLDivElement>(null);
   const [showMissing, setShowMissing] = useState(false);
+  const [rf, setRf] = useState<ReviewFilter>(NO_FILTER);
+  const [filterOpen, setFilterOpen] = useState(false);
+  const usedTags = useMemo(() => [...new Set([...ratings.values()].flatMap((r) => r.tags))], [ratings]);
 
-  const stats = useMemo(() => groupStats(dim, ratings), [dim, ratings]);
+  // The map can show just part of your list: only good ones, ones you'd rewatch, a tag.
+  const shownRatings = useMemo(
+    () => (filtering(rf) ? new Map([...ratings].filter(([, r]) => passes(r, rf))) : ratings),
+    [ratings, rf],
+  );
+  const stats = useMemo(() => groupStats(dim, shownRatings), [dim, shownRatings]);
   const explored = useMemo(
     () => [...stats.values()].filter((s) => s.rated.length)
-      .sort((a, b) => b.rated.length - a.rated.length || b.avg - a.avg),
+      .sort((a, b) => b.rated.length - a.rated.length || b.verdicts.good / b.rated.length - a.verdicts.good / a.rated.length),
     [stats],
   );
   const missing = UNIVERSE[dim].filter((k) => !stats.get(k)!.rated.length);
@@ -102,13 +119,29 @@ export function TasteMap({ active }: { active: boolean }) {
   }, [dim, selected, recs, ratings, dismissed]);
 
   const noun = DIMS.find((d) => d.value === dim)!.noun;
-  const rankedIn = explored.reduce((n, s) => n + s.rated.length, 0);
-  const overall = rankedIn ? explored.reduce((n, s) => n + s.avg * s.rated.length, 0) / rankedIn : 0;
+  const narrowed = filtering(rf);
 
   return (
     <Screen title="Galaxy" active={active}>
-      <div className="filter-bar">
-        <Segmented<Dimension> value={dim} onChange={setDim} options={DIMS} />
+      <div className="tools">
+        <div className="tools-row">
+          <Segmented<Dimension> value={dim} onChange={setDim} options={DIMS} />
+          <button className={`icon-btn tool ${filterOpen || narrowed ? 'on' : ''}`} onClick={() => setFilterOpen((v) => !v)}
+            aria-expanded={filterOpen} aria-label="Filters">
+            <FilterIcon size={17} />
+          </button>
+        </div>
+        {filterOpen ? (
+          <div className="filter-panel">
+            <div className="filter-head">
+              <p className="filter-title">Show on the map</p>
+              {narrowed && <button className="filter-clear" onClick={() => setRf(NO_FILTER)}>Clear all</button>}
+            </div>
+            <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />
+          </div>
+        ) : narrowed && (
+          <div className="genre-wrap"><ReviewFilterChips value={rf} onChange={setRf} /></div>
+        )}
       </div>
 
       <div className="theater">
@@ -138,7 +171,7 @@ export function TasteMap({ active }: { active: boolean }) {
         )}
 
         {layout.bubbles.length > 0 ? (
-          <svg viewBox={`${vx} ${by - PAD} ${vw} ${vh}`} role="group" aria-label={`Your ${noun}, average ${overall.toFixed(1)}`}>
+          <svg viewBox={`${vx} ${by - PAD} ${vw} ${vh}`} role="group" aria-label={`Your ${noun}`}>
             <defs>
               <radialGradient id="planet-shade" cx="34%" cy="28%" r="78%">
                 <stop offset="0" stopColor="#fff" stopOpacity="0.22" />
@@ -159,7 +192,7 @@ export function TasteMap({ active }: { active: boolean }) {
             ))}
           </svg>
         ) : (
-          <p className="theater-empty">Rate a few titles and your first planets appear here.</p>
+          <p className="theater-empty">{narrowed && ratings.size ? 'None of your ratings match these filters.' : 'Rate a few titles and your first planets appear here.'}</p>
         )}
 
       </div>
@@ -172,11 +205,11 @@ export function TasteMap({ active }: { active: boolean }) {
               <h2>{sel.name}</h2>
               <p>
                 {sel.rated.length
-                  ? `${sel.rated.length} ranked · ${Math.round((sel.rated.length / ratings.size) * 100)}% of your list`
-                  : 'Uncharted: you haven’t ranked anything here yet'}
+                  ? `${sel.rated.length} rated · ${verdictSummary(sel.verdicts)}`
+                  : narrowed ? 'Nothing here matches your filters' : 'Uncharted: you haven’t rated anything here yet'}
               </p>
             </div>
-            {sel.rated.length > 0 && <ScoreBadge rating={{ score: sel.avg, sentiment: sentimentOf(sel.avg) }} />}
+            {sel.rated.length > 0 && <VerdictMix n={sel.verdicts} />}
           </div>
           <div className="progress" aria-label={`${sel.rated.length} of ${sel.catalog} titles`}>
             <span style={{ width: `${Math.max(sel.rated.length ? 2 : 0, (sel.rated.length / Math.max(1, sel.catalog)) * 100)}%` }} />
@@ -189,7 +222,7 @@ export function TasteMap({ active }: { active: boolean }) {
         <>
           <SectionHeader title="Your top" />
           <Cards>
-            {sel.rated.slice(0, 3).map((r, i) => <TitleRow key={r.id} t={BY_ID.get(r.id)!} rank={i + 1} />)}
+            {sel.rated.slice(0, 3).map((r) => <TitleRow key={r.id} t={BY_ID.get(r.id)!} />)}
           </Cards>
         </>
       )}
@@ -213,7 +246,7 @@ export function TasteMap({ active }: { active: boolean }) {
   );
 }
 
-/** One explored group as a planet: your favourite title in it for a surface, its name and your average score. */
+/** One explored group as a planet: your favourite title in it for a surface, its name and your good / mid / bad split. */
 function BubbleNode({ b, s, cover, i, color, on, onPick }: {
   b: { name: string; x: number; y: number; r: number };
   s: GroupStat;
@@ -230,11 +263,21 @@ function BubbleNode({ b, s, cover, i, color, on, onPick }: {
   const lh = fs * 1.1;
   const top = -((ls.length - 1) * lh) / 2 - fs * 0.55;
   const clip = `clip-${i}-${b.name.replace(/[^a-z0-9]/gi, '')}`;
+  const n = s.rated.length;
+  const barW = Math.min(64, b.r * 1.15);
+  const barY = top + (ls.length - 1) * lh + fs * 0.55 + 7;
+  let x = -barW / 2;
+  const segs = VERDICTS.filter((v) => s.verdicts[v]).map((v) => {
+    const w = (barW * s.verdicts[v]) / n;
+    const seg = { v, x, w };
+    x += w;
+    return seg;
+  });
   const rx = b.r * 1.55;
   const ry = b.r * 0.36;
   return (
     <g className={`bubble ${on ? 'on' : ''}`} transform={`translate(${b.x} ${b.y})`} style={{ ['--c' as string]: color }}
-      role="button" tabIndex={0} aria-pressed={on} aria-label={`${b.name}: ${s.rated.length} ranked, average ${s.avg.toFixed(1)}`}
+      role="button" tabIndex={0} aria-pressed={on} aria-label={`${b.name}: ${n} rated, ${verdictSummary(s.verdicts)}`}
       onClick={onPick} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick()}>
       <g className="pop" style={{ animationDelay: `${i * 30}ms` }}>
         <circle r={b.r + 2} className="atmosphere" filter="url(#atmosphere)" />
@@ -252,10 +295,11 @@ function BubbleNode({ b, s, cover, i, color, on, onPick }: {
         <text className="name" style={{ fontSize: fs }}>
           {ls.map((l, j) => <tspan key={j} x={0} y={top + j * lh} dy="0.35em">{l}</tspan>)}
         </text>
-        <text className={`avg s-${sentimentOf(s.avg)}`} y={top + (ls.length - 1) * lh + fs * 0.9 + 8} dy="0.35em"
-          style={{ fontSize: Math.max(9.5, fs * 0.92) }}>
-          ★ {s.avg.toFixed(1)}
-        </text>
+        <clipPath id={`${clip}-mix`}><rect x={-barW / 2} y={barY} width={barW} height={5} rx={2.5} /></clipPath>
+        <rect className="mix-back" x={-barW / 2 - 1.5} y={barY - 1.5} width={barW + 3} height={8} rx={4} />
+        <g clipPath={`url(#${clip}-mix)`}>
+          {segs.map((g) => <rect key={g.v} className={`mix-seg v-${g.v}`} x={g.x} y={barY} width={g.w} height={5} />)}
+        </g>
       </g>
     </g>
   );

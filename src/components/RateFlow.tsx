@@ -1,135 +1,142 @@
-import { useEffect, useState } from 'react';
-import type { Sentiment } from '../types';
+import { useState, type ReactNode } from 'react';
+import type { Verdict } from '../types';
 import { BY_ID, metaLine } from '../lib/catalog';
-import { SENTIMENT_LABEL, maxComparisons } from '../lib/ranking';
-import { useStore } from '../lib/store';
-import { MehIcon, ThumbIcon, UndoIcon, XIcon } from './Icons';
-import { Poster, ScoreBadge } from './Poster';
+import { TAGS, VERDICTS, VERDICT_LABEL } from '../lib/rating';
+import { pendingIds, useStore } from '../lib/store';
+import { useNav } from '../nav';
+import { CheckIcon, MehIcon, RefreshIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
+import { Poster } from './Poster';
 
-interface Range {
-  lo: number;
-  hi: number;
-}
+const VERDICT_ICON: Record<Verdict, ReactNode> = {
+  good: <ThumbIcon size={24} />,
+  mid: <MehIcon size={24} />,
+  bad: <ThumbIcon size={24} down />,
+};
 
 /**
- * Beli-style rating: pick a reaction, then answer "which did you prefer?" against
- * titles already in that bucket. Binary search finds the slot in ~log2(n) taps,
- * and the slot determines the score.
+ * Rating on one page: good, mid or bad, optional tags for what stood out, and whether you'd watch
+ * it again, then Finish. Given several `ids` it walks through them in turn (reviewing titles carried
+ * over from the old rankings), and `intro` first explains why.
  */
-export function RateFlow({ id, onClose }: { id: string; onClose: () => void }) {
+export function RateFlow({ ids, intro = false, onClose }: { ids: string[]; intro?: boolean; onClose: () => void }) {
+  const { data } = useStore();
+  const nav = useNav();
+  const [started, setStarted] = useState(!intro);
+  const [i, setI] = useState(0);
+  const queue = intro || ids.length > 1;
+
+  const next = (justRated?: string) => {
+    if (i + 1 < ids.length) return setI(i + 1);
+    onClose();
+    const left = pendingIds(data).filter((x) => x !== justRated).length;
+    nav.notify(left ? `${left} left to review · pick up any time in your logbook` : 'All caught up');
+  };
+
+  if (!started) {
+    return (
+      <div className="rate">
+        <div className="sheet-toolbar">
+          <span />
+          <button className="icon-btn" onClick={onClose} aria-label="Close"><XIcon size={16} /></button>
+        </div>
+        <div className="rate-step rate-intro fade-in">
+          <span className="intro-icon"><StarIcon size={30} /></span>
+          <h2 className="rate-title">Rating got simpler</h2>
+          <p>No more ranking titles against each other. Now you say whether it was good, mid or bad, add a few tags if you like, and tick whether you’d watch it again.</p>
+          <p>Take a quick pass over your {ids.length === 1 ? 'title' : `${ids.length} titles`} to bring {ids.length === 1 ? 'it' : 'them'} over. Until then they keep the verdict they had.</p>
+        </div>
+        <div className="rate-foot">
+          <button className="secondary-btn" onClick={onClose}>Later</button>
+          <button className="primary-btn" onClick={() => setStarted(true)}>Start review</button>
+        </div>
+      </div>
+    );
+  }
+
+  const id = ids[i];
+  if (!BY_ID.has(id)) return null;
+  return (
+    <RatePage key={id} id={id} onClose={onClose}
+      progress={queue ? { at: i + 1, of: ids.length } : undefined}
+      onSkip={queue ? () => next() : undefined}
+      onDone={(title, verdict) => {
+        if (queue) return next(id);
+        onClose();
+        nav.notify(`Logged ${title} as ${VERDICT_LABEL[verdict].toLowerCase()}`);
+      }} />
+  );
+}
+
+function RatePage({ id, progress, onDone, onSkip, onClose }: {
+  id: string;
+  progress?: { at: number; of: number };
+  onDone: (title: string, verdict: Verdict) => void;
+  onSkip?: () => void;
+  onClose: () => void;
+}) {
   const t = BY_ID.get(id)!;
-  const { data, ratings, place } = useStore();
-  const [step, setStep] = useState<'react' | 'compare' | 'done'>('react');
-  const [sentiment, setSentiment] = useState<Sentiment>('liked');
-  const [bucket, setBucket] = useState<string[]>([]);
-  const [range, setRange] = useState<Range>({ lo: 0, hi: 0 });
-  const [history, setHistory] = useState<Range[]>([]);
-  const previous = ratings.get(id);
+  const { data, rate } = useStore();
+  const prev = data.reviews[id];
+  const [verdict, setVerdict] = useState<Verdict | null>(prev?.verdict ?? null);
+  const [tags, setTags] = useState<string[]>(prev?.tags ?? []);
+  const [again, setAgain] = useState(prev?.again ?? false);
+  const last = !progress || progress.at === progress.of;
 
-  const mid = (range.lo + range.hi) >> 1;
-  const other = BY_ID.get(bucket[mid] ?? '');
-
-  const finish = (s: Sentiment, index: number) => {
-    place(id, s, index);
-    setStep('done');
+  const toggleTag = (tag: string) => setTags((ts) => (ts.includes(tag) ? ts.filter((x) => x !== tag) : [...ts, tag]));
+  const finish = () => {
+    if (!verdict) return;
+    rate(id, { verdict, tags: TAGS.map((x) => x.id).filter((x) => tags.includes(x)), again });
+    onDone(t.title, verdict);
   };
-
-  const react = (s: Sentiment) => {
-    const b = data.ranks[t.type][s].filter((x) => x !== id);
-    setSentiment(s);
-    setBucket(b);
-    if (!b.length) return finish(s, 0);
-    setRange({ lo: 0, hi: b.length });
-    setHistory([]);
-    setStep('compare');
-  };
-
-  const choose = (preferNew: boolean) => {
-    const next = preferNew ? { lo: range.lo, hi: mid } : { lo: mid + 1, hi: range.hi };
-    if (next.lo >= next.hi) return finish(sentiment, next.lo);
-    setHistory((h) => [...h, range]);
-    setRange(next);
-  };
-
-  const undo = () => {
-    if (!history.length) return setStep('react');
-    setRange(history[history.length - 1]);
-    setHistory((h) => h.slice(0, -1));
-  };
-
-  useEffect(() => {
-    if (step !== 'compare') return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft') choose(true);
-      else if (e.key === 'ArrowRight') choose(false);
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  });
-
-  const result = ratings.get(id);
-  const noun = t.type === 'movie' ? 'movies' : 'shows';
 
   return (
     <div className="rate">
       <div className="sheet-toolbar">
-        {step === 'compare' ? (
-          <button className="toolbar-btn" onClick={undo}><UndoIcon size={16} /> Back</button>
-        ) : <span />}
+        {progress ? <span className="rate-progress">Review {progress.at} of {progress.of}</span> : <span />}
         <button className="icon-btn" onClick={onClose} aria-label="Close"><XIcon size={16} /></button>
       </div>
 
-      {step === 'react' && (
-        <div className="rate-step fade-in">
+      <div className="rate-body fade-in">
+        <div className="rate-head">
           <Poster t={t} size="md" className="rate-poster" />
-          <h2 className="rate-title">{t.title}</h2>
-          <p className="rate-sub">{metaLine(t)}</p>
-          <h3 className="rate-q">How was it?</h3>
-          <div className="react-row">
-            {(['liked', 'fine', 'disliked'] as Sentiment[]).map((s) => (
-              <button key={s} className={`react react-${s} ${previous?.sentiment === s ? 'prev' : ''}`} onClick={() => react(s)}>
-                <span className="react-circle">
-                  {s === 'liked' ? <ThumbIcon size={24} /> : s === 'fine' ? <MehIcon size={24} /> : <ThumbIcon size={24} down />}
-                </span>
-                <span className="react-label">{SENTIMENT_LABEL[s]}</span>
-              </button>
-            ))}
+          <div>
+            <h2 className="rate-title">{t.title}</h2>
+            <p className="rate-sub">{metaLine(t)}</p>
+            {prev?.pending && <p className="rate-note">Carried over as {VERDICT_LABEL[prev.verdict].toLowerCase()} from your old rankings. Check it still fits.</p>}
           </div>
-          {previous && <p className="rate-note">Currently {previous.score.toFixed(1)} · re-ranking will replace it</p>}
         </div>
-      )}
 
-      {step === 'compare' && other && (
-        <div className="rate-step" key={`${range.lo}-${range.hi}`}>
-          <h3 className="rate-q">Which do you prefer?</h3>
-          <p className="rate-sub">
-            Comparison {history.length + 1} of up to {maxComparisons(bucket.length)}
-          </p>
-          <div className="versus">
-            <button className="vs-card fade-in" onClick={() => choose(true)}>
-              <Poster t={t} size="lg" />
-              <span className="vs-title">{t.title}</span>
-              <span className="vs-sub">{t.year}</span>
+        <h3 className="rate-q">How was it?</h3>
+        <div className="react-row" role="radiogroup" aria-label="Verdict">
+          {VERDICTS.map((v) => (
+            <button key={v} className={`react react-${v} ${verdict === v ? 'on' : ''}`} onClick={() => setVerdict(v)}
+              role="radio" aria-checked={verdict === v}>
+              <span className="react-circle">{VERDICT_ICON[v]}</span>
+              <span className="react-label">{VERDICT_LABEL[v]}</span>
             </button>
-            <span className="vs-or">or</span>
-            <button className="vs-card fade-in" onClick={() => choose(false)}>
-              <Poster t={other} size="lg" rating={ratings.get(other.id)} />
-              <span className="vs-title">{other.title}</span>
-              <span className="vs-sub">{other.year}</span>
-            </button>
-          </div>
-          <button className="pill-btn" onClick={() => finish(sentiment, mid + 1)}>Too tough — call it a tie</button>
+          ))}
         </div>
-      )}
 
-      {step === 'done' && result && (
-        <div className="rate-step done fade-in">
-          <ScoreBadge rating={result} size="xl" className="pop-in" />
-          <h2 className="rate-title">{t.title}</h2>
-          <p className="rate-sub">#{result.rank} of {result.total} {noun} you've ranked</p>
-          <button className="primary-btn wide" onClick={onClose}>Done</button>
+        <h3 className="rate-q">What stood out? <span>Optional</span></h3>
+        <div className="genre-wrap rate-tags" role="group" aria-label="Tags">
+          {TAGS.map((x) => (
+            <button key={x.id} className={`chip toggle tag ${tags.includes(x.id) ? 'on' : ''}`} onClick={() => toggleTag(x.id)}
+              aria-pressed={tags.includes(x.id)}>{x.label}</button>
+          ))}
         </div>
-      )}
+
+        <label className={`again-row ${again ? 'on' : ''}`}>
+          <input type="checkbox" checked={again} onChange={(e) => setAgain(e.target.checked)} />
+          <span className="again-box" aria-hidden="true"><CheckIcon size={16} strokeWidth={3} /></span>
+          <span className="again-text"><strong>Would watch again</strong><small>Rewatches show up as picks in your crew</small></span>
+          <RefreshIcon size={18} className="again-icon" />
+        </label>
+      </div>
+
+      <div className="rate-foot">
+        {onSkip && <button className="secondary-btn" onClick={onSkip}>Skip</button>}
+        <button className="primary-btn" disabled={!verdict} onClick={finish}>{last ? 'Finish' : 'Next'}</button>
+      </div>
     </div>
   );
 }

@@ -27,7 +27,7 @@ function markSeen(id: string) {
     a.push(id);
     localStorage.setItem(SEEN_KEY, JSON.stringify(a.slice(-SEEN_MAX)));
   } catch {
-    /* storage unavailable — feeds just won't avoid repeats */
+    /* storage unavailable â€” feeds just won't avoid repeats */
   }
 }
 /** How far past the first card you pull (in px, after resistance) before letting go refreshes. */
@@ -123,7 +123,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
     };
   }, [hasFeed]);
 
-  // Well-known titles to rate first, for someone who hasn't ranked anything yet.
+  // Well-known titles to rate first, for someone who hasn't rated anything yet.
   const starters = useMemo(() => {
     const skip = (id: string) => dismissed.has(id) || data.watchlist.includes(id);
     const first = STARTERS.filter((t) => !skip(t.id));
@@ -136,7 +136,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
         <div className="hero-card">
           <div className="hero-planet" aria-hidden="true"><i /></div>
           <h2>Your voyage starts here.</h2>
-          <p>Rank what you've watched by picking between two titles. Teli maps your taste and charts what to watch next.</p>
+          <p>Rate what you've watched as good, mid or bad. Teli maps your taste and charts what to watch next.</p>
           <button className="primary-btn" onClick={onSearch}><SearchIcon size={16} /> Search the library</button>
         </div>
         <SectionHeader title="Seen any of these?" subtitle="Tap one to rate it" />
@@ -192,8 +192,8 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
           <OrbitIcon size={40} />
           <h2>{feed.length ? 'Edge of the known universe' : 'Nothing out here yet'}</h2>
           <p>{discovering
-            ? 'You’ve seen every frontier we can chart right now. Rank more titles to open new ones.'
-            : 'Rank more titles and new picks will appear, or go looking somewhere new.'}</p>
+            ? 'Youâ€™ve seen every frontier we can chart right now. Rate more titles to open new ones.'
+            : 'Rate more titles and new picks will appear, or go looking somewhere new.'}</p>
           <button className="primary-btn" onClick={switchMode}>{discovering ? 'Back to your picks' : 'Turn on Discover'}</button>
         </div>
       )}
@@ -216,15 +216,11 @@ function Reel({ rec, discovering }: { rec: Rec; discovering: boolean }) {
       <Poster t={t} size="fill" />
       <button className="reel-hit" onClick={() => nav.openDetail(t.id)} aria-label={`${t.title}: details`} />
       <div className="reel-info">
-        <div className="frontier">
-          {discovering
-            ? rec.frontier?.map((f) => <span key={f}>{f}</span>)
-            : <span className="match-pill">{rec.match}% match</span>}
-        </div>
+        {discovering && <div className="frontier">{rec.frontier?.map((f) => <span key={f}>{f}</span>)}</div>}
         <h2>{t.title}</h2>
         <p>{metaLine(t, 3)}</p>
         {!discovering && rec.because && <p className="reel-why">Because you liked {rec.because.title}</p>}
-        {discovering && <p className="reel-why">New territory for you{rec.match >= 70 ? ', but close to things you love' : ''}</p>}
+        {discovering && <p className="reel-why">New territory for you{rec.close ? ', but close to things you love' : ''}</p>}
         <div className="reel-actions">
           <button className="reel-btn primary" onClick={() => nav.openRate(t.id)}><StarIcon size={16} /> Seen it</button>
           <button className={`reel-btn ${saved ? 'on' : ''}`} onClick={() => toggleWatchlist(t.id)} aria-pressed={saved}>

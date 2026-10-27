@@ -3,7 +3,7 @@ import type { MediaType } from '../types';
 import { GENRES, metaLine } from '../lib/catalog';
 import { CrewError, cleanCode, inviteLink, useCloudCrew, validCode } from '../lib/cloud';
 import { groupPicks, loadGroup, saveGroup, toMember, type GroupPick, type GroupState, type SeenMode } from '../lib/group';
-import { rankedCount, useStore } from '../lib/store';
+import { ratedCount, useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { ShareIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
 import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
@@ -14,11 +14,12 @@ const SEEN: { value: SeenMode; label: string }[] = [
   { value: 'none', label: 'New to everyone' },
   { value: 'some', label: 'Seen by some' },
   { value: 'either', label: 'Seen or not' },
+  { value: 'rewatch', label: 'Rewatch favorites' },
 ];
 
-/** One line under a pick: who has seen it (with their score), who wants to, or the usual details. */
+/** One line under a pick: who has seen it (with their verdict, ↻ if they'd watch it again), who wants to, or the usual details. */
 function pickDetail(p: GroupPick) {
-  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${s.score.toFixed(1)})`).join(', ')}`;
+  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${s.verdict}${s.again ? ' ↻' : ''})`).join(', ')}`;
   if (p.wanted.length) return `On ${p.wanted.map((n) => (n === 'You' ? 'your' : `${n}'s`)).join(' & ')} watchlist`;
   return metaLine(p.title);
 }
@@ -75,7 +76,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
         <div className="person">
           <span className="avatar sm"><UserIcon size={14} /></span>
           <span className="person-name">{cloud.name.trim() || 'You'}</span>
-          <span className="person-sub">{rankedCount(data)} ranked</span>
+          <span className="person-sub">{ratedCount(data)} rated</span>
           <label className="switch">
             <input type="checkbox" checked={group.includeMe}
               onChange={(e) => setGroup((g) => ({ ...g, includeMe: e.target.checked }))} />
@@ -89,7 +90,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
               {friendName(m.name, i).charAt(0).toUpperCase()}
             </span>
             <span className="person-name">{friendName(m.name, i)}</span>
-            <span className="person-sub">{rankedCount(m.data)} ranked · {ago(m.updatedAt)}</span>
+            <span className="person-sub">{ratedCount(m.data)} rated · {ago(m.updatedAt)}</span>
           </div>
         ))}
         {group.people.map((p, j) => {
@@ -101,7 +102,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
               </span>
               <input className="person-input" value={p.name} placeholder={`Friend ${i + 1}`} maxLength={40}
                 onChange={(e) => rename(p.id, e.target.value)} aria-label="Name" />
-              <span className="person-sub">{rankedCount(p.data)} ranked</span>
+              <span className="person-sub">{ratedCount(p.data)} rated</span>
               <button className="icon-btn ghost" onClick={() => remove(p.id)} aria-label={`Remove ${friendName(p.name, i)}`}>
                 <XIcon size={14} />
               </button>
@@ -120,8 +121,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
             <>
               <Cards>
                 {shown.slice(0, limit).map((p) => (
-                  <TitleRow key={p.title.id} t={p.title} accessory={<span className="match-pill">{p.match}%</span>}
-                    detail={pickDetail(p)} />
+                  <TitleRow key={p.title.id} t={p.title} detail={pickDetail(p)} />
                 ))}
               </Cards>
               {shown.length > limit && (

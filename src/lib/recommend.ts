@@ -1,12 +1,13 @@
 import type { MediaType, Rating, Title } from '../types';
 import { BY_ID, CATALOG, ORDER } from './catalog';
+import { pull } from './rating';
 import { UNIVERSE } from './taste';
 
 /*
  * Content-based recommender. Each title becomes a weighted feature vector
  * (genres, tags, director/network, type, decade) and similarity is cosine.
  * A candidate's score is the sum of its similarity to everything you've rated,
- * weighted by how much you liked each one (dislikes push it down).
+ * weighted by your verdict (good pulls it up, bad pushes it down, and would-watch-again counts extra).
  */
 
 const W = { genre: 1, tag: 1.6, creator: 2.2, type: 0.6, decade: 0.4 };
@@ -59,16 +60,16 @@ export function similarTitles(id: string, exclude: Set<string> = new Set(), k = 
 export interface Rec {
   title: Title;
   score: number;
-  /** 55–99, relative to the best recommendation. */
-  match: number;
-  /** The rated title that contributed most to this pick. */
+  /** The title you rated good that contributed most to this pick. */
   because?: Title;
-  /** Discover mode: the genres and themes in it you haven't ranked anything from yet. */
+  /** Discover mode: the genres and themes in it you haven't rated anything from yet. */
   frontier?: string[];
+  /** Discover mode: close to things you liked, even though it's new ground. */
+  close?: boolean;
 }
 
 export function recommend(ratings: Map<string, Rating>, dismissed: Set<string>, type?: MediaType): Rec[] {
-  const rated = [...ratings.values()].map((r) => ({ t: BY_ID.get(r.id)!, w: (r.score - 5.5) / 4.5 }));
+  const rated = [...ratings.values()].map((r) => ({ t: BY_ID.get(r.id)!, w: pull(r), good: r.verdict === 'good' }));
   if (!rated.length) return [];
   const N = CATALOG.length;
   const scale = Math.sqrt(rated.length);
@@ -84,20 +85,17 @@ export function recommend(ratings: Map<string, Rating>, dismissed: Set<string>, 
       if (s < 0.15) continue;
       const c = s * s * r.w;
       total += c;
-      if (c > best) {
+      if (r.good && c > best) {
         best = c;
         because = r.t;
       }
     }
     if (total <= 0) continue;
     const prior = 0.04 * (1 - ORDER.get(t.id)! / N);
-    out.push({ title: t, score: total / scale + prior, match: 0, because });
+    out.push({ title: t, score: total / scale + prior, because });
   }
 
-  out.sort((a, b) => b.score - a.score);
-  const max = out[0]?.score ?? 1;
-  for (const r of out) r.match = Math.round(55 + 44 * Math.min(1, r.score / max));
-  return out;
+  return out.sort((a, b) => b.score - a.score);
 }
 
 /** A number in [0, 1) fixed for a seed and title, so a feed keeps its order when one title drops out of it. */
@@ -161,7 +159,7 @@ export function shuffle(recs: Rec[], seed: number, seen: Set<string> = new Set()
 const THEMES = new Set(UNIVERSE.themes);
 
 /**
- * Discover mode: well-known titles from genres and themes you haven't ranked anything in.
+ * Discover mode: well-known titles from genres and themes you haven't rated anything in.
  * Your taste still breaks ties, so the first Western you're shown is one you're likely to enjoy,
  * and the feed rotates through frontiers instead of showing five Westerns in a row. Like `shuffle`,
  * the order is drawn at random (weighted by score) for each seed, and titles in `seen` sit lower.
@@ -186,13 +184,13 @@ export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, r
     const newGenres = t.genres.filter((g) => !seenGenres.has(g));
     const newThemes = t.tags.filter((x) => THEMES.has(x) && !seenThemes.has(x));
     if (!newGenres.length && !newThemes.length) continue;
-    // Genres you rank a lot are home turf and make a title feel less new.
+    // Genres you rate a lot are home turf and make a title feel less new.
     const familiar = t.genres.reduce((s, g) => s + Math.min(1, (seenGenres.get(g) ?? 0) / home), 0) / t.genres.length;
     const novelty = newGenres.length + 0.6 * newThemes.length + 0.5 * (1 - familiar);
     const known = 1 - ORDER.get(t.id)! / N;
     const f = Math.max(0, (fit.get(t.id) ?? 0) / maxFit);
     const score = novelty * (0.15 + known * known) * (0.6 + 0.8 * f) * (t.image ? 1 : 0.5);
-    pool.push({ title: t, score, match: Math.round(55 + 44 * Math.min(1, f)), frontier: [...newGenres, ...newThemes].slice(0, 3) });
+    pool.push({ title: t, score, close: f >= 0.35, frontier: [...newGenres, ...newThemes].slice(0, 3) });
   }
   pool.sort((a, b) => b.score - a.score);
 

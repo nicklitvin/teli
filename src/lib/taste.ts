@@ -1,5 +1,6 @@
-import type { Rating, Title } from '../types';
+import type { Rating, Title, Verdict } from '../types';
 import { BY_ID, CATALOG, GENRES } from './catalog';
+import { byVerdict, countVerdicts } from './rating';
 
 export const pairKey = (a: string, b: string) => (a < b ? `${a}|${b}` : `${b}|${a}`);
 
@@ -129,9 +130,9 @@ export const UNIVERSE: Record<Dimension, string[]> = {
 
 export interface GroupStat {
   name: string;
-  /** Your ranked titles in this group, best first. */
+  /** Your rated titles in this group, best first. */
   rated: Rating[];
-  avg: number;
+  verdicts: Record<Verdict, number>;
   /** Titles in the catalog in this group. */
   catalog: number;
 }
@@ -140,14 +141,14 @@ export function groupStats(dim: Dimension, ratings: Map<string, Rating>): Map<st
   const m = new Map<string, GroupStat>();
   const get = (k: string) => {
     let s = m.get(k);
-    if (!s) m.set(k, (s = { name: k, rated: [], avg: 0, catalog: COUNTS[dim].get(k) ?? 0 }));
+    if (!s) m.set(k, (s = { name: k, rated: [], verdicts: { good: 0, mid: 0, bad: 0 }, catalog: COUNTS[dim].get(k) ?? 0 }));
     return s;
   };
   for (const k of UNIVERSE[dim]) get(k);
   for (const r of ratings.values()) for (const k of keysOf(dim, BY_ID.get(r.id)!)) get(k).rated.push(r);
   for (const s of m.values()) {
-    s.rated.sort((a, b) => b.score - a.score);
-    s.avg = s.rated.length ? s.rated.reduce((n, r) => n + r.score, 0) / s.rated.length : 0;
+    s.rated.sort(byVerdict);
+    s.verdicts = countVerdicts(s.rated);
   }
   return m;
 }

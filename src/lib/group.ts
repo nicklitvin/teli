@@ -1,5 +1,6 @@
-import type { Rating, Title } from '../types';
+import type { Rating, Title, Verdict } from '../types';
 import { CATALOG } from './catalog';
+import { appeal } from './rating';
 import { recommend } from './recommend';
 import { computeRatings, emptyData, sanitize, type Data } from './store';
 
@@ -17,26 +18,26 @@ export interface Member {
 
 export interface GroupPick {
   title: Title;
-  /** 55–99, relative to the best pick. */
-  match: number;
-  /** Each member's own match for this title, or null when we know nothing about their taste here. */
-  per: { name: string; match: number | null }[];
   /** Members who already have it on their watchlist. */
   wanted: string[];
-  /** Members who have ranked it, with their score. */
-  seenBy: { name: string; score: number }[];
+  /** Members who have rated it, with their verdict and whether they'd watch it again. */
+  seenBy: { name: string; verdict: Verdict; again: boolean }[];
 }
 
-/** Which titles to consider: ones nobody has ranked, ones some (not all) of you have, or both. */
-export type SeenMode = 'none' | 'some' | 'either';
+/**
+ * Which titles to consider: ones nobody has rated, ones some (not all) of you have, both, or
+ * rewatches: ones at least one of you would happily watch again (even if everyone's seen them).
+ */
+export type SeenMode = 'none' | 'some' | 'either' | 'rewatch';
 
 export const toMember = (name: string, data: Data): Member => ({ name, data, ratings: computeRatings(data) });
 
 /**
  * Titles scored for everyone at once. Each member's taste is scored with the normal recommender
- * (or, for a title they've ranked, their own score), then combined so one person loving a title
- * can't outvote the others: half the average, half the least-happy member. Titles everyone has
- * ranked are always left out; `seen` picks between unseen titles, ones some of you have seen, or both.
+ * (or, for a title they've rated, by their verdict and whether they'd watch it again), then
+ * combined so one person loving a title can't outvote the others: half the average, half the
+ * least-happy member. Titles everyone has rated are left out except for rewatches; `seen` picks
+ * between unseen titles, ones some of you have seen, both, or rewatches.
  */
 export function groupPicks(members: Member[], seen: SeenMode = 'none'): GroupPick[] {
   const dismissed = new Set(members.flatMap((m) => m.data.dismissed));
@@ -51,12 +52,13 @@ export function groupPicks(members: Member[], seen: SeenMode = 'none'): GroupPic
   for (const t of CATALOG) {
     if (dismissed.has(t.id)) continue;
     const seenBy = members.filter((m) => m.ratings.has(t.id));
-    if (seenBy.length === members.length || (seen === 'none' && seenBy.length) || (seen === 'some' && !seenBy.length)) continue;
+    if (seen === 'rewatch') {
+      if (!seenBy.some((m) => m.ratings.get(t.id)!.again)) continue;
+    } else if (seenBy.length === members.length || (seen === 'none' && seenBy.length) || (seen === 'some' && !seenBy.length)) continue;
     const wanted = members.filter((m) => m.data.watchlist.includes(t.id)).map((m) => m.name);
-    // Someone who ranked it counts by how much they liked it: 3 or lower is a no, 10 a full yes.
     const vals = tasters.map((m, i) => {
       const r = m.ratings.get(t.id);
-      return r ? Math.max(0, Math.min(1, (r.score - 3) / 7)) : fits[i].get(t.id) ?? 0;
+      return r ? appeal(r) : fits[i].get(t.id) ?? 0;
     });
     if (!wanted.length && !vals.some((v) => v > 0)) continue;
     const mean = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : 0;
@@ -65,16 +67,14 @@ export function groupPicks(members: Member[], seen: SeenMode = 'none'): GroupPic
     out.push({
       title: t,
       score,
-      match: 0,
       wanted,
-      seenBy: seenBy.map((m) => ({ name: m.name, score: m.ratings.get(t.id)!.score })),
-      per: tasters.map((m, i) => ({ name: m.name, match: vals[i] > 0 ? Math.round(55 + 44 * vals[i]) : null })),
+      seenBy: seenBy.map((m) => {
+        const r = m.ratings.get(t.id)!;
+        return { name: m.name, verdict: r.verdict, again: r.again };
+      }),
     });
   }
-  out.sort((a, b) => b.score - a.score);
-  const max = out[0]?.score || 1;
-  for (const p of out) p.match = Math.round(55 + 44 * Math.min(1, p.score / max));
-  return out;
+  return out.sort((a, b) => b.score - a.score);
 }
 
 const KEY = 'teli:group:v1';

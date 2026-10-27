@@ -1,5 +1,7 @@
 import { useState, type CSSProperties } from 'react';
-import type { Rating, Title } from '../types';
+import type { Review, Title } from '../types';
+import { VERDICT_LABEL } from '../lib/rating';
+import { RefreshIcon } from './Icons';
 
 function hash(s: string) {
   let h = 2166136261;
@@ -41,7 +43,7 @@ interface PosterProps {
   size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl' | 'fill';
   /** Always crop to fill, even title cards and logos (for landscape cards, where they fit anyway). */
   cover?: boolean;
-  rating?: Rating;
+  rating?: Review;
   className?: string;
   style?: CSSProperties;
 }
@@ -75,7 +77,7 @@ export function Poster({ t, size = 'md', cover, rating, className = '', style }:
           onLoad={(e) => e.currentTarget.classList.add('loaded')} onError={onError} />
       )}
       {!tiny && size !== 'fill' && t.type === 'tv' && <span className="poster-tag">TV</span>}
-      {rating && !tiny && <ScoreBadge rating={rating} size="sm" className="poster-score" />}
+      {rating && !tiny && <VerdictBadge rating={rating} size="sm" className="poster-score" />}
     </div>
   );
 }
@@ -85,15 +87,17 @@ function initials(title: string) {
   return words.slice(0, 2).map((w) => w.replace(/[^A-Za-z0-9]/g, '')[0] ?? '').join('').toUpperCase();
 }
 
-export function ScoreBadge({ rating, size = 'md', className = '' }: {
-  rating: Pick<Rating, 'score' | 'sentiment'>;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+/** Your verdict as a colored tag, with a rewatch mark when you'd watch it again. Dashed while it still needs a review. */
+export function VerdictBadge({ rating, size = 'md', className = '' }: {
+  rating: Pick<Review, 'verdict' | 'again' | 'pending'>;
+  size?: 'sm' | 'md' | 'lg';
   className?: string;
 }) {
+  const label = `${VERDICT_LABEL[rating.verdict]}${rating.again ? ', would watch again' : ''}${rating.pending ? ', needs a review' : ''}`;
   return (
-    <span className={`score score-${size} s-${rating.sentiment} ${className}`}>
-      {rating.score.toFixed(1)}
+    <span className={`score score-${size} v-${rating.verdict} ${rating.pending ? 'pending' : ''} ${className}`} role="img" aria-label={label}>
+      {VERDICT_LABEL[rating.verdict]}
+      {rating.again && <RefreshIcon size={size === 'lg' ? 14 : size === 'md' ? 12 : 10} strokeWidth={2.6} />}
     </span>
   );
 }
-

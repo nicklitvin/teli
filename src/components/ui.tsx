@@ -4,7 +4,7 @@ import { GENRE_COLORS, metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { FilterIcon, SearchIcon, XIcon } from './Icons';
-import { Poster, ScoreBadge } from './Poster';
+import { Poster, VerdictBadge } from './Poster';
 
 /**
  * A tab's scroll container. There's no top bar: content starts under the status bar. `dock` is
@@ -52,11 +52,12 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 }
 
 /**
- * Tabs for a list plus two small tools: a filter panel (genre, plus an optional extra choice) and
- * an optional search box. Each opens under the row; active filters stay visible as removable chips.
+ * Tabs for a list plus two small tools: a filter panel (genre, plus an optional extra choice and
+ * any `more` filter groups) and an optional search box. Each opens under the row and the panel
+ * stays open while you pick; active filters stay visible as removable chips once it's closed.
  * `extra` puts more buttons in the row, before the filter and search buttons.
  */
-export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, extra }: {
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, extra }: {
   tab: T;
   tabs: { value: T; label: string }[];
   onTab: (t: T) => void;
@@ -68,17 +69,25 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   placeholder?: string;
   /** An extra single-choice filter shown above the genres; anything but `initial` counts as active. */
   option?: { label: string; value: string; initial: string; choices: { value: string; label: string }[]; onChange: (v: string) => void };
+  /** More filter groups shown above the genres, with their own removable chips. */
+  more?: { panel: ReactNode; chips: ReactNode; active: boolean; onClear: () => void };
   extra?: ReactNode;
 }) {
   const [open, setOpen] = useState<'search' | 'genre' | null>(null);
   const optionOn = !!option && option.value !== option.initial;
+  const anyOn = !!genre || optionOn || !!more?.active;
   const toggle = (k: 'search' | 'genre') => setOpen((o) => (o === k ? null : k));
+  const clearAll = () => {
+    onGenre(null);
+    if (option) option.onChange(option.initial);
+    more?.onClear();
+  };
   return (
     <div className="tools">
       <div className="tools-row">
         <Segmented<T> value={tab} options={tabs} onChange={onTab} />
         {extra}
-        <button className={`icon-btn tool ${open === 'genre' || genre || optionOn ? 'on' : ''}`} onClick={() => toggle('genre')}
+        <button className={`icon-btn tool ${open === 'genre' || anyOn ? 'on' : ''}`} onClick={() => toggle('genre')}
           aria-expanded={open === 'genre'} aria-label="Filters">
           <FilterIcon size={17} />
         </button>
@@ -101,6 +110,10 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
       )}
       {open === 'genre' ? (
         <div className="filter-panel">
+          <div className="filter-head">
+            <p className="filter-title">Filters</p>
+            {anyOn && <button className="filter-clear" onClick={clearAll}>Clear all</button>}
+          </div>
           {option && (
             <div className="filter-group" role="group" aria-label={option.label}>
               <p className="filter-label">{option.label}</p>
@@ -112,19 +125,20 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
               </div>
             </div>
           )}
+          {more?.panel}
           <div className="filter-group" role="group" aria-label="Genres">
-            {option && <p className="filter-label">Genre</p>}
+            <p className="filter-label">Genre</p>
             <div className="genre-wrap">
-              <button className={`chip toggle any ${genre ? '' : 'on'}`} onClick={() => { onGenre(null); setOpen(null); }}
+              <button className={`chip toggle any ${genre ? '' : 'on'}`} onClick={() => onGenre(null)}
                 aria-pressed={!genre}>Any genre</button>
               {genres.map((g) => (
                 <button key={g} className={`chip toggle ${genre === g ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
-                  onClick={() => { onGenre(genre === g ? null : g); setOpen(null); }} aria-pressed={genre === g}>{g}</button>
+                  onClick={() => onGenre(genre === g ? null : g)} aria-pressed={genre === g}>{g}</button>
               ))}
             </div>
           </div>
         </div>
-      ) : (genre || optionOn) && (
+      ) : anyOn && (
         <div className="genre-wrap">
           {option && optionOn && (
             <button className="chip removable" style={{ ['--c' as string]: 'var(--accent-2)' }} onClick={() => option.onChange(option.initial)}
@@ -132,6 +146,7 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
               {option.choices.find((c) => c.value === option.value)?.label} <XIcon size={12} strokeWidth={3} />
             </button>
           )}
+          {more?.active && more.chips}
           {genre && (
             <button className="chip removable" style={{ ['--c' as string]: GENRE_COLORS[genre] }} onClick={() => onGenre(null)}
               aria-label={`Remove ${genre} filter`}>
@@ -157,12 +172,11 @@ export function SectionHeader({ title, subtitle, action }: { title: string; subt
 }
 
 /**
- * A title as a wide image card: the art fills it and the name, a line of detail and a score tag
- * sit over the bottom. `accessory` replaces the score tag; `actions` are buttons in the top corner.
+ * A title as a wide image card: the art fills it and the name, a line of detail and your verdict
+ * sit over the bottom. `accessory` replaces the verdict; `actions` are buttons in the top corner.
  */
-export function TitleRow({ t, rank, detail, accessory, actions, readOnly }: {
+export function TitleRow({ t, detail, accessory, actions, readOnly }: {
   t: Title;
-  rank?: number;
   detail?: ReactNode;
   accessory?: ReactNode;
   actions?: ReactNode;
@@ -172,12 +186,11 @@ export function TitleRow({ t, rank, detail, accessory, actions, readOnly }: {
   const { ratings } = useStore();
   const nav = useNav();
   const r = ratings.get(t.id);
-  const tag = accessory ?? (r ? <ScoreBadge rating={r} size="lg" /> : null);
+  const tag = accessory ?? (r ? <VerdictBadge rating={r} size="lg" /> : null);
   return (
     <div className="tcard">
       <Poster t={t} size="fill" cover />
       {!readOnly && <button className="tcard-hit" onClick={() => nav.openDetail(t.id)} aria-label={`${t.title}, ${t.year}`} />}
-      {rank !== undefined && <span className="tcard-rank">#{rank}</span>}
       {actions && <span className="tcard-actions">{actions}</span>}
       <span className="tcard-info">
         <span className="tcard-text">

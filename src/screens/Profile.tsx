@@ -1,13 +1,15 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import type { MediaType } from '../types';
-import { BY_ID, GENRES } from '../lib/catalog';
+import type { MediaType, Title } from '../types';
+import { BY_ID, GENRES, metaLine } from '../lib/catalog';
 import { setName, useName } from '../lib/name';
+import { NO_FILTER, TAG_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
 import { normalize } from '../lib/search';
-import { emptyData, parseBackup, rankedCount, useStore, type Data } from '../lib/store';
+import { emptyData, parseBackup, pendingIds, ratedCount, useStore, type Data } from '../lib/store';
 import { useNav } from '../nav';
 import {
-  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
+  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, RefreshIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
 } from '../components/Icons';
+import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
 import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Pending = { kind: 'import'; data: Data; name: string } | { kind: 'reset' };
@@ -20,12 +22,16 @@ const TABS: { value: MediaType; label: string }[] = [
 ];
 
 /**
- * Your logbook: movies or shows ranked by score, with genre and search filters. The bookmark button
- * beside the filters swaps in your watchlist. Backups and hidden titles sit behind the gear.
+ * Your logbook: movies or shows, good first, with filters for your verdict, would watch again, tags
+ * and genre, plus search. The bookmark button beside the filters swaps in your watchlist. Backups
+ * and hidden titles sit behind the gear.
  */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
+  const nav = useNav();
   const name = useName().trim();
+  const [rf, setRf] = useState<ReviewFilter>(NO_FILTER);
+  const toReview = pendingIds(data).length;
   const [settings, setSettings] = useState(false);
   const [hiddenPage, setHiddenPage] = useState(false);
   const [tab, setTab] = useState<MediaType>('movie');
@@ -33,23 +39,22 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState('');
 
-  // Numbers are your overall rank in movies or shows, so they stay put while filtering.
-  // The watchlist has no numbers and shows what you saved most recently first.
+  // Rated titles: good, then mid, then bad. The watchlist shows what you saved most recently first.
   const list = useMemo(
     () => (watching
-      ? data.watchlist.map((id) => ({ id, t: BY_ID.get(id)!, n: undefined as number | undefined })).filter((x) => x.t.type === tab)
-      : [...ratings.values()].filter((r) => r.type === tab)
-        .sort((a, b) => b.score - a.score || a.rank - b.rank)
-        .map((r, i) => ({ id: r.id, t: BY_ID.get(r.id)!, n: i + 1 as number | undefined }))),
+      ? data.watchlist.map((id) => ({ id, t: BY_ID.get(id)! })).filter((x) => x.t.type === tab)
+      : [...ratings.values()].filter((r) => r.type === tab).sort(byVerdict).map((r) => ({ id: r.id, t: BY_ID.get(r.id)! }))),
     [ratings, data.watchlist, tab, watching],
   );
   const genres = GENRES.filter((g) => list.some((x) => x.t.genres.includes(g)));
+  const usedTags = useMemo(() => [...new Set([...ratings.values()].filter((r) => r.type === tab).flatMap((r) => r.tags))], [ratings, tab]);
   const q = normalize(query.trim());
+  const reviewing = !watching && filtering(rf);
   const shown = list.filter((x) => (!genre || x.t.genres.includes(genre))
+    && (!reviewing || passes(ratings.get(x.id)!, rf))
     && (!q || normalize(`${x.t.title} ${x.t.creator} ${x.t.year}`).includes(q)));
-  const filtering = !!genre || !!q;
-  const scores = list.map((x) => ratings.get(x.id)?.score ?? 0);
-  const avg = scores.length ? scores.reduce((a, b) => a + b, 0) / scores.length : 0;
+  const narrowed = !!genre || !!q || reviewing;
+  const counts = countVerdicts(list.map((x) => ratings.get(x.id)!).filter(Boolean));
   const noun = tab === 'movie' ? 'movies' : 'shows';
 
   if (hiddenPage) {
@@ -66,7 +71,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
         <span className="avatar avatar-lg"><UserIcon size={26} /></span>
         <div>
           <h2>{name ? `${name}’s notebook` : 'Your logbook'}</h2>
-          <p>{plural(ratings.size, 'title')} ranked · saved on this device</p>
+          <p>{plural(ratings.size, 'title')} rated · saved on this device</p>
         </div>
         <button className={`icon-btn ${settings ? 'on' : ''}`} onClick={() => setSettings((v) => !v)}
           aria-expanded={settings} aria-label="Settings">
@@ -76,13 +81,27 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
 
       {settings && <Settings onHidden={() => setHiddenPage(true)} />}
 
+      {toReview > 0 && (
+        <button className="review-banner" onClick={() => nav.openReview()}>
+          <RefreshIcon size={18} />
+          <span><strong>{plural(toReview, 'title')} to review</strong><small>Carried over from the old rankings. Give each a quick good, mid or bad.</small></span>
+          <ChevronRight size={16} />
+        </button>
+      )}
+
       {ratings.size || data.watchlist.length ? (
         <>
-          <ListTools<MediaType> tab={tab} onTab={(t) => { setTab(t); setGenre(null); }} tabs={TABS}
+          <ListTools<MediaType> tab={tab} onTab={(t) => { setTab(t); setGenre(null); setRf(NO_FILTER); }} tabs={TABS}
             genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery}
             placeholder={`Search your ${watching ? 'saved ' : ''}${noun}`}
+            more={watching ? undefined : {
+              panel: <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />,
+              chips: <ReviewFilterChips value={rf} onChange={setRf} />,
+              active: filtering(rf),
+              onClear: () => setRf(NO_FILTER),
+            }}
             extra={
-              <button className={`icon-btn tool ${watching ? 'on' : ''}`} onClick={() => { setWatching((v) => !v); setGenre(null); }}
+              <button className={`icon-btn tool ${watching ? 'on' : ''}`} onClick={() => { setWatching((v) => !v); setGenre(null); setRf(NO_FILTER); }}
                 aria-pressed={watching} aria-label="Watchlist">
                 <BookmarkIcon size={17} filled={watching} />
               </button>
@@ -91,34 +110,41 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
             shown.length ? (
               <>
                 <p className="list-caption">
-                  {filtering ? `${shown.length} of ${list.length} ${noun}`
+                  {narrowed ? `${shown.length} of ${list.length} ${noun}`
                     : watching ? `${plural(list.length, tab === 'movie' ? 'movie' : 'show')} to watch`
-                    : `${list.length} ranked · average ${avg.toFixed(1)}`}
+                    : `${list.length} rated · ${verdictSummary(counts)}`}
                 </p>
                 <Cards>
                   {shown.map((x) => (
-                    <TitleRow key={x.id} t={x.t} rank={x.n} actions={watching ? <Unsave id={x.id} title={x.t.title} /> : undefined} />
+                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!)}
+                      actions={watching ? <Unsave id={x.id} title={x.t.title} /> : undefined} />
                   ))}
                 </Cards>
               </>
             ) : (
-              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ${watching ? 'saved' : 'ranked'} ${noun} match that filter.`} />
+              <Empty icon={<SearchIcon size={30} />} title="Nothing matches" body={`None of your ${watching ? 'saved' : 'rated'} ${noun} match that filter.`} />
             )
           ) : watching ? (
             <Empty icon={<BookmarkIcon size={30} />} title={`No ${noun} saved`} body={`Tap Save on any of the ${noun} you want to watch and they’ll wait here.`}
               action={<button className="primary-btn" onClick={onSearch}>Find {noun}</button>} />
           ) : (
-            <Empty icon={<BookIcon size={30} />} title={`No ${noun} yet`} body={`Rate a few ${noun} and they'll be ranked here.`}
+            <Empty icon={<BookIcon size={30} />} title={`No ${noun} yet`} body={`Rate a few ${noun} and they'll be logged here.`}
               action={<button className="primary-btn" onClick={onSearch}>Find {noun}</button>} />
           )}
         </>
       ) : (
         <Empty icon={<BookIcon size={34} />} title="Your logbook is empty"
-          body="Rate something you've watched and it'll be logged here, ordered by your score."
+          body="Rate something you've watched and it'll be logged here, good ones first."
           action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
       )}
     </Screen>
   );
+}
+
+/** Under a rated title: what stood out, or a nudge when it still needs a review. */
+function ratedDetail(t: Title, r: { tags: string[]; pending?: boolean }) {
+  if (r.pending) return 'Needs a quick review';
+  return r.tags.length ? [t.year, ...r.tags.map((x) => TAG_LABEL.get(x))].join(' · ') : metaLine(t);
 }
 
 /** Takes a title off your watchlist, with an undo. */
@@ -201,7 +227,7 @@ function Settings({ onHidden }: { onHidden: () => void }) {
     if (!pending) return;
     if (pending.kind === 'import') {
       replace(pending.data);
-      setNote({ text: `Imported ${plural(rankedCount(pending.data), 'ranking')} and ${plural(pending.data.watchlist.length, 'watchlist title')}.` });
+      setNote({ text: `Imported ${plural(ratedCount(pending.data), 'rating')} and ${plural(pending.data.watchlist.length, 'watchlist title')}.` });
     } else {
       replace(emptyData());
       setNote({ text: 'Everything was erased.' });
@@ -220,7 +246,7 @@ function Settings({ onHidden }: { onHidden: () => void }) {
         </label>
         <button className="setting" onClick={exportData}>
           <DownloadIcon size={18} />
-          <span><strong>Export backup</strong><small>Download your rankings and watchlist, or send it to your crew</small></span>
+          <span><strong>Export backup</strong><small>Download your ratings and watchlist, or send it to your crew</small></span>
         </button>
         <label className="setting">
           <UploadIcon size={18} />
@@ -229,7 +255,7 @@ function Settings({ onHidden }: { onHidden: () => void }) {
         </label>
         <button className="setting danger" onClick={() => { setPending({ kind: 'reset' }); setNote(null); }}>
           <TrashIcon size={18} />
-          <span><strong>Reset everything</strong><small>Erase all rankings, watchlist and hidden titles</small></span>
+          <span><strong>Reset everything</strong><small>Erase all ratings, watchlist and hidden titles</small></span>
         </button>
         <button className="setting" onClick={onHidden}>
           <EyeSlashIcon size={18} />
@@ -242,8 +268,8 @@ function Settings({ onHidden }: { onHidden: () => void }) {
         <div className={`confirm ${pending.kind === 'reset' ? 'danger' : ''}`} role="alertdialog" aria-label="Confirm">
           <p>
             {pending.kind === 'import'
-              ? <>Replace your {plural(rankedCount(data), 'ranking')} with {plural(rankedCount(pending.data), 'ranking')} and {plural(pending.data.watchlist.length, 'watchlist title')} from <b>{pending.name}</b>?</>
-              : <>Erase {plural(rankedCount(data), 'ranking')} and {plural(data.watchlist.length, 'watchlist title')}? This can't be undone.</>}
+              ? <>Replace your {plural(ratedCount(data), 'rating')} with {plural(ratedCount(pending.data), 'rating')} and {plural(pending.data.watchlist.length, 'watchlist title')} from <b>{pending.name}</b>?</>
+              : <>Erase {plural(ratedCount(data), 'rating')} and {plural(data.watchlist.length, 'watchlist title')}? This can't be undone.</>}
           </p>
           <div className="confirm-actions">
             <button className="secondary-btn" onClick={() => setPending(null)}>Cancel</button>

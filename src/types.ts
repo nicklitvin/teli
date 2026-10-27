@@ -1,5 +1,5 @@
 export type MediaType = 'movie' | 'tv';
-export type Sentiment = 'liked' | 'fine' | 'disliked';
+export type Verdict = 'good' | 'mid' | 'bad';
 
 export interface Title {
   id: string;
@@ -14,12 +14,20 @@ export interface Title {
   image?: [string, number, number];
 }
 
-export interface Rating {
+/** What you thought of a title. */
+export interface Review {
+  verdict: Verdict;
+  /** What stood out, as ids from `TAGS`. */
+  tags: string[];
+  /** Would you watch it again? */
+  again: boolean;
+  /** When you first logged it (ms since epoch). */
+  at: number;
+  /** Carried over from the old ranking system and not reviewed yet. */
+  pending?: boolean;
+}
+
+export interface Rating extends Review {
   id: string;
   type: MediaType;
-  sentiment: Sentiment;
-  score: number;
-  /** 1-based position among all ranked titles of the same type. */
-  rank: number;
-  total: number;
 }
