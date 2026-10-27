@@ -759,7 +759,9 @@ h1, h2, h3, p { margin: 0; }
 }
 .crew-box .note, .crew-dock .note { margin: 0; }
 /* Not in a crew yet: start and join sit just above the tab bar, in thumb reach. */
-.screen.crew-docked { padding-bottom: calc(var(--tabbar-h) + 140px); }
+.screen.crew-docked { padding-bottom: calc(var(--tabbar-h) + 140px); display: flex; flex-direction: column; }
+/* Nothing to list yet: the intro sits in the middle of the space above the dock. */
+.screen.crew-docked > .empty { flex: 1; justify-content: center; }
 .crew-dock {
   position: absolute; z-index: 15; left: 0; right: 0; bottom: var(--tabbar-h); display: flex; flex-direction: column; gap: 10px; padding: 12px var(--gutter);
   background: rgba(6, 7, 18, 0.96); border-top: 1px solid var(--border);

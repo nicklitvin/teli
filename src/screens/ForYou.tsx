@@ -9,6 +9,27 @@ import { Screen, SectionHeader } from '../components/ui';
 
 type Mode = 'picks' | 'discover';
 const PAGE = 8;
+
+// Titles you've scrolled past lately, oldest first, so the next feed leads with something else.
+const SEEN_KEY = 'teli:seen:v1';
+const SEEN_MAX = 60;
+function loadSeen(): Set<string> {
+  try {
+    const a: unknown = JSON.parse(localStorage.getItem(SEEN_KEY) ?? '[]');
+    return new Set(Array.isArray(a) ? a.filter((x): x is string => typeof x === 'string') : []);
+  } catch {
+    return new Set();
+  }
+}
+function markSeen(id: string) {
+  try {
+    const a = [...loadSeen()].filter((x) => x !== id);
+    a.push(id);
+    localStorage.setItem(SEEN_KEY, JSON.stringify(a.slice(-SEEN_MAX)));
+  } catch {
+    /* storage unavailable — feeds just won't avoid repeats */
+  }
+}
 /** How far past the first card you pull (in px, after resistance) before letting go refreshes. */
 const PULL_AT = 70;
 
@@ -18,12 +39,20 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   const dismissed = useMemo(() => new Set(data.dismissed), [data.dismissed]);
   const recs = useMemo(() => recommend(ratings, dismissed), [ratings, dismissed]);
   const [mode, setMode] = useState<Mode>('picks');
-  // A new seed on every load and every switch between picks and Discover, so the feed isn't the same each time.
-  const [seed, setSeed] = useState(newSeed);
+  // A new deal on every load, switch between picks and Discover, and pull to refresh: a new seed,
+  // plus what you've seen lately (read once per deal, so marking cards seen doesn't reshuffle the feed).
+  const [deal, setDeal] = useState(() => ({ seed: newSeed(), seen: loadSeen() }));
+  const newDeal = () => setDeal({ seed: newSeed(), seen: loadSeen() });
   const feed = useMemo(
-    () => (mode === 'discover' ? discover(ratings, dismissed, recs, seed) : shuffle(recs, seed)),
-    [mode, ratings, dismissed, recs, seed],
+    () => (mode === 'discover' ? discover(ratings, dismissed, recs, deal.seed, deal.seen) : shuffle(recs, deal.seed, deal.seen)),
+    [mode, ratings, dismissed, recs, deal],
   );
+  const lastSeen = useRef(-1);
+  useEffect(() => {
+    lastSeen.current = 0;
+    if (feed[0]) markSeen(feed[0].title.id);
+    // Only when a new feed is dealt, not when a card drops out of this one.
+  }, [deal, mode]);
   const [limit, setLimit] = useState(PAGE);
   const scroller = useRef<HTMLDivElement>(null);
   const [pull, setPull] = useState(0);
@@ -32,7 +61,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   // Pulling down past the first card (or scrolling up past it with a wheel) deals a fresh feed.
   const refresh = useRef(() => {});
   refresh.current = () => {
-    setSeed(newSeed());
+    newDeal();
     setLimit(PAGE);
     scroller.current?.scrollTo({ top: 0 });
     nav.notify(mode === 'discover' ? 'New frontiers charted' : 'Fresh picks');
@@ -127,7 +156,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   const switchMode = () => {
     const next = discovering ? 'picks' : 'discover';
     setMode(next);
-    setSeed(newSeed());
+    newDeal();
     setLimit(PAGE);
     scroller.current?.scrollTo({ top: 0 });
     nav.notify(next === 'discover' ? 'Discover on: genres and themes new to you' : 'Back to your usual picks');
@@ -136,6 +165,12 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   return (
     <Screen title={discovering ? 'Discover' : 'For You'} active={active} className="feed" scrollRef={scroller}
       onScroll={(el) => {
+        const h = el.querySelector<HTMLElement>('.reel')?.offsetHeight || el.clientHeight;
+        const i = Math.round(el.scrollTop / h);
+        if (i !== lastSeen.current && feed[i]) {
+          lastSeen.current = i;
+          markSeen(feed[i].title.id);
+        }
         if (el.scrollTop + el.clientHeight * 2.5 > el.scrollHeight) setLimit((n) => Math.min(n + PAGE, feed.length));
       }}>
       <div className="feed-float">
@@ -150,7 +185,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
         </button>
       </div>
       {feed.slice(0, limit).map((r) => (
-        <Reel key={`${mode}-${seed}-${r.title.id}`} rec={r} discovering={discovering} />
+        <Reel key={`${mode}-${deal.seed}-${r.title.id}`} rec={r} discovering={discovering} />
       ))}
       {limit >= feed.length && (
         <div className="reel reel-end">

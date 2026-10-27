@@ -25,6 +25,7 @@ const TABS: { value: MediaType; label: string }[] = [
  */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
+  const name = useName().trim();
   const [settings, setSettings] = useState(false);
   const [hiddenPage, setHiddenPage] = useState(false);
   const [tab, setTab] = useState<MediaType>('movie');
@@ -64,7 +65,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
       <div className="profile-head">
         <span className="avatar avatar-lg"><UserIcon size={26} /></span>
         <div>
-          <h2>Your logbook</h2>
+          <h2>{name ? `${name}’s notebook` : 'Your logbook'}</h2>
           <p>{plural(ratings.size, 'title')} ranked · saved on this device</p>
         </div>
         <button className={`icon-btn ${settings ? 'on' : ''}`} onClick={() => setSettings((v) => !v)}

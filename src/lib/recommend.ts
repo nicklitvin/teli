@@ -112,25 +112,39 @@ function jitter(seed: number, id: string): number {
 /** A fresh seed for `shuffle` and `discover`. */
 export const newSeed = () => Math.floor(Math.random() * 2 ** 32);
 
-const MIX = 150;
+/**
+ * Gumbel noise for a seed and title. Adding it to log-weights and always taking the highest draws
+ * titles at random in proportion to their weight, without replacement.
+ */
+const gumbel = (seed: number, id: string) => -Math.log(-Math.log(Math.min(1 - 1e-12, Math.max(1e-12, jitter(seed, id)))));
+
+const MIX = 200;
+/** Titles from your last few feeds are five times less likely to come up again soon. */
+const SEEN = Math.log(0.2);
 
 /**
- * Your picks in a new order for each seed. Strong matches still lead, but every score is nudged up
- * or down by up to half, and titles picked because of the same favorite, by the same director or
- * network, or sharing a main genre with the last few shown, are pushed back so the feed keeps changing subject.
+ * Your picks in a new order for each seed. Each next card is drawn at random with odds that grow
+ * with the cube of its score, so strong matches lead most feeds without always being the same
+ * ones. Titles in `seen` (shown in recent feeds) sit lower, and titles picked because of the same
+ * favorite, by the same director or network, or sharing a main genre with the last few shown are
+ * pushed back so the feed keeps changing subject.
  */
-export function shuffle(recs: Rec[], seed: number): Rec[] {
-  const left = recs.slice(0, MIX).map((r) => ({ r, s: r.score * (0.5 + jitter(seed, r.title.id)) }));
+export function shuffle(recs: Rec[], seed: number, seen: Set<string> = new Set()): Rec[] {
+  const max = recs[0]?.score || 1;
+  const left = recs.slice(0, MIX).map((r) => ({
+    r,
+    k: 3 * Math.log(Math.max(1e-6, r.score / max)) + gumbel(seed, r.title.id) + (seen.has(r.title.id) ? SEEN : 0),
+  }));
   const because = new Map<string, number>();
   const creators = new Map<string, number>();
   const out: Rec[] = [];
   while (left.length) {
     const recent = out.slice(-3).map((r) => r.title.genres[0]);
     let best = 0;
-    let bestScore = -1;
+    let bestScore = -Infinity;
     left.forEach((x, i) => {
-      let s = x.s * 0.6 ** (because.get(x.r.because?.id ?? '') ?? 0) * 0.6 ** (creators.get(x.r.title.creator) ?? 0);
-      if (recent.includes(x.r.title.genres[0])) s *= 0.75;
+      let s = x.k + Math.log(0.6) * ((because.get(x.r.because?.id ?? '') ?? 0) + (creators.get(x.r.title.creator) ?? 0));
+      if (recent.includes(x.r.title.genres[0])) s += Math.log(0.75);
       if (s > bestScore) {
         bestScore = s;
         best = i;
@@ -149,10 +163,10 @@ const THEMES = new Set(UNIVERSE.themes);
 /**
  * Discover mode: well-known titles from genres and themes you haven't ranked anything in.
  * Your taste still breaks ties, so the first Western you're shown is one you're likely to enjoy,
- * and the feed rotates through frontiers instead of showing five Westerns in a row. The seed
- * shakes up the order, so each visit starts somewhere different.
+ * and the feed rotates through frontiers instead of showing five Westerns in a row. Like `shuffle`,
+ * the order is drawn at random (weighted by score) for each seed, and titles in `seen` sit lower.
  */
-export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, recs: Rec[], seed = 0): Rec[] {
+export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, recs: Rec[], seed = 0, seen: Set<string> = new Set()): Rec[] {
   if (!ratings.size) return [];
   const seenGenres = new Map<string, number>();
   const seenThemes = new Set<string>();
@@ -177,26 +191,29 @@ export function discover(ratings: Map<string, Rating>, dismissed: Set<string>, r
     const novelty = newGenres.length + 0.6 * newThemes.length + 0.5 * (1 - familiar);
     const known = 1 - ORDER.get(t.id)! / N;
     const f = Math.max(0, (fit.get(t.id) ?? 0) / maxFit);
-    const luck = 0.5 + jitter(seed, t.id);
-    const score = novelty * (0.15 + known * known) * (0.6 + 0.8 * f) * (t.image ? 1 : 0.5) * luck;
+    const score = novelty * (0.15 + known * known) * (0.6 + 0.8 * f) * (t.image ? 1 : 0.5);
     pool.push({ title: t, score, match: Math.round(55 + 44 * Math.min(1, f)), frontier: [...newGenres, ...newThemes].slice(0, 3) });
   }
   pool.sort((a, b) => b.score - a.score);
 
-  const left = pool.slice(0, 600);
+  const max = pool[0]?.score || 1;
+  const left = pool.slice(0, 600).map((r) => ({
+    r,
+    k: 1.5 * Math.log(Math.max(1e-6, r.score / max)) + gumbel(seed, r.title.id) + (seen.has(r.title.id) ? SEEN : 0),
+  }));
   const used = new Map<string, number>();
   const out: Rec[] = [];
   while (left.length && out.length < 200) {
     let best = 0;
-    let bestScore = -1;
-    left.forEach((r, i) => {
-      const s = r.score * 0.55 ** (used.get(r.frontier![0]) ?? 0);
+    let bestScore = -Infinity;
+    left.forEach((x, i) => {
+      const s = x.k + Math.log(0.55) * (used.get(x.r.frontier![0]) ?? 0);
       if (s > bestScore) {
         bestScore = s;
         best = i;
       }
     });
-    const [r] = left.splice(best, 1);
+    const [{ r }] = left.splice(best, 1);
     used.set(r.frontier![0], (used.get(r.frontier![0]) ?? 0) + 1);
     out.push(r);
   }
