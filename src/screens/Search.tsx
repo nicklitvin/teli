@@ -43,12 +43,29 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
     setGenres([]);
   };
 
-  // Pinned above the tab bar: filters open upward from the button beside the search box and stay
-  // open while you pick, until you tap the button again or start typing.
-  const dock = (
-    <div className="search-dock">
+  // At the top like the logbook's tools: filters open under the search box and stay open while
+  // you pick, until you tap the button again or start typing.
+  const top = (
+    <div className="search-top">
+      <div className="search-bar">
+        <label className={`search-field ${focused ? 'focused' : ''}`}>
+          <SearchIcon size={17} />
+          <input ref={input} type="search" placeholder="Movies, shows, directors…" value={q}
+            onChange={(e) => setQ(e.target.value)} onFocus={() => { setFocused(true); setPanel(false); }} onBlur={() => setFocused(false)}
+            enterKeyHint="search" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
+          {q && (
+            <button className="clear-btn" onClick={() => { setQ(''); input.current?.focus(); }} aria-label="Clear">
+              <XIcon size={12} strokeWidth={3} />
+            </button>
+          )}
+        </label>
+        <button className={`icon-btn tool ${panel || filtered ? 'on' : ''}`} onClick={() => setPanel((v) => !v)}
+          aria-expanded={panel} aria-label="Filters">
+          <FilterIcon size={18} />
+        </button>
+      </div>
       {panel ? (
-        <div className="search-panel filter-panel">
+        <div className="filter-panel">
           <div className="filter-head">
             <p className="filter-title">Filters</p>
             {filtered && <button className="filter-clear" onClick={clearFilters}>Clear all</button>}
@@ -74,7 +91,7 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
           </div>
         </div>
       ) : filtered && (
-        <div className="genre-wrap dock-chips">
+        <div className="genre-wrap">
           {filter !== 'all' && (
             <button className="chip removable" style={{ ['--c' as string]: 'var(--accent-2)' }} onClick={() => setFilter('all')}>
               {filter === 'movie' ? 'Movies' : 'Shows'} <XIcon size={12} strokeWidth={3} />
@@ -88,28 +105,12 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
           ))}
         </div>
       )}
-      <div className="search-bar">
-        <label className={`search-field ${focused ? 'focused' : ''}`}>
-          <SearchIcon size={17} />
-          <input ref={input} type="search" placeholder="Movies, shows, directors…" value={q}
-            onChange={(e) => setQ(e.target.value)} onFocus={() => { setFocused(true); setPanel(false); }} onBlur={() => setFocused(false)}
-            enterKeyHint="search" autoCorrect="off" autoCapitalize="off" spellCheck={false} />
-          {q && (
-            <button className="clear-btn" onClick={() => { setQ(''); input.current?.focus(); }} aria-label="Clear">
-              <XIcon size={12} strokeWidth={3} />
-            </button>
-          )}
-        </label>
-        <button className={`icon-btn tool ${panel || filtered ? 'on' : ''}`} onClick={() => setPanel((v) => !v)}
-          aria-expanded={panel} aria-label="Filters">
-          <FilterIcon size={18} />
-        </button>
-      </div>
     </div>
   );
 
   return (
-    <Screen title="Search" active={active} className="search" dock={dock}>
+    <Screen title="Search" active={active} className="search">
+      {top}
       {browsing ? (
         <>
           <h2 className="browse-title">Visit a genre</h2>

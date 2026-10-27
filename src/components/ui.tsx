@@ -3,7 +3,7 @@ import type { Title } from '../types';
 import { GENRE_COLORS, metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { FilterIcon, SearchIcon, XIcon } from './Icons';
+import { ChartIcon, FilterIcon, SearchIcon, XIcon } from './Icons';
 import { Poster, VerdictBadge } from './Poster';
 
 /**
@@ -52,12 +52,12 @@ export function Segmented<T extends string>({ value, options, onChange }: {
 }
 
 /**
- * Tabs for a list plus two small tools: a filter panel (genre, plus an optional extra choice and
- * any `more` filter groups) and an optional search box. Each opens under the row and the panel
- * stays open while you pick; active filters stay visible as removable chips once it's closed.
- * `extra` puts more buttons in the row, before the filter and search buttons.
+ * Tabs for a list plus small tools: an optional stats panel, a filter panel (genre, plus an optional
+ * extra choice and any `more` filter groups) and an optional search box. Each opens under the row
+ * and the panel stays open while you pick; active filters stay visible as removable chips once it's
+ * closed. `extra` puts more buttons in the row, after the stats button and before the filters.
  */
-export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, extra }: {
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, stats, extra }: {
   tab: T;
   tabs: { value: T; label: string }[];
   onTab: (t: T) => void;
@@ -71,12 +71,15 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   option?: { label: string; value: string; initial: string; choices: { value: string; label: string }[]; onChange: (v: string) => void };
   /** More filter groups shown above the genres, with their own removable chips. */
   more?: { panel: ReactNode; chips: ReactNode; active: boolean; onClear: () => void };
+  /** Shown in a panel behind a chart button. */
+  stats?: ReactNode;
   extra?: ReactNode;
 }) {
-  const [open, setOpen] = useState<'search' | 'genre' | null>(null);
+  type Tool = 'search' | 'genre' | 'stats';
+  const [open, setOpen] = useState<Tool | null>(null);
   const optionOn = !!option && option.value !== option.initial;
   const anyOn = !!genre || optionOn || !!more?.active;
-  const toggle = (k: 'search' | 'genre') => setOpen((o) => (o === k ? null : k));
+  const toggle = (k: Tool) => setOpen((o) => (o === k ? null : k));
   const clearAll = () => {
     onGenre(null);
     if (option) option.onChange(option.initial);
@@ -86,6 +89,12 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
     <div className="tools">
       <div className="tools-row">
         <Segmented<T> value={tab} options={tabs} onChange={onTab} />
+        {stats && (
+          <button className={`icon-btn tool ${open === 'stats' ? 'on' : ''}`} onClick={() => toggle('stats')}
+            aria-expanded={open === 'stats'} aria-label="Stats">
+            <ChartIcon size={17} />
+          </button>
+        )}
         {extra}
         <button className={`icon-btn tool ${open === 'genre' || anyOn ? 'on' : ''}`} onClick={() => toggle('genre')}
           aria-expanded={open === 'genre'} aria-label="Filters">
@@ -108,6 +117,7 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
           )}
         </label>
       )}
+      {open === 'stats' && stats}
       {open === 'genre' ? (
         <div className="filter-panel">
           <div className="filter-head">

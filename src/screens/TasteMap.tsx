@@ -1,12 +1,13 @@
-import { useMemo, useRef, useState } from 'react';
-import type { Title, Verdict } from '../types';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import type { Verdict } from '../types';
 import { BY_ID, GENRE_COLORS } from '../lib/catalog';
 import { NO_FILTER, VERDICTS, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
 import { recommend } from '../lib/recommend';
 import { useStore } from '../lib/store';
-import { UNIVERSE, bubbleLayout, groupStats, groupTitles, keysOf, type Dimension, type GroupStat } from '../lib/taste';
+import { UNIVERSE, groupStats, groupTitles, keysOf, type Dimension } from '../lib/taste';
 import { useNav } from '../nav';
 import { ChevronDown, FilterIcon } from '../components/Icons';
+import { GalaxyView, LOOKS, type GalaxyItem, type Look } from '../components/Galaxy';
 import { Poster } from '../components/Poster';
 import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
 import { Cards, Screen, SectionHeader, Segmented, Shelf, TitleRow } from '../components/ui';
@@ -26,7 +27,7 @@ const colorOf = (dim: Dimension, name: string) => {
   return PALETTE[h % PALETTE.length];
 };
 
-/** Your good / mid / bad split in a group, as a small bar. */
+/** Your good / ok / bad split in a group, as a small bar. */
 function VerdictMix({ n }: { n: Record<Verdict, number> }) {
   return (
     <span className="mix" role="img" aria-label={verdictSummary(n)}>
@@ -35,17 +36,17 @@ function VerdictMix({ n }: { n: Record<Verdict, number> }) {
   );
 }
 
-/** Splits a label over at most two lines, breaking at the space nearest the middle. */
-function lines(label: string): string[] {
-  if (label.length <= 11 || !label.includes(' ')) return [label];
-  const mid = label.length / 2;
-  let best = -1;
-  for (let i = 0; i < label.length; i++) if (label[i] === ' ' && (best < 0 || Math.abs(i - mid) < Math.abs(best - mid))) best = i;
-  return [label.slice(0, best), label.slice(best + 1)];
-}
-
 const MAX_BUBBLES = 18;
-const MIN_W = 340;
+
+const LOOK_KEY = 'teli:galaxy-look';
+const savedLook = (): Look => {
+  try {
+    const v = localStorage.getItem(LOOK_KEY);
+    return LOOKS.some((l) => l.value === v) ? (v as Look) : 'planets';
+  } catch {
+    return 'planets';
+  }
+};
 
 export function TasteMap({ active }: { active: boolean }) {
   const { data, ratings } = useStore();
@@ -56,6 +57,14 @@ export function TasteMap({ active }: { active: boolean }) {
   const [showMissing, setShowMissing] = useState(false);
   const [rf, setRf] = useState<ReviewFilter>(NO_FILTER);
   const [filterOpen, setFilterOpen] = useState(false);
+  const [look, setLook] = useState<Look>(savedLook);
+  useEffect(() => {
+    try {
+      localStorage.setItem(LOOK_KEY, look);
+    } catch {
+      /* private mode */
+    }
+  }, [look]);
   const usedTags = useMemo(() => [...new Set([...ratings.values()].flatMap((r) => r.tags))], [ratings]);
 
   // The map can show just part of your list: only good ones, ones you'd rewatch, a tag.
@@ -81,31 +90,17 @@ export function TasteMap({ active }: { active: boolean }) {
     requestAnimationFrame(() => panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' }));
   };
 
-  const layout = useMemo(() => {
-    const shown = explored.slice(0, MAX_BUBBLES);
-    const max = Math.max(1, ...shown.map((s) => s.rated.length));
-    return bubbleLayout(shown.map((s) => ({ name: s.name, r: 27 + 31 * Math.sqrt(s.rated.length / max) })));
-  }, [explored]);
-  // Each bubble shows your favourite title in it, but never one another bubble already uses,
-  // so Drama, Crime and Action don't all wear the same poster. Bigger bubbles choose first.
-  const covers = useMemo(() => {
+  // Each group wears your favourite title in it, but never one another group already uses, so
+  // Drama, Crime and Action don't all wear the same poster. Bigger groups choose first.
+  const items = useMemo(() => {
     const used = new Set<string>();
-    const m = new Map<string, Title>();
-    for (const b of [...layout.bubbles].sort((x, y) => y.r - x.r)) {
-      const withImage = stats.get(b.name)!.rated.map((r) => BY_ID.get(r.id)!).filter((t) => t.image);
-      const t = withImage.find((x) => !used.has(x.id)) ?? withImage[0];
-      if (t) {
-        used.add(t.id);
-        m.set(b.name, t);
-      }
-    }
-    return m;
-  }, [layout, stats]);
-  const [bx, by, bw, bh] = layout.box;
-  const PAD = 26; // room for the ring around the selected planet
-  const vw = Math.max(bw + PAD * 2, MIN_W);
-  const vh = bh + PAD * 2;
-  const vx = bx + bw / 2 - vw / 2;
+    return explored.slice(0, MAX_BUBBLES).map((s): GalaxyItem => {
+      const withImage = s.rated.map((r) => BY_ID.get(r.id)!).filter((t) => t.image);
+      const cover = withImage.find((x) => !used.has(x.id)) ?? withImage[0];
+      if (cover) used.add(cover.id);
+      return { name: s.name, s, color: colorOf(dim, s.name), cover };
+    });
+  }, [explored, dim]);
 
   const dismissed = useMemo(() => new Set(data.dismissed), [data.dismissed]);
   const recs = useMemo(() => recommend(ratings, dismissed), [ratings, dismissed]);
@@ -170,30 +165,23 @@ export function TasteMap({ active }: { active: boolean }) {
           </div>
         )}
 
-        {layout.bubbles.length > 0 ? (
-          <svg viewBox={`${vx} ${by - PAD} ${vw} ${vh}`} role="group" aria-label={`Your ${noun}`}>
-            <defs>
-              <radialGradient id="planet-shade" cx="34%" cy="28%" r="78%">
-                <stop offset="0" stopColor="#fff" stopOpacity="0.22" />
-                <stop offset="0.38" stopColor="#000" stopOpacity="0.12" />
-                <stop offset="0.8" stopColor="#000" stopOpacity="0.62" />
-                <stop offset="1" stopColor="#000" stopOpacity="0.82" />
-              </radialGradient>
-              <filter id="atmosphere" x="-50%" y="-50%" width="200%" height="200%">
-                <feGaussianBlur stdDeviation="6" />
-              </filter>
-            </defs>
-            {[0.62, 0.9, 1.18].map((k) => (
-              <ellipse key={k} className="orbit" cx={bx + bw / 2} cy={by + bh / 2} rx={(bw / 2) * k + 10} ry={(bh / 2) * k + 6} />
-            ))}
-            {layout.bubbles.map((b, i) => (
-              <BubbleNode key={b.name} b={b} s={stats.get(b.name)!} cover={covers.get(b.name)} i={i} color={colorOf(dim, b.name)}
-                on={selected === b.name} onPick={() => pick(b.name)} />
-            ))}
-          </svg>
+        {items.length > 0 ? (
+          <GalaxyView look={look} items={items} total={shownRatings.size} selected={selected} onPick={pick} label={`Your ${noun}`} />
         ) : (
           <p className="theater-empty">{narrowed && ratings.size ? 'None of your ratings match these filters.' : 'Rate a few titles and your first planets appear here.'}</p>
         )}
+
+        {/* Trying out different looks for the map. */}
+        <div className="look-row" role="group" aria-label="Map look">
+          <span>Look</span>
+          <div className="look-pills">
+            {LOOKS.map((l) => (
+              <button key={l.value} className={`pill ${look === l.value ? 'on' : ''}`} onClick={() => setLook(l.value)} aria-pressed={look === l.value}>
+                {l.label}
+              </button>
+            ))}
+          </div>
+        </div>
 
       </div>
 
@@ -243,64 +231,5 @@ export function TasteMap({ active }: { active: boolean }) {
         </>
       )}
     </Screen>
-  );
-}
-
-/** One explored group as a planet: your favourite title in it for a surface, its name and your good / mid / bad split. */
-function BubbleNode({ b, s, cover, i, color, on, onPick }: {
-  b: { name: string; x: number; y: number; r: number };
-  s: GroupStat;
-  cover?: Title;
-  i: number;
-  color: string;
-  on: boolean;
-  onPick: () => void;
-}) {
-  // Themes are stored lowercase ("heist", "ai"); show them like names.
-  const ls = lines(b.name.length <= 2 ? b.name.toUpperCase() : b.name[0].toUpperCase() + b.name.slice(1));
-  const longest = Math.max(...ls.map((l) => l.length));
-  const fs = Math.max(8.5, Math.min(13, 6 + b.r / 7, (b.r * 1.6) / (longest * 0.58)));
-  const lh = fs * 1.1;
-  const top = -((ls.length - 1) * lh) / 2 - fs * 0.55;
-  const clip = `clip-${i}-${b.name.replace(/[^a-z0-9]/gi, '')}`;
-  const n = s.rated.length;
-  const barW = Math.min(64, b.r * 1.15);
-  const barY = top + (ls.length - 1) * lh + fs * 0.55 + 7;
-  let x = -barW / 2;
-  const segs = VERDICTS.filter((v) => s.verdicts[v]).map((v) => {
-    const w = (barW * s.verdicts[v]) / n;
-    const seg = { v, x, w };
-    x += w;
-    return seg;
-  });
-  const rx = b.r * 1.55;
-  const ry = b.r * 0.36;
-  return (
-    <g className={`bubble ${on ? 'on' : ''}`} transform={`translate(${b.x} ${b.y})`} style={{ ['--c' as string]: color }}
-      role="button" tabIndex={0} aria-pressed={on} aria-label={`${b.name}: ${n} rated, ${verdictSummary(s.verdicts)}`}
-      onClick={onPick} onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && onPick()}>
-      <g className="pop" style={{ animationDelay: `${i * 30}ms` }}>
-        <circle r={b.r + 2} className="atmosphere" filter="url(#atmosphere)" />
-        {on && <ellipse className="saturn back" rx={rx} ry={ry} transform="rotate(-16)" />}
-        <clipPath id={clip}><circle r={b.r} /></clipPath>
-        <circle r={b.r} className="base" />
-        {cover && (
-          <image href={cover.image![0]} x={-b.r} y={-b.r} width={b.r * 2} height={b.r * 2}
-            preserveAspectRatio="xMidYMid slice" clipPath={`url(#${clip})`} />
-        )}
-        <circle r={b.r} className="tint" />
-        <circle r={b.r} className="shade" fill="url(#planet-shade)" />
-        <circle r={b.r} className="rim" />
-        {on && <path className="saturn" d={`M ${-rx} 0 A ${rx} ${ry} 0 0 0 ${rx} 0`} transform="rotate(-16)" />}
-        <text className="name" style={{ fontSize: fs }}>
-          {ls.map((l, j) => <tspan key={j} x={0} y={top + j * lh} dy="0.35em">{l}</tspan>)}
-        </text>
-        <clipPath id={`${clip}-mix`}><rect x={-barW / 2} y={barY} width={barW} height={5} rx={2.5} /></clipPath>
-        <rect className="mix-back" x={-barW / 2 - 1.5} y={barY - 1.5} width={barW + 3} height={8} rx={4} />
-        <g clipPath={`url(#${clip}-mix)`}>
-          {segs.map((g) => <rect key={g.v} className={`mix-seg v-${g.v}`} x={g.x} y={barY} width={g.w} height={5} />)}
-        </g>
-      </g>
-    </g>
   );
 }

@@ -1,5 +1,5 @@
 export type MediaType = 'movie' | 'tv';
-export type Verdict = 'good' | 'mid' | 'bad';
+export type Verdict = 'good' | 'ok' | 'bad';
 
 export interface Title {
   id: string;

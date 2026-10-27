@@ -1,8 +1,8 @@
 import { useMemo, useState, type ChangeEvent } from 'react';
-import type { MediaType, Title } from '../types';
+import type { MediaType, Rating, Title } from '../types';
 import { BY_ID, GENRES, metaLine } from '../lib/catalog';
 import { setName, useName } from '../lib/name';
-import { NO_FILTER, TAG_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
+import { NO_FILTER, TAG_LABEL, VERDICTS, VERDICT_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
 import { normalize } from '../lib/search';
 import { emptyData, parseBackup, pendingIds, ratedCount, useStore, type Data } from '../lib/store';
 import { useNav } from '../nav';
@@ -21,10 +21,29 @@ const TABS: { value: MediaType; label: string }[] = [
   { value: 'tv', label: 'Shows' },
 ];
 
+type Sort = 'verdict' | 'new' | 'old';
+
+const SORTS: { value: Sort; label: string }[] = [
+  { value: 'verdict', label: 'Best first' },
+  { value: 'new', label: 'Newest rated' },
+  { value: 'old', label: 'Oldest rated' },
+];
+
+const SORT_BY: Record<Sort, (a: Rating, b: Rating) => number> = {
+  verdict: byVerdict,
+  new: (a, b) => b.at - a.at,
+  old: (a, b) => a.at - b.at,
+};
+
+const DAY = 864e5;
+const shortDate = (at: number) => new Date(at).toLocaleDateString(undefined, {
+  month: 'short', day: 'numeric', ...(new Date(at).getFullYear() === new Date().getFullYear() ? {} : { year: 'numeric' }),
+});
+
 /**
- * Your logbook: movies or shows, good first, with filters for your verdict, would watch again, tags
- * and genre, plus search. The bookmark button beside the filters swaps in your watchlist. Backups
- * and hidden titles sit behind the gear.
+ * Your logbook: movies or shows, good first or by when you rated them, with filters for your
+ * verdict, would watch again, tags and genre, plus search and stats. The bookmark button beside the
+ * filters swaps in your watchlist. Backups and hidden titles sit behind the gear.
  */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
   const { data, ratings } = useStore();
@@ -38,13 +57,15 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   const [watching, setWatching] = useState(false);
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState('');
+  const [sort, setSort] = useState<Sort>('verdict');
 
-  // Rated titles: good, then mid, then bad. The watchlist shows what you saved most recently first.
+  const rated = useMemo(() => [...ratings.values()].filter((r) => r.type === tab), [ratings, tab]);
+  // Rated titles: good, then ok, then bad, or by when you rated them. The watchlist keeps the order you saved in.
   const list = useMemo(
     () => (watching
       ? data.watchlist.map((id) => ({ id, t: BY_ID.get(id)! })).filter((x) => x.t.type === tab)
-      : [...ratings.values()].filter((r) => r.type === tab).sort(byVerdict).map((r) => ({ id: r.id, t: BY_ID.get(r.id)! }))),
-    [ratings, data.watchlist, tab, watching],
+      : [...rated].sort(SORT_BY[sort]).map((r) => ({ id: r.id, t: BY_ID.get(r.id)! }))),
+    [rated, data.watchlist, tab, watching, sort],
   );
   const genres = GENRES.filter((g) => list.some((x) => x.t.genres.includes(g)));
   const usedTags = useMemo(() => [...new Set([...ratings.values()].filter((r) => r.type === tab).flatMap((r) => r.tags))], [ratings, tab]);
@@ -54,7 +75,6 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
     && (!reviewing || passes(ratings.get(x.id)!, rf))
     && (!q || normalize(`${x.t.title} ${x.t.creator} ${x.t.year}`).includes(q)));
   const narrowed = !!genre || !!q || reviewing;
-  const counts = countVerdicts(list.map((x) => ratings.get(x.id)!).filter(Boolean));
   const noun = tab === 'movie' ? 'movies' : 'shows';
 
   if (hiddenPage) {
@@ -71,7 +91,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
         <span className="avatar avatar-lg"><UserIcon size={26} /></span>
         <div>
           <h2>{name ? `${name}’s notebook` : 'Your logbook'}</h2>
-          <p>{plural(ratings.size, 'title')} rated · saved on this device</p>
+          <p>Saved on this device</p>
         </div>
         <button className={`icon-btn ${settings ? 'on' : ''}`} onClick={() => setSettings((v) => !v)}
           aria-expanded={settings} aria-label="Settings">
@@ -84,7 +104,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
       {toReview > 0 && (
         <button className="review-banner" onClick={() => nav.openReview()}>
           <RefreshIcon size={18} />
-          <span><strong>{plural(toReview, 'title')} to review</strong><small>Carried over from the old rankings. Give each a quick good, mid or bad.</small></span>
+          <span><strong>{plural(toReview, 'title')} to review</strong><small>Carried over from the old rankings. Give each a quick good, ok or bad.</small></span>
           <ChevronRight size={16} />
         </button>
       )}
@@ -94,6 +114,8 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
           <ListTools<MediaType> tab={tab} onTab={(t) => { setTab(t); setGenre(null); setRf(NO_FILTER); }} tabs={TABS}
             genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery}
             placeholder={`Search your ${watching ? 'saved ' : ''}${noun}`}
+            option={watching ? undefined : { label: 'Sort', value: sort, initial: 'verdict', choices: SORTS, onChange: (v) => setSort(v as Sort) }}
+            stats={<Stats rated={rated} noun={noun} />}
             more={watching ? undefined : {
               panel: <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />,
               chips: <ReviewFilterChips value={rf} onChange={setRf} />,
@@ -109,14 +131,14 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
           {list.length ? (
             shown.length ? (
               <>
-                <p className="list-caption">
-                  {narrowed ? `${shown.length} of ${list.length} ${noun}`
-                    : watching ? `${plural(list.length, tab === 'movie' ? 'movie' : 'show')} to watch`
-                    : `${list.length} rated · ${verdictSummary(counts)}`}
-                </p>
+                {(narrowed || watching) && (
+                  <p className="list-caption">
+                    {narrowed ? `${shown.length} of ${list.length} ${noun}` : `${plural(list.length, tab === 'movie' ? 'movie' : 'show')} to watch`}
+                  </p>
+                )}
                 <Cards>
                   {shown.map((x) => (
-                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!)}
+                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!, sort !== 'verdict')}
                       actions={watching ? <Unsave id={x.id} title={x.t.title} /> : undefined} />
                   ))}
                 </Cards>
@@ -141,10 +163,55 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   );
 }
 
-/** Under a rated title: what stood out, or a nudge when it still needs a review. */
-function ratedDetail(t: Title, r: { tags: string[]; pending?: boolean }) {
+/** Under a rated title: what stood out (and when you rated it, when sorted by that), or a nudge when it still needs a review. */
+function ratedDetail(t: Title, r: Rating, dated: boolean) {
   if (r.pending) return 'Needs a quick review';
-  return r.tags.length ? [t.year, ...r.tags.map((x) => TAG_LABEL.get(x))].join(' · ') : metaLine(t);
+  const tags = r.tags.map((x) => TAG_LABEL.get(x)!);
+  if (dated) return [`Rated ${shortDate(r.at)}`, ...tags].join(' · ');
+  return tags.length ? [t.year, ...tags].join(' · ') : metaLine(t);
+}
+
+/** The `n` keys that come up most, with how often. */
+function top(keys: string[], n = 3) {
+  const m = new Map<string, number>();
+  for (const k of keys) m.set(k, (m.get(k) ?? 0) + 1);
+  return [...m].sort((a, b) => b[1] - a[1]).slice(0, n);
+}
+
+/** A few numbers about the movies or shows you've rated: how many, lately, the good / ok / bad split, top genres and tags. */
+function Stats({ rated, noun }: { rated: Rating[]; noun: string }) {
+  if (!rated.length) return <div className="stats-panel"><p className="stats-empty">Rate a few {noun} to see your stats.</p></div>;
+  const n = countVerdicts(rated);
+  const now = Date.now();
+  const recent = rated.filter((r) => !r.pending && now - r.at < 30 * DAY);
+  const again = rated.filter((r) => r.again).length;
+  const genres = top(rated.flatMap((r) => BY_ID.get(r.id)!.genres));
+  const tags = top(rated.flatMap((r) => r.tags));
+  return (
+    <div className="stats-panel">
+      <div className="stat-tiles">
+        <div className="stat"><strong>{rated.length}</strong><span>{noun} rated</span></div>
+        <div className="stat"><strong>{recent.length}</strong><span>last 30 days</span></div>
+        <div className="stat"><strong>{again}</strong><span>would rewatch</span></div>
+      </div>
+      <div className="stat-split">
+        <span className="stat-bar" role="img" aria-label={verdictSummary(n)}>
+          {VERDICTS.filter((v) => n[v]).map((v) => <i key={v} className={`v-${v}`} style={{ flexGrow: n[v] }} />)}
+        </span>
+        <div className="stat-legend">
+          {VERDICTS.map((v) => (
+            <span key={v}><i className={`v-${v}`} />{VERDICT_LABEL[v]} <b>{n[v]}</b> <small>{Math.round((n[v] / rated.length) * 100)}%</small></span>
+          ))}
+        </div>
+      </div>
+      <p className="stat-line">
+        <span>Last 30 days</span>
+        {recent.length ? verdictSummary(countVerdicts(recent)) : `No ${noun} rated`}
+      </p>
+      <p className="stat-line"><span>Top genres</span>{genres.map(([g, k]) => `${g} ${k}`).join(' · ')}</p>
+      {tags.length > 0 && <p className="stat-line"><span>Top tags</span>{tags.map(([t, k]) => `${TAG_LABEL.get(t)} ${k}`).join(' · ')}</p>}
+    </div>
+  );
 }
 
 /** Takes a title off your watchlist, with an undo. */

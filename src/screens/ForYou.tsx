@@ -136,7 +136,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
         <div className="hero-card">
           <div className="hero-planet" aria-hidden="true"><i /></div>
           <h2>Your voyage starts here.</h2>
-          <p>Rate what you've watched as good, mid or bad. Teli maps your taste and charts what to watch next.</p>
+          <p>Rate what you've watched as good, ok or bad. Teli maps your taste and charts what to watch next.</p>
           <button className="primary-btn" onClick={onSearch}><SearchIcon size={16} /> Search the library</button>
         </div>
         <SectionHeader title="Seen any of these?" subtitle="Tap one to rate it" />

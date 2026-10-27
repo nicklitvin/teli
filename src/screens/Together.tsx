@@ -68,9 +68,8 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   const enough = members.length >= 2;
 
   return (
-    <Screen title="Crew" active={active} className={cloud.code ? '' : 'crew-docked'}
-      dock={cloud.code ? undefined : <CrewBox cloud={cloud} invite={invite} />}>
-      {cloud.code && <CrewBox cloud={cloud} invite={invite} />}
+    <Screen title="Crew" active={active}>
+      <CrewBox cloud={cloud} invite={invite} />
       {/* Who's in: shown once you've started or joined a crew. */}
       {(cloud.code || group.people.length > 0) && <div className="list people">
         <div className="person">
@@ -143,10 +142,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   );
 }
 
-/**
- * Before you're in a crew: start or join, docked just above the tab bar within thumb reach.
- * Once you're in one: its code, an invite button and whether it's in sync, at the top.
- */
+/** At the top of the page. Before you're in a crew: join with a code or start one. Once you're in one: its code, an invite button and whether it's in sync. */
 function CrewBox({ cloud, invite }: { cloud: ReturnType<typeof useCloudCrew>; invite: string | null }) {
   const nav = useNav();
   const [code, setCode] = useState(invite ?? '');
@@ -214,7 +210,7 @@ function CrewBox({ cloud, invite }: { cloud: ReturnType<typeof useCloudCrew>; in
 
   const clean = cleanCode(code);
   return (
-    <div className="crew-dock">
+    <div className="crew-box crew-start">
       {error && <p className="note error" role="status">{error}</p>}
       <form className="crew-row" onSubmit={(e) => { e.preventDefault(); if (validCode(clean)) void run(() => cloud.join(clean)); }}>
         <input className="crew-input" value={clean} onChange={(e) => setCode(e.target.value)} placeholder="Have a code?"

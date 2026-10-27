@@ -266,7 +266,7 @@ h1, h2, h3, p { margin: 0; }
   font-family: var(--font-display); font-weight: 700; color: var(--on-glow); background: var(--c); white-space: nowrap;
 }
 .v-good { --c: var(--liked); }
-.v-mid { --c: var(--fine); }
+.v-ok { --c: var(--fine); }
 .v-bad { --c: var(--disliked); }
 /* Carried over from the old rankings and not reviewed yet. */
 .score.pending { color: var(--c); background: rgba(5, 6, 15, 0.72); outline: 1.5px dashed var(--c); outline-offset: -1.5px; }
@@ -307,8 +307,9 @@ h1, h2, h3, p { margin: 0; }
 .icon-btn.ghost { background: none; }
 .icon-btn.glass.on { background: var(--accent); border-color: transparent; color: var(--on-glow); }
 .rate-btn {
-  flex: none; height: 34px; padding: 0 14px; border-radius: 999px; background: var(--glow); color: var(--on-glow);
-  font-size: 13px; font-weight: 650; transition: transform 0.1s; box-shadow: 0 0 16px rgba(139, 123, 255, 0.4);
+  flex: none; height: 34px; padding: 0 14px; border-radius: 999px; font-size: 13px; font-weight: 650; transition: transform 0.1s;
+  background: rgba(5, 6, 15, 0.5); color: #fff; border: 1px solid rgba(255, 255, 255, 0.18);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
 }
 .pill-btn { padding: 0 16px; height: 38px; border-radius: 999px; border: 1px solid var(--border-hi); color: var(--text); font-weight: 500; font-size: 13px; }
 .pill-btn:hover { background: var(--surface-hi); }
@@ -342,6 +343,26 @@ h1, h2, h3, p { margin: 0; }
 .search-field.slim { height: 40px; animation: fadeIn 0.2s; }
 .genre-wrap { display: flex; flex-wrap: wrap; gap: 6px; animation: fadeIn 0.2s; }
 .filter-panel { display: flex; flex-direction: column; gap: 14px; animation: fadeIn 0.2s; }
+/* Logbook stats, behind the chart button. */
+.stats-panel {
+  display: flex; flex-direction: column; gap: 12px; padding: 14px; animation: fadeIn 0.2s;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
+}
+.stats-empty { font-size: 13px; color: var(--text-2); }
+.stat-tiles { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.stat { display: flex; flex-direction: column; gap: 2px; padding: 10px; border-radius: var(--r); background: var(--surface-hi); }
+.stat strong { font-family: var(--font-display); font-size: 24px; font-weight: 700; letter-spacing: -0.02em; line-height: 1.1; font-variant-numeric: tabular-nums; }
+.stat span { font-size: 11.5px; color: var(--text-2); }
+.stat-split { display: flex; flex-direction: column; gap: 8px; }
+.stat-bar { display: flex; gap: 2px; height: 10px; border-radius: 5px; overflow: hidden; }
+.stat-bar i { display: block; min-width: 4px; background: var(--c); }
+.stat-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12.5px; color: var(--text-2); }
+.stat-legend span { display: inline-flex; align-items: center; gap: 5px; }
+.stat-legend i { width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.stat-legend b { color: var(--text); font-weight: 650; }
+.stat-legend small { font-size: 11px; color: var(--text-3); }
+.stat-line { display: flex; flex-direction: column; gap: 2px; font-size: 13px; color: var(--text); padding-top: 10px; border-top: 1px solid var(--border); }
+.stat-line span { font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); }
 .filter-head { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
 .filter-title { font-family: var(--font-display); font-size: 15px; font-weight: 650; }
 .filter-clear { color: var(--accent-text); font-size: 13px; font-weight: 600; padding: 4px 0 4px 12px; }
@@ -416,15 +437,11 @@ h1, h2, h3, p { margin: 0; }
 .reel-end .primary-btn { margin-top: 8px; }
 
 /* ---------- Search ---------- */
-/* The search box sits just above the tab bar, in thumb reach. */
-.screen.search { padding-bottom: calc(var(--tabbar-h) + 120px); }
-.search-dock {
-  position: absolute; z-index: 15; left: 0; right: 0; bottom: var(--tabbar-h);
-  background: rgba(6, 7, 18, 0.96); border-top: 1px solid var(--border);
-  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-}
-.search-bar { display: flex; align-items: center; gap: 8px; padding: 10px var(--gutter); }
+.search-top { display: flex; flex-direction: column; gap: 10px; padding: 4px var(--gutter) 16px; }
+.search-bar { display: flex; align-items: center; gap: 8px; }
 .search-bar .search-field { min-width: 0; }
+.search-bar .icon-btn.tool { width: 44px; height: 44px; }
+.search-field { min-width: 0; }
 .search-bar .icon-btn.tool { width: 44px; height: 44px; }
 .search-panel { max-height: 46dvh; overflow-y: auto; overscroll-behavior: contain; padding: 14px var(--gutter) 4px; }
 .dock-chips { padding: 10px var(--gutter) 0; }
@@ -476,7 +493,6 @@ h1, h2, h3, p { margin: 0; }
 .chip.plain { color: var(--text-2); background: var(--surface-hi); border-color: var(--border); font-weight: 500; text-transform: capitalize; }
 .chip.removable { flex: none; }
 .chip.toggle { background: var(--surface-hi); border-color: var(--border); color: var(--text-2); }
-.chip.toggle::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--c); box-shadow: 0 0 6px var(--c); }
 .chip.toggle.on { background: color-mix(in srgb, var(--c) 20%, transparent); border-color: var(--c); color: #fff; }
 
 /* ---------- Profile ---------- */
@@ -534,7 +550,7 @@ h1, h2, h3, p { margin: 0; }
 
 /* ---------- Galaxy (taste map) ---------- */
 .theater {
-  position: relative; margin: 0 var(--gutter); border-radius: 22px; overflow: hidden; color: #fff;
+  position: relative; margin: 0 var(--gutter); border-radius: 22px; overflow: hidden; color: #fff; isolation: isolate;
   background:
     radial-gradient(80% 55% at 50% 0%, rgba(139, 123, 255, 0.2), transparent 70%),
     radial-gradient(70% 45% at 50% 105%, rgba(62, 230, 212, 0.12), transparent 70%),
@@ -557,6 +573,62 @@ h1, h2, h3, p { margin: 0; }
 .theater svg { display: block; width: 100%; height: auto; max-height: min(520px, 52dvh); font-family: var(--font-display); user-select: none; -webkit-user-select: none; overflow: visible; }
 .theater-empty { padding: 36px 24px; text-align: center; font-size: 13px; color: rgba(255, 255, 255, 0.6); }
 .orbit { fill: none; stroke: rgba(180, 190, 255, 0.13); stroke-width: 1; stroke-dasharray: 2 7; }
+.orbit.on { stroke: rgba(200, 205, 255, 0.4); }
+/* Map look switcher (for trying out looks). */
+.look-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px 12px 16px; }
+.look-row > span { flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255, 255, 255, 0.45); }
+.look-pills { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; }
+.look-pills::-webkit-scrollbar { display: none; }
+.look-pills .pill { flex: none; padding: 4px 11px; font-size: 12px; color: rgba(255, 255, 255, 0.7); border-color: rgba(255, 255, 255, 0.16); }
+.look-pills .pill.on { background: #fff; border-color: #fff; color: var(--space); }
+/* Shared by the looks: faint twinkling background stars. */
+.starfield circle { fill: #fff; opacity: 0.35; animation: twinkle 5s ease-in-out infinite alternate; }
+@keyframes twinkle { from { opacity: 0.12; } to { opacity: 0.55; } }
+/* Solar system */
+.sun { filter: drop-shadow(0 0 10px #ffb86b); }
+.sun-count { fill: #3a1a00; font-size: 15px; font-weight: 800; text-anchor: middle; pointer-events: none; }
+.sun-label { fill: rgba(255, 255, 255, 0.6); font-size: 8px; font-weight: 600; text-anchor: middle; letter-spacing: 0.08em; text-transform: uppercase; pointer-events: none; }
+.sun-glow { animation: sunPulse 4s ease-in-out infinite alternate; transform-box: fill-box; transform-origin: center; }
+@keyframes sunPulse { from { opacity: 0.7; transform: scale(0.94); } to { opacity: 1; transform: scale(1.06); } }
+.orb { cursor: pointer; outline: none; }
+.orb-hit { fill: transparent; }
+.orb-glow { fill: var(--c); opacity: 0.35; filter: blur(4px); }
+.orb-base { fill: var(--c); }
+.orb-tint { fill: var(--c); opacity: 0.3; }
+.orb-rim { fill: none; stroke: color-mix(in srgb, var(--c) 60%, white); stroke-width: 1; opacity: 0.8; }
+.orb.on .orb-rim { stroke: #fff; stroke-width: 2; opacity: 1; }
+.orb.on .orb-glow { opacity: 0.8; }
+.orb:focus-visible .orb-rim { stroke: var(--accent-2); stroke-width: 2.5; }
+.orb-name { fill: rgba(255, 255, 255, 0.78); font-size: 9px; font-weight: 650; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(0, 0, 0, 0.6); stroke-width: 2.5px; }
+.orb.on .orb-name { fill: #fff; }
+/* Constellations */
+.constellation { cursor: pointer; outline: none; }
+.cst-hit { fill: transparent; }
+.cst-halo { fill: color-mix(in srgb, var(--c) 10%, transparent); stroke: var(--c); stroke-width: 1; stroke-dasharray: 2 5; opacity: 0.8; }
+.cst-line { stroke: var(--c); stroke-width: 0.8; opacity: 0.4; }
+.constellation.on .cst-line, .constellation:hover .cst-line { opacity: 0.85; stroke-width: 1.2; }
+.cst-dot { fill: color-mix(in srgb, var(--c) 35%, white); }
+.cst-star.v-good .cst-dot { fill: #fff; }
+.cst-star.v-bad .cst-dot { opacity: 0.55; }
+.cst-glow { fill: var(--c); opacity: 0.35; filter: blur(2px); }
+.cst-star.again { animation: twinkle 2.4s ease-in-out infinite alternate; }
+.cst-name { fill: var(--c); font-size: 9.5px; font-weight: 700; text-anchor: middle; letter-spacing: 0.06em; text-transform: uppercase; pointer-events: none; filter: brightness(1.5); }
+.constellation.on .cst-name { fill: #fff; }
+.constellation:focus-visible .cst-hit { stroke: var(--accent-2); stroke-width: 2; }
+/* Nebula */
+.cloud { fill: var(--c); opacity: 0.42; }
+.nebula-clouds .on .cloud { opacity: 0.75; }
+.nebula { cursor: pointer; outline: none; }
+.neb-hit { fill: transparent; }
+.neb-halo { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1; stroke-dasharray: 2 5; }
+.neb-rim { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 1.2; }
+.nebula.on .neb-rim { stroke: #fff; stroke-width: 2; }
+.neb-name { fill: #fff; font-size: 10.5px; font-weight: 700; text-anchor: middle; pointer-events: none; paint-order: stroke; stroke: rgba(0, 0, 0, 0.55); stroke-width: 3px; }
+.neb-count { fill: rgba(255, 255, 255, 0.6); font-weight: 600; }
+.nebula:focus-visible .neb-hit { stroke: var(--accent-2); stroke-width: 2; }
+@media (prefers-reduced-motion: reduce) {
+  .starfield circle, .cst-star.again, .sun-glow { animation: none; }
+}
 .bubble { cursor: pointer; outline: none; }
 .bubble .pop { animation: bubbleIn 0.6s cubic-bezier(0.3, 1.3, 0.5, 1) both; transform-box: fill-box; transform-origin: center; }
 .bubble .atmosphere { fill: var(--c); opacity: 0.5; transition: opacity 0.2s; }
@@ -573,7 +645,7 @@ h1, h2, h3, p { margin: 0; }
 .bubble .name { fill: #fff; font-weight: 700; text-anchor: middle; letter-spacing: -0.01em; pointer-events: none; paint-order: stroke; stroke: rgba(0, 0, 0, 0.55); stroke-width: 3px; }
 .bubble .mix-back { fill: rgba(0, 0, 0, 0.55); pointer-events: none; }
 .bubble .mix-seg { fill: var(--c); pointer-events: none; }
-/* Good / mid / bad split for a group. */
+/* Good / ok / bad split for a group. */
 .mix { flex: none; display: flex; gap: 2px; width: 72px; height: 8px; border-radius: 4px; overflow: hidden; }
 .mix i { display: block; min-width: 4px; background: var(--c); }
 .unexplored { margin: 8px 12px 4px; padding: 14px 4px; max-height: 300px; overflow-y: auto; overscroll-behavior: contain; border-block: 1px dashed rgba(255, 255, 255, 0.14); animation: fadeIn 0.2s; }
@@ -641,7 +713,6 @@ h1, h2, h3, p { margin: 0; }
 .switch input:checked + span::after { transform: translateX(16px); }
 .switch input:focus-visible + span { outline: 2px solid var(--accent-2); outline-offset: 2px; }
 .chip.toggle.any { --c: var(--text); }
-.chip.toggle.any::before { display: none; }
 
 /* ---------- Sheets ---------- */
 .sheet-root { position: fixed; inset: 0; }
@@ -709,7 +780,7 @@ h1, h2, h3, p { margin: 0; }
   border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface);
   transition: border-color 0.15s, background 0.15s, transform 0.1s, box-shadow 0.15s;
 }
-.react-mid { --c: var(--fine); }
+.react-ok { --c: var(--fine); }
 .react-bad { --c: var(--disliked); }
 .react-circle { width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; color: var(--c); background: color-mix(in srgb, var(--c) 16%, transparent); box-shadow: 0 0 18px color-mix(in srgb, var(--c) 25%, transparent); }
 .react:hover { border-color: var(--c); box-shadow: 0 0 20px color-mix(in srgb, var(--c) 25%, transparent); }
@@ -719,7 +790,6 @@ h1, h2, h3, p { margin: 0; }
 .react-label { font-size: 13px; font-weight: 600; }
 .rate-tags { margin-top: 10px; }
 .chip.toggle.tag { --c: var(--accent); padding: 7px 13px; font-size: 13.5px; }
-.chip.toggle.tag::before { display: none; }
 .again-row {
   position: relative; display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 14px; cursor: pointer;
   border: 1px solid var(--border); border-radius: var(--r-lg); background: var(--surface); transition: border-color 0.15s, background 0.15s;
@@ -779,17 +849,8 @@ h1, h2, h3, p { margin: 0; }
   display: flex; flex-direction: column; gap: 10px; margin: 0 var(--gutter) 12px; padding: 14px;
   background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-lg);
 }
-.crew-box .note, .crew-dock .note { margin: 0; }
-/* Not in a crew yet: start and join sit just above the tab bar, in thumb reach. */
-.screen.crew-docked { padding-bottom: calc(var(--tabbar-h) + 140px); display: flex; flex-direction: column; }
-/* Nothing to list yet: the intro sits in the middle of the space above the dock. */
-.screen.crew-docked > .empty { flex: 1; justify-content: center; }
-.crew-dock {
-  position: absolute; z-index: 15; left: 0; right: 0; bottom: var(--tabbar-h); display: flex; flex-direction: column; gap: 10px; padding: 12px var(--gutter);
-  background: rgba(6, 7, 18, 0.96); border-top: 1px solid var(--border);
-  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
-}
-.crew-dock .primary-btn { width: 100%; }
+.crew-box .note { margin: 0; }
+.crew-start .primary-btn { width: 100%; }
 .crew-row { display: flex; align-items: center; gap: 8px; }
 .crew-id { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .crew-label { font-size: 11px; color: var(--text-2); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600; }

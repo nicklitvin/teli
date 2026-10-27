@@ -11,16 +11,16 @@ export interface Data {
 }
 
 const KEY = 'teli:data:v2';
-/** Rankings from before ratings were good / mid / bad. Read once to carry them over, then left alone. */
+/** Rankings from before ratings were good / ok / bad. Read once to carry them over, then left alone. */
 const OLD_KEY = 'teli:data:v1';
-const OLD_VERDICT: Record<string, Verdict> = { liked: 'good', fine: 'mid', disliked: 'bad' };
+const OLD_VERDICT: Record<string, Verdict> = { liked: 'good', fine: 'ok', disliked: 'bad' };
 
 export const emptyData = (): Data => ({ reviews: {}, watchlist: [], dismissed: [] });
 
 /**
  * Accepts anything (localStorage, an imported file, a crewmate's row) and returns a valid Data,
  * dropping unknown ids and tags. Old ranked backups come in as pending reviews: liked, fine and
- * didn't like become good, mid and bad, in their old order, until you look at them again.
+ * didn't like become good, ok and bad, in their old order, until you look at them again.
  */
 export function sanitize(x: unknown): Data {
   const d = emptyData();
@@ -31,9 +31,11 @@ export function sanitize(x: unknown): Data {
   };
   if (src.reviews && typeof src.reviews === 'object') {
     for (const [id, v] of Object.entries(src.reviews as Record<string, Partial<Review>>)) {
-      if (!v || !VERDICTS.includes(v.verdict as Verdict)) continue;
+      // "ok" was called "mid" at first.
+      const verdict = (v?.verdict as string) === 'mid' ? 'ok' : v?.verdict;
+      if (!v || !VERDICTS.includes(verdict as Verdict)) continue;
       add(id, {
-        verdict: v.verdict!,
+        verdict: verdict!,
         tags: Array.isArray(v.tags) ? [...new Set(v.tags.map((t) => OLD_TAGS[t] ?? t).filter((t) => typeof t === 'string' && TAG_LABEL.has(t)))] : [],
         again: v.again === true,
         at: typeof v.at === 'number' && Number.isFinite(v.at) ? v.at : 0,

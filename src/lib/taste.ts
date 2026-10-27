@@ -141,7 +141,7 @@ export function groupStats(dim: Dimension, ratings: Map<string, Rating>): Map<st
   const m = new Map<string, GroupStat>();
   const get = (k: string) => {
     let s = m.get(k);
-    if (!s) m.set(k, (s = { name: k, rated: [], verdicts: { good: 0, mid: 0, bad: 0 }, catalog: COUNTS[dim].get(k) ?? 0 }));
+    if (!s) m.set(k, (s = { name: k, rated: [], verdicts: { good: 0, ok: 0, bad: 0 }, catalog: COUNTS[dim].get(k) ?? 0 }));
     return s;
   };
   for (const k of UNIVERSE[dim]) get(k);

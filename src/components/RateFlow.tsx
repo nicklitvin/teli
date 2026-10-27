@@ -9,12 +9,12 @@ import { Poster } from './Poster';
 
 const VERDICT_ICON: Record<Verdict, ReactNode> = {
   good: <ThumbIcon size={24} />,
-  mid: <MehIcon size={24} />,
+  ok: <MehIcon size={24} />,
   bad: <ThumbIcon size={24} down />,
 };
 
 /**
- * Rating on one page: good, mid or bad, optional tags for what stood out, and whether you'd watch
+ * Rating on one page: good, ok or bad, optional tags for what stood out, and whether you'd watch
  * it again, then Finish. Given several `ids` it walks through them in turn (reviewing titles carried
  * over from the old rankings), and `intro` first explains why.
  */
@@ -42,7 +42,7 @@ export function RateFlow({ ids, intro = false, onClose }: { ids: string[]; intro
         <div className="rate-step rate-intro fade-in">
           <span className="intro-icon"><StarIcon size={30} /></span>
           <h2 className="rate-title">Rating got simpler</h2>
-          <p>No more ranking titles against each other. Now you say whether it was good, mid or bad, add a few tags if you like, and tick whether you’d watch it again.</p>
+          <p>No more ranking titles against each other. Now you say whether it was good, ok or bad, add a few tags if you like, and tick whether you’d watch it again.</p>
           <p>Take a quick pass over your {ids.length === 1 ? 'title' : `${ids.length} titles`} to bring {ids.length === 1 ? 'it' : 'them'} over. Until then they keep the verdict they had.</p>
         </div>
         <div className="rate-foot">
