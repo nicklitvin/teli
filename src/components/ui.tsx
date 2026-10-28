@@ -57,7 +57,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
  * and the panel stays open while you pick; active filters stay visible as removable chips once it's
  * closed. `extra` puts more buttons in the row, after the stats button and before the filters.
  */
-export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, stats, extra }: {
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, stats, onStats, extra }: {
   tab: T;
   tabs: { value: T; label: string }[];
   onTab: (t: T) => void;
@@ -73,13 +73,19 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   more?: { panel: ReactNode; chips: ReactNode; active: boolean; onClear: () => void };
   /** Shown in a panel behind a chart button. */
   stats?: ReactNode;
+  /** Told when the stats panel opens or closes, so the list under it can step aside. */
+  onStats?: (open: boolean) => void;
   extra?: ReactNode;
 }) {
   type Tool = 'search' | 'genre' | 'stats';
   const [open, setOpen] = useState<Tool | null>(null);
   const optionOn = !!option && option.value !== option.initial;
   const anyOn = !!genre || optionOn || !!more?.active;
-  const toggle = (k: Tool) => setOpen((o) => (o === k ? null : k));
+  const toggle = (k: Tool) => {
+    const next = open === k ? null : k;
+    setOpen(next);
+    onStats?.(next === 'stats');
+  };
   const clearAll = () => {
     onGenre(null);
     if (option) option.onChange(option.initial);

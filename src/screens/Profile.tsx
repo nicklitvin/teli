@@ -58,6 +58,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   const [genre, setGenre] = useState<string | null>(null);
   const [query, setQuery] = useState('');
   const [sort, setSort] = useState<Sort>('verdict');
+  const [statsOpen, setStatsOpen] = useState(false);
 
   const rated = useMemo(() => [...ratings.values()].filter((r) => r.type === tab), [ratings, tab]);
   // Rated titles: good, then ok, then bad, or by when you rated them. The watchlist keeps the order you saved in.
@@ -115,7 +116,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
             genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery}
             placeholder={`Search your ${watching ? 'saved ' : ''}${noun}`}
             option={watching ? undefined : { label: 'Sort', value: sort, initial: 'verdict', choices: SORTS, onChange: (v) => setSort(v as Sort) }}
-            stats={<Stats rated={rated} noun={noun} />}
+            stats={watching ? undefined : <Stats rated={rated} noun={noun} />} onStats={setStatsOpen}
             more={watching ? undefined : {
               panel: <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />,
               chips: <ReviewFilterChips value={rf} onChange={setRf} />,
@@ -128,7 +129,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
                 <BookmarkIcon size={17} filled={watching} />
               </button>
             } />
-          {list.length ? (
+          {statsOpen && !watching ? null : list.length ? (
             shown.length ? (
               <>
                 {(narrowed || watching) && (
@@ -178,38 +179,94 @@ function top(keys: string[], n = 3) {
   return [...m].sort((a, b) => b[1] - a[1]).slice(0, n);
 }
 
-/** A few numbers about the movies or shows you've rated: how many, lately, the good / ok / bad split, top genres and tags. */
+/**
+ * Charts of the movies or shows you've rated, in place of the list: a few big numbers, the
+ * good / ok / bad split as a ring, ratings per day over the last 30 days, and top genres and tags as bars.
+ */
 function Stats({ rated, noun }: { rated: Rating[]; noun: string }) {
   if (!rated.length) return <div className="stats-panel"><p className="stats-empty">Rate a few {noun} to see your stats.</p></div>;
-  const n = countVerdicts(rated);
-  const now = Date.now();
-  const recent = rated.filter((r) => !r.pending && now - r.at < 30 * DAY);
-  const again = rated.filter((r) => r.again).length;
-  const genres = top(rated.flatMap((r) => BY_ID.get(r.id)!.genres));
-  const tags = top(rated.flatMap((r) => r.tags));
+  const done = rated.filter((r) => !r.pending);
+  const n = countVerdicts(done);
+  const today = new Date().setHours(0, 0, 0, 0);
+  // Index 0 is 29 days ago, 29 is today.
+  const days = Array.from({ length: 30 }, () => ({ good: 0, ok: 0, bad: 0 }));
+  for (const r of done) {
+    const d = 29 - Math.floor((today - new Date(r.at).setHours(0, 0, 0, 0)) / DAY);
+    if (d >= 0 && d < 30) days[d][r.verdict]++;
+  }
+  const recent = days.reduce((s, d) => s + d.good + d.ok + d.bad, 0);
+  const peak = Math.max(1, ...days.map((d) => d.good + d.ok + d.bad));
+  const again = done.length ? Math.round((done.filter((r) => r.again).length / done.length) * 100) : 0;
+  const genres = top(rated.flatMap((r) => BY_ID.get(r.id)!.genres), 4);
+  const tags = top(done.flatMap((r) => r.tags), 4);
+  // The ring: each verdict's share as an arc on a circle 100 long, starting at 12 o'clock.
+  let at = 0;
+  const arcs = VERDICTS.filter((v) => n[v]).map((v) => {
+    const len = (n[v] / Math.max(1, done.length)) * 100;
+    const arc = { v, len, at };
+    at += len;
+    return arc;
+  });
   return (
     <div className="stats-panel">
       <div className="stat-tiles">
-        <div className="stat"><strong>{rated.length}</strong><span>{noun} rated</span></div>
-        <div className="stat"><strong>{recent.length}</strong><span>last 30 days</span></div>
-        <div className="stat"><strong>{again}</strong><span>would rewatch</span></div>
+        <div className="stat"><strong>{rated.length}</strong><span>rated</span></div>
+        <div className="stat"><strong>{recent}</strong><span>30 days</span></div>
+        <div className="stat"><strong>{again}%</strong><span>rewatch</span></div>
       </div>
       <div className="stat-split">
-        <span className="stat-bar" role="img" aria-label={verdictSummary(n)}>
-          {VERDICTS.filter((v) => n[v]).map((v) => <i key={v} className={`v-${v}`} style={{ flexGrow: n[v] }} />)}
-        </span>
+        <svg className="stat-ring" viewBox="0 0 42 42" role="img" aria-label={verdictSummary(n)}>
+          <circle className="ring-track" cx="21" cy="21" r="15.915" />
+          {arcs.map((a) => (
+            <circle key={a.v} className={`v-${a.v}`} cx="21" cy="21" r="15.915"
+              strokeDasharray={`${Math.max(0, a.len - (arcs.length > 1 ? 1.2 : 0))} ${100 - a.len + (arcs.length > 1 ? 1.2 : 0)}`}
+              strokeDashoffset={25 - a.at} />
+          ))}
+          <text x="21" y="21">{done.length ? Math.round((n.good / done.length) * 100) : 0}%</text>
+          <text className="ring-sub" x="21" y="27">good</text>
+        </svg>
         <div className="stat-legend">
           {VERDICTS.map((v) => (
-            <span key={v}><i className={`v-${v}`} />{VERDICT_LABEL[v]} <b>{n[v]}</b> <small>{Math.round((n[v] / rated.length) * 100)}%</small></span>
+            <span key={v}><i className={`v-${v}`} />{VERDICT_LABEL[v]}<b>{n[v]}</b></span>
           ))}
         </div>
       </div>
-      <p className="stat-line">
-        <span>Last 30 days</span>
-        {recent.length ? verdictSummary(countVerdicts(recent)) : `No ${noun} rated`}
-      </p>
-      <p className="stat-line"><span>Top genres</span>{genres.map(([g, k]) => `${g} ${k}`).join(' · ')}</p>
-      {tags.length > 0 && <p className="stat-line"><span>Top tags</span>{tags.map(([t, k]) => `${TAG_LABEL.get(t)} ${k}`).join(' · ')}</p>}
+      <figure className="stat-chart">
+        <figcaption>Last 30 days</figcaption>
+        <div className="stat-days" role="img" aria-label={`${recent} rated in the last 30 days`}>
+          {days.map((d, i) => (
+            <span key={i} className="stat-day">
+              {VERDICTS.filter((v) => d[v]).map((v) => <i key={v} className={`v-${v}`} style={{ height: `${(d[v] / peak) * 100}%` }} />)}
+            </span>
+          ))}
+        </div>
+      </figure>
+      <figure className="stat-chart">
+        <figcaption>Genres</figcaption>
+        <Bars rows={genres.map(([g, k]) => [g, k])} />
+      </figure>
+      {tags.length > 0 && (
+        <figure className="stat-chart">
+          <figcaption>Tags</figcaption>
+          <Bars rows={tags.map(([t, k]) => [TAG_LABEL.get(t)!, k])} />
+        </figure>
+      )}
+    </div>
+  );
+}
+
+/** A small horizontal bar chart, longest bar first. */
+function Bars({ rows }: { rows: [string, number][] }) {
+  const most = Math.max(1, ...rows.map(([, k]) => k));
+  return (
+    <div className="stat-bars">
+      {rows.map(([label, k]) => (
+        <div key={label} className="stat-row">
+          <span>{label}</span>
+          <i><b style={{ width: `${(k / most) * 100}%` }} /></i>
+          <small>{k}</small>
+        </div>
+      ))}
     </div>
   );
 }
