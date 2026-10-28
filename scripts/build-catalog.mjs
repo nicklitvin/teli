@@ -107,6 +107,28 @@ const byImage = new Map();
 for (const t of out) if (images[t.id] && !byImage.has(images[t.id][0])) byImage.set(images[t.id][0], t.id);
 const aliases = {};
 
+// Different titles can share an id (Big Brother, American and British, both from 2000). The
+// one already in the catalog keeps it, matched by network or director so saved ratings stay
+// put; the others get the qualifier from their article name ("…-british") or their network.
+const CATALOG_FILE = join(root, 'src/data/catalog.json');
+const prevCreator = new Map(existsSync(CATALOG_FILE) ? JSON.parse(readFileSync(CATALOG_FILE, 'utf8')).map((t) => [t.id, t.creator]) : []);
+const sameId = new Map();
+for (const w of wd) sameId.set(w.id, [...(sameId.get(w.id) ?? []), w]);
+for (const [id, group] of sameId) {
+  if (group.length < 2) continue;
+  const keep = group.find((w) => (SAME_CREATOR[w.creator] ?? w.creator) === prevCreator.get(id)) ?? group[0];
+  const taken = new Set([id]);
+  for (const w of group) {
+    if (w === keep) continue;
+    const paren = /\(([^)]*)\)\s*$/.exec(w.wiki ?? '')?.[1] ?? '';
+    const words = slug(paren).split('-').filter((x) => x && !/^(?:tv|series|serial|miniseries|film|\d{4})$/.test(x)).join('-');
+    let next = `${id}-${words || slug(SAME_CREATOR[w.creator] ?? w.creator) || 'b'}`;
+    while (taken.has(next)) next += '-2';
+    taken.add(next);
+    w.id = next;
+  }
+}
+
 for (const w of wd) {
   if (w.year > new Date().getFullYear()) continue; // announced, not out yet
   if (/\bseason \d+$/i.test(w.title)) continue; // single seasons of a show

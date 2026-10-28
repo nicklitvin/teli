@@ -28,10 +28,10 @@ npm run build     # static build in dist/ (relative paths, so it works from file
 
 ## Catalog
 
-The library has about 13,400 titles (9,000 movies, 4,400 shows) from two sources:
+The library has about 17,500 titles (9,000 movies, 8,400 shows) from two sources:
 
 - [`data/catalog.txt`](data/catalog.txt): about 930 hand-written titles, one per line.
-- `data/wikidata.json`: films and series pulled from Wikidata by `npm run wikidata`. A title is included when it has an English Wikipedia article and articles in many other languages (20+ for films, 10+ for series), which works well as a popularity filter. Wikidata's fine-grained genres ("heist film", "space opera") are mapped onto Teli's 21 genres and kept as themes, along with the title's main subjects and franchise.
+- `data/wikidata.json`: films and series pulled from Wikidata by `npm run wikidata`. A title is included when it has an English Wikipedia article and articles in many other languages (20+ for films, 10+ for series), which works well as a popularity filter. Plenty of popular shows (reality, British panel shows, new streaming series) are only written up in a few languages, so a series with 3–9 still gets in when its English article averages 120+ views a day over the last 60 days. Series include TV and web series, miniseries, animated and anime series, and TV programs (most reality and game shows); an anime with no English article of its own comes in under its manga's or light novel's article. `npm run wikidata -- --only tv` refreshes just the shows. Titles already in the file keep their ids and are never dropped, so saved ratings stay attached. Wikidata's fine-grained genres ("heist film", "space opera") are mapped onto Teli's 21 genres and kept as themes, along with the title's main subjects and franchise.
 
 Lines in `catalog.txt` look like this:
 
@@ -39,7 +39,7 @@ Lines in `catalog.txt` look like this:
 Title|Year|M or T|Genre,Genre|tag,tag|Director or Network
 ```
 
-Run `npm run catalog` to merge both into `src/data/catalog.json` (about 2.2 MB). It validates genres, rejects duplicates, and skips Wikidata titles that are already in `catalog.txt`. Wikidata titles that share a Wikipedia image with an earlier title (Se7en / Seven) are merged into it, and `src/data/aliases.json` maps the dropped ids so saved ratings follow.
+Run `npm run catalog` to merge both into `src/data/catalog.json` (about 2.8 MB). It validates genres, rejects duplicates, and skips Wikidata titles that are already in `catalog.txt`. Wikidata titles that share a Wikipedia image with an earlier title (Se7en / Seven) are merged into it, and `src/data/aliases.json` maps the dropped ids so saved ratings follow. Different titles that would get the same id (Big Brother, American and British, both 2000) are told apart by their article name (`t-big-brother-2000-british`); the one already in the catalog keeps the plain id.
 
 Then run `npm run images` to find images for any new titles. It looks up each title's Wikipedia article, checks the article's short description to confirm it's the right film or series and year, and stores the article's lead image URL (usually the poster or title card) in `src/data/images.json`. Titles from Wikidata already know their article, so they skip the guessing. This step needs network access, but the app itself makes no API calls. Use `npm run images -- --all` to look up every title again.
 
