@@ -35,6 +35,8 @@ const KINDS = {
   },
 };
 const ANIME = 'wd:Q63952888';
+// What an anime can borrow an article from: manga, light novels, manhwa, webtoons (not novels or games).
+const SOURCES = ['wd:Q21198342', 'wd:Q104213567', 'wd:Q865484', 'wd:Q74262765', 'wd:Q7978994', 'wd:Q213369'];
 const only = process.argv.includes('--only') ? process.argv[process.argv.indexOf('--only') + 1] : null;
 const previous = existsSync(OUT) ? JSON.parse(readFileSync(OUT, 'utf8')) : [];
 
@@ -144,7 +146,7 @@ const RULES = [
   ['Comedy', /comedy|comedic|sitcom|parody|satire|satirical|mockumentary|slapstick|sketch/],
   ['Crime', /crime|gangster|heist|police|detective|noir|legal|mafia|procedural|caper|prison/],
   ['Documentary', /documentary|docuseries/],
-  ['Drama', /drama|melodrama|soap opera|tragedy/],
+  ['Drama', /drama|melodrama|soap opera|tragedy|limited-run/],
   ['Family', /family|children|kids/],
   ['Fantasy', /fantasy|fairy tale|sword and sorcery|supernatural|magic/],
   ['History', /histor|period piece|biograph|biopic|costume|peplum|epic film/],
@@ -185,7 +187,8 @@ async function showCandidates(k) {
   const base = rows.map((r) => ({ item: qid(r.item.value), wiki: articleOf(r.article.value), links: Number(r.links.value) }));
   // Anime series with no English article of their own, written up in their manga's article instead.
   const anime = await sparql(`SELECT ?item ?src ?article (MAX(?sl) AS ?links) WHERE {
-    ?item wdt:P31 ${ANIME}; wdt:P144 ?src.
+    VALUES ?kind { ${SOURCES.join(' ')} }
+    ?item wdt:P31 ${ANIME}; wdt:P144 ?src. ?src wdt:P31 ?kind.
     FILTER NOT EXISTS { ?own schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>. }
     ?src wikibase:sitelinks ?sl. FILTER(?sl >= ${k.floorLinks})
     ?article schema:about ?src; schema:isPartOf <https://en.wikipedia.org/>.
@@ -195,12 +198,22 @@ async function showCandidates(k) {
     const wiki = articleOf(r.article.value);
     if (!have.has(wiki)) base.push({ item: qid(r.item.value), src: qid(r.src.value), wiki, links: Number(r.links.value) });
   }
-  const few = [...new Set(base.filter((b) => b.links < k.minLinks).map((b) => b.wiki))];
-  console.log(`tv: ${base.length} candidates (${anime.length} anime via their manga); checking page views for ${few.length}`);
-  const views = await pageviews(few);
-  const kept = base.filter((b) => b.links >= k.minLinks || (views.get(b.wiki) ?? 0) >= k.minViews);
+  // Anime with a small article of their own: most readers go to the manga's article, so count those views too.
+  const sourced = await sparql(`SELECT ?item ?article WHERE {
+    VALUES ?kind { ${SOURCES.join(' ')} }
+    ?item wdt:P31 ${ANIME}; wdt:P144 ?src. ?src wdt:P31 ?kind.
+    ?own schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>.
+    ?article schema:about ?src; schema:isPartOf <https://en.wikipedia.org/>.
+  }`);
+  const srcWiki = new Map(sourced.map((r) => [qid(r.item.value), articleOf(r.article.value)]));
+  const few = base.filter((b) => b.links < k.minLinks);
+  const toCheck = [...new Set(few.flatMap((b) => (srcWiki.has(b.item) ? [b.wiki, srcWiki.get(b.item)] : [b.wiki])))];
+  console.log(`tv: ${base.length} candidates (${anime.length} anime via their manga); checking page views for ${toCheck.length}`);
+  const views = await pageviews(toCheck);
+  const viewsOf = (b) => Math.max(views.get(b.wiki) ?? 0, srcWiki.has(b.item) ? views.get(srcWiki.get(b.item)) ?? 0 : 0);
+  const kept = base.filter((b) => b.links >= k.minLinks || viewsOf(b) >= k.minViews);
   // Popularity for ordering: sitelinks, or what the page views are worth in sitelinks (500 a day ≈ 10).
-  for (const b of kept) b.pop = b.links >= k.minLinks ? b.links : Math.max(b.links, Math.round(10 * Math.sqrt((views.get(b.wiki) ?? 0) / 500)));
+  for (const b of kept) b.pop = b.links >= k.minLinks ? b.links : Math.max(b.links, Math.round(10 * Math.sqrt(viewsOf(b) / 500)));
   console.log(`tv: kept ${kept.length}`);
   return kept;
 }
@@ -219,6 +232,7 @@ for (const [type, k] of Object.entries(KINDS)) {
   const dates = await get(k.date);
   const pub = type === 'tv' ? await get('P577') : new Map();
   const genres = await get('P136');
+  const classes = type === 'tv' ? await get('P31') : new Map();
   const subjects = await get('P921');
   const series = await get('P179');
   const creators = await get(k.creator);
@@ -241,9 +255,15 @@ for (const [type, k] of Object.entries(KINDS)) {
     const glabels = genreIds.map((u) => L.get(qid(u))).filter(Boolean).map((s) => s.toLowerCase());
     if (type === 'tv' && glabels.length && glabels.every((g) => SKIP_TV.test(g))) continue;
     const g = RULES.filter(([, re]) => glabels.some((l) => re.test(l))).map(([name]) => name);
+    // Shows with no usable genre: animated ones are still Animation, miniseries are Drama.
+    if (!g.length && type === 'tv') {
+      const cls = (classes.get(item) ?? []).map(qid);
+      if (cls.some((c) => ['Q581714', 'Q117467246', 'Q63952888'].includes(c))) g.push('Animation');
+      else if (cls.includes('Q1259759')) g.push('Drama');
+    }
     if (!g.length) continue;
     // Animated features are usually tagged "animated film" plus little else; give them Family.
-    if (g.length === 1 && g[0] === 'Animation') g.push('Family');
+    if (type === 'movie' && g.length === 1 && g[0] === 'Animation') g.push('Family');
     const themes = [
       ...(series.get(item) ?? []).map((u) => L.get(qid(u))).filter(Boolean),
       ...glabels.filter((l) => !PLAIN.test(l)).map(themeOf),
