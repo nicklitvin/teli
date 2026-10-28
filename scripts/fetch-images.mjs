@@ -166,8 +166,11 @@ await Promise.all(Array.from({ length: 4 }, async () => {
   }
 }));
 
-// Keep only ids that still exist, in catalog order, one per line.
-const ids = catalog.map((t) => t.id).filter((id) => images[id]);
+// Keep only ids that still exist, in catalog order, one per line. Ids merged into another
+// title (aliases.json) keep their image too: the catalog build spots those duplicates by it.
+const ALIASES_FILE = join(root, 'src/data/aliases.json');
+const merged = existsSync(ALIASES_FILE) ? Object.keys(JSON.parse(readFileSync(ALIASES_FILE, 'utf8'))) : [];
+const ids = [...catalog.map((t) => t.id), ...merged].filter((id) => images[id]);
 writeFileSync(OUT, '{\n' + ids.map((id) => `${JSON.stringify(id)}:${JSON.stringify(images[id])}`).join(',\n') + '\n}\n');
 const without = catalog.filter((t) => !images[t.id]);
 console.log(`Wrote ${ids.length}/${catalog.length} images. Without one: ${without.length}`);

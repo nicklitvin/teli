@@ -123,6 +123,8 @@ for (const [id, group] of sameId) {
     const paren = /\(([^)]*)\)\s*$/.exec(w.wiki ?? '')?.[1] ?? '';
     const words = slug(paren).split('-').filter((x) => x && !/^(?:tv|series|serial|miniseries|film|\d{4})$/.test(x)).join('-');
     let next = `${id}-${words || slug(SAME_CREATOR[w.creator] ?? w.creator) || 'b'}`;
+    // Say which one it is in the name too ("Big Brother (British)"), or the two look the same in a list.
+    if (words) w.title = `${w.title} (${paren.replace(/\s*(?:TV series|TV serial|serial|series|miniseries|film|\d{4})\s*/gi, ' ').trim()})`;
     while (taken.has(next)) next += '-2';
     taken.add(next);
     w.id = next;
