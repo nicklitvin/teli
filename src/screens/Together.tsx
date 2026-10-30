@@ -68,7 +68,8 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   const enough = members.length >= 2;
 
   return (
-    <Screen title="Crew" active={active}>
+    // With nothing but the explainer on the page, it sits in the middle of the screen.
+    <Screen title="Crew" active={active} className={!cloud.code && !enough && !group.people.length ? 'crew-alone' : ''}>
       {/* In a crew: its code up top. Not in one: join or start sits under the explainer below. */}
       {(cloud.code || enough) && <CrewBox cloud={cloud} invite={invite} />}
       {/* Who's in: shown once you've started or joined a crew. */}

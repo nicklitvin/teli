@@ -865,6 +865,7 @@ h1, h2, h3, p { margin: 0; }
 }
 .crew-box .note { margin: 0; }
 .crew-start .primary-btn { width: 100%; }
+.screen.crew-alone:not([hidden]) { display: flex; flex-direction: column; justify-content: center; }
 /* Under the "Watch together" explainer: no card, centered, the width of the text above. */
 .empty .crew-start { width: 100%; max-width: 300px; margin: 18px 0 0; padding: 0; background: none; border: none; }
 .empty .crew-start .primary-btn { margin-top: 0; }
