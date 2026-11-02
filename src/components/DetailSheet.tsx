@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { BY_ID, CATALOG, GENRE_COLORS, typeLabel } from '../lib/catalog';
+import { BY_ID, CATALOG, GENRE_COLORS, isCustom, typeLabel } from '../lib/catalog';
 import { TAG_LABEL } from '../lib/rating';
 import { similarTitles } from '../lib/recommend';
 import { useStore } from '../lib/store';
@@ -24,7 +24,7 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
 
   const similar = useMemo(() => similarTitles(id, new Set(), 15), [id]);
   const sameCreator = useMemo(
-    () => CATALOG.filter((c) => c.creator === t.creator && c.id !== id && c.type === t.type).slice(0, 15),
+    () => (t.creator ? CATALOG.filter((c) => c.creator === t.creator && c.id !== id && c.type === t.type).slice(0, 15) : []),
     [id, t.creator, t.type],
   );
 
@@ -45,7 +45,8 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
           <div className="detail-info">
             <h2>{t.title}</h2>
             <p>{t.year} · {typeLabel(t)}</p>
-            <p className="muted">{t.type === 'movie' ? `Directed by ${t.creator}` : t.creator}</p>
+            {t.creator && <p className="muted">{t.type === 'movie' ? `Directed by ${t.creator}` : t.creator}</p>}
+            {isCustom(t.id) && <p className="muted">Added by hand</p>}
           </div>
         </div>
       </div>

@@ -15,7 +15,7 @@ interface Entry {
   order: number;
 }
 
-const INDEX: Entry[] = CATALOG.map((t, order) => {
+const entry = (t: Title, order: number): Entry => {
   const title = normalize(t.title);
   return {
     t,
@@ -26,7 +26,12 @@ const INDEX: Entry[] = CATALOG.map((t, order) => {
     extra: normalize([t.creator, ...t.genres, ...t.tags.map((x) => x.replace(/-/g, ' '))].join(' ')),
     order,
   };
-});
+};
+const INDEX: Entry[] = CATALOG.map(entry);
+/** Titles added by hand during the session go on the end of the catalog; index any new ones. */
+const catchUp = () => {
+  for (let i = INDEX.length; i < CATALOG.length; i++) INDEX.push(entry(CATALOG[i], i));
+};
 
 function scoreEntry(e: Entry, q: string, tokens: string[]): number {
   if (e.title === q) return 100;
@@ -49,6 +54,7 @@ function scoreEntry(e: Entry, q: string, tokens: string[]): number {
 
 /** Titles matching `query`, optionally only one type and only titles in any of `genres`. */
 export function search(query: string, opts: { type?: MediaType; genres?: string[] } = {}, limit = 80): Title[] {
+  catchUp();
   const q = normalize(query);
   const genres = opts.genres ?? [];
   const filtered = INDEX.filter(

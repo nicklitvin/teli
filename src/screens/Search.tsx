@@ -4,7 +4,9 @@ import { GENRES, GENRE_COLORS } from '../lib/catalog';
 import { search } from '../lib/search';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { BookmarkIcon, FilterIcon, SearchIcon, XIcon } from '../components/Icons';
+import { AddTitle } from '../components/AddTitle';
+import { BookmarkIcon, FilterIcon, PlusIcon, SearchIcon, XIcon } from '../components/Icons';
+import { Sheet } from '../components/Sheet';
 import { Cards, Empty, Screen, TitleRow } from '../components/ui';
 
 type Filter = 'all' | MediaType;
@@ -21,6 +23,7 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
   const [genres, setGenres] = useState<string[]>([]);
   const [focused, setFocused] = useState(false);
   const [panel, setPanel] = useState(false);
+  const [adding, setAdding] = useState(false);
   const input = useRef<HTMLInputElement>(null);
   const { data, toggleWatchlist, ratings } = useStore();
   const nav = useNav();
@@ -34,7 +37,8 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
   const browsing = !q.trim() && !filtered;
   const results = useMemo(
     () => (browsing ? [] : search(q, { type: filter === 'all' ? undefined : filter, genres })),
-    [q, filter, genres, browsing],
+    // Titles you add join the catalog, so search again when one is added.
+    [q, filter, genres, browsing, data.custom.length],
   );
   // Several genres means any of them, so each tap widens the results.
   const toggleGenre = (g: string) => setGenres((gs) => (gs.includes(g) ? gs.filter((x) => x !== g) : [...gs, g]));
@@ -145,10 +149,27 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
               })}
             </Cards>
           ) : (
-            <Empty icon={<SearchIcon size={34} />} title="No results" body={q.trim() ? `Nothing matches “${q}”${filtered ? " with these filters" : ""}. Try a title, director, or genre.` : "Nothing matches these filters."} />
+            <Empty icon={<SearchIcon size={34} />} title="No results" body={q.trim() ? `Nothing matches “${q}”${filtered ? " with these filters" : ""}. Try a title, director, or genre.` : "Nothing matches these filters."}
+              action={q.trim() ? <button className="primary-btn" onClick={() => setAdding(true)}><PlusIcon size={16} /> Add “{q.trim()}”</button> : undefined} />
+          )}
+          {results.length > 0 && q.trim() && (
+            <button className="add-missing" onClick={() => setAdding(true)}>
+              <PlusIcon size={16} />
+              <span>Can’t find it? <b>Add “{q.trim()}”</b></span>
+            </button>
           )}
         </>
       )}
+      <Sheet open={adding} onClose={() => setAdding(false)} z={55} label="Add a title">
+        {adding && (
+          <AddTitle initial={q} type={filter === 'all' ? undefined : filter} onClose={() => setAdding(false)}
+            onDone={(id, added) => {
+              setAdding(false);
+              if (added) nav.notify('Added to Teli');
+              nav.openDetail(id);
+            }} />
+        )}
+      </Sheet>
     </Screen>
   );
 }
