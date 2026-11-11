@@ -48,6 +48,7 @@ export function groupPicks(members: Member[], seen: SeenMode = 'none'): GroupPic
     return new Map(recs.map((r) => [r.title.id, Math.max(0, r.score / max)]));
   });
 
+  const watching = members.map((m) => new Set(m.data.watchlist));
   const out: (GroupPick & { score: number })[] = [];
   for (const t of CATALOG) {
     if (dismissed.has(t.id)) continue;
@@ -55,7 +56,7 @@ export function groupPicks(members: Member[], seen: SeenMode = 'none'): GroupPic
     if (seen === 'rewatch') {
       if (!seenBy.some((m) => m.ratings.get(t.id)!.again)) continue;
     } else if (seenBy.length === members.length || (seen === 'none' && seenBy.length) || (seen === 'some' && !seenBy.length)) continue;
-    const wanted = members.filter((m) => m.data.watchlist.includes(t.id)).map((m) => m.name);
+    const wanted = members.filter((_, i) => watching[i].has(t.id)).map((m) => m.name);
     const vals = tasters.map((m, i) => {
       const r = m.ratings.get(t.id);
       return r ? appeal(r) : fits[i].get(t.id) ?? 0;

@@ -46,6 +46,35 @@ export function similarity(a: Title, b: Title): number {
   return dot / (A.norm * B.norm);
 }
 
+// For scoring the whole catalog at once: every feature lists the titles that have it (and
+// their weight for it), so a rated title's similarity to all titles is a few passes over those
+// lists instead of one comparison per title. Hand-added titles join on the end as they appear.
+const FEATURE = new Map<string, number>();
+let posts: { t: number[]; w: number[] }[] = [];
+let norms = new Float64Array(0);
+let indexed = 0;
+function index() {
+  if (indexed === CATALOG.length) return;
+  const n = CATALOG.length;
+  const grown = new Float64Array(n);
+  grown.set(norms);
+  norms = grown;
+  for (let i = indexed; i < n; i++) {
+    const v = vec(CATALOG[i]);
+    norms[i] = v.norm;
+    for (const [k, x] of v.w) {
+      let f = FEATURE.get(k);
+      if (f === undefined) {
+        FEATURE.set(k, (f = posts.length));
+        posts.push({ t: [], w: [] });
+      }
+      posts[f].t.push(i);
+      posts[f].w.push(x);
+    }
+  }
+  indexed = n;
+}
+
 export function similarTitles(id: string, exclude: Set<string> = new Set(), k = 12, minSim = 0.2): Title[] {
   const t = BY_ID.get(id);
   if (!t) return [];
@@ -71,30 +100,48 @@ export interface Rec {
 export function recommend(ratings: Map<string, Rating>, dismissed: Set<string>, type?: MediaType): Rec[] {
   const rated = [...ratings.values()].map((r) => ({ t: BY_ID.get(r.id)!, w: pull(r), good: r.verdict === 'good' }));
   if (!rated.length) return [];
+  index();
   const N = CATALOG.length;
   const scale = Math.sqrt(rated.length);
-  const out: Rec[] = [];
+  const total = new Float64Array(N);
+  const best = new Float64Array(N);
+  const because = new Int32Array(N).fill(-1);
+  const dot = new Float64Array(N);
+  const touched: number[] = [];
 
-  for (const t of CATALOG) {
-    if (ratings.has(t.id) || dismissed.has(t.id) || (type && t.type !== type)) continue;
-    let total = 0;
-    let best = 0;
-    let because: Title | undefined;
-    for (const r of rated) {
-      const s = similarity(t, r.t);
-      if (s < 0.15) continue;
-      const c = s * s * r.w;
-      total += c;
-      if (r.good && c > best) {
-        best = c;
-        because = r.t;
+  rated.forEach((r, ri) => {
+    // Dot product of this rated title with every title that shares a feature with it.
+    const v = vec(r.t);
+    for (const [k, x] of v.w) {
+      const p = posts[FEATURE.get(k)!];
+      for (let j = 0; j < p.t.length; j++) {
+        const i = p.t[j];
+        if (!dot[i]) touched.push(i);
+        dot[i] += x * p.w[j];
       }
     }
-    if (total <= 0) continue;
-    const prior = 0.04 * (1 - ORDER.get(t.id)! / N);
-    out.push({ title: t, score: total / scale + prior, because });
-  }
+    for (const i of touched) {
+      const s = dot[i] / (norms[i] * v.norm);
+      dot[i] = 0;
+      if (s < 0.15) continue;
+      const c = s * s * r.w;
+      total[i] += c;
+      if (r.good && c > best[i]) {
+        best[i] = c;
+        because[i] = ri;
+      }
+    }
+    touched.length = 0;
+  });
 
+  const out: Rec[] = [];
+  for (let i = 0; i < N; i++) {
+    if (total[i] <= 0) continue;
+    const t = CATALOG[i];
+    if (ratings.has(t.id) || dismissed.has(t.id) || (type && t.type !== type)) continue;
+    const prior = 0.04 * (1 - i / N);
+    out.push({ title: t, score: total[i] / scale + prior, because: because[i] >= 0 ? rated[because[i]].t : undefined });
+  }
   return out.sort((a, b) => b.score - a.score);
 }
 
