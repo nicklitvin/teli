@@ -116,7 +116,8 @@ async function pageviews(titles) {
       for (let attempt = 1; ; attempt++) {
         const res = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, { headers: { 'User-Agent': UA } });
         if (res.ok) { j = await res.json(); break; }
-        if (attempt < 6) { await sleep(2000 * attempt); continue; }
+        // Rate limited: wait as long as asked (or longer each time), then carry on.
+        if (attempt < 12) { await sleep(Math.max(Number(res.headers.get('retry-after')) * 1000 || 0, 3000 * attempt)); continue; }
         throw new Error(`Wikipedia ${res.status}`);
       }
       for (const n of [...(j.query?.normalized ?? []), ...(j.query?.redirects ?? [])]) alias.set(n.to, n.from);
@@ -132,12 +133,12 @@ async function pageviews(titles) {
     }
     for (const t of batch) if (!cache.has(t)) cache.set(t, 0);
   };
-  // Three batches at a time: much quicker, and still gentle on the API.
+  // Two batches at a time: quicker, and still gentle on the API.
   const batches = [];
   for (let i = 0; i < list.length; i += 50) batches.push(list.slice(i, i + 50));
   let next = 0;
   let done = 0;
-  await Promise.all([0, 1, 2].map(async () => {
+  await Promise.all([0, 1].map(async () => {
     while (next < batches.length) {
       await one(batches[next++]);
       if (++done % 50 === 0) {
