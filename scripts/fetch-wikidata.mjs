@@ -296,6 +296,8 @@ for (const [type, k] of Object.entries(KINDS)) {
     const years = [...(dates.get(item) ?? []), ...(pub.get(item) ?? [])].map((d) => Number(d.slice(0, 4))).filter((y) => y > 1900);
     if (!years.length) continue;
     const year = Math.min(...years);
+    // Announced films get plenty of page views before they're out; leave them for a later run.
+    if (type === 'movie' && !(dates.get(item) ?? []).some((d) => new Date(d) <= new Date())) continue;
     // An anime without its own genres borrows its manga's.
     const genreIds = genres.get(item) ?? (b.src ? genres.get(b.src) : undefined) ?? [];
     const glabels = genreIds.map((u) => L.get(qid(u))).filter(Boolean).map((s) => s.toLowerCase());
