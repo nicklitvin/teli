@@ -2,20 +2,21 @@
 // build-catalog.mjs merges with the hand-written data/catalog.txt.
 //
 // "Well-known" means the title has an English Wikipedia article and articles in many
-// other languages (Wikidata "sitelinks"), which works well as a popularity signal. Shows
-// get a second way in: plenty of popular ones (reality, British panel shows, new streaming
-// series) are only written up in a few languages, so a show with fewer sitelinks still
-// counts if its English article gets enough page views. Anime series without an article of
+// other languages (Wikidata "sitelinks"), which works well as a popularity signal. There's a
+// second way in: plenty of popular titles (reality, British panel shows, new streaming series,
+// American comedies and genre films) are only written up in a few languages, so a title with
+// fewer sitelinks still counts if its English article gets enough page views. Anime series without an article of
 // their own come in under the article of the manga they're based on.
 // Like the image script, this only runs when you rebuild the catalog; the app itself
 // never calls Wikidata.
 //
 //   npm run wikidata             # films and shows
 //   npm run wikidata -- --only tv  # just shows, keeping the films already in data/wikidata.json
+//   npm run wikidata -- --only movie
 //
 // Titles already in data/wikidata.json keep their ids, and none are dropped, so ratings
 // saved under them stay attached.
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -25,7 +26,8 @@ const UA = 'TeliCatalogBuilder/0.4 (https://github.com/nicklitvin/teli)';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 const KINDS = {
-  movie: { classes: ['wd:Q11424'], minLinks: 20, date: 'P577', creator: 'P57' },
+  // Films with 6–19 sitelinks need `minViews` English page views a day.
+  movie: { classes: ['wd:Q11424'], minLinks: 20, floorLinks: 6, minViews: 40, date: 'P577', creator: 'P57' },
   // TV series, miniseries, animated series (old and new class), anime series, television
   // programs (most reality and game shows), web series, entertainment programs.
   // Shows with 3–9 sitelinks need `minViews` English page views a day.
@@ -64,18 +66,6 @@ function scope(k) {
     ?article schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>.`;
 }
 
-/** item → values of one property, for every title in scope. */
-async function property(k, prop) {
-  const rows = await sparql(`SELECT DISTINCT ?item ?v WHERE { ${scope(k)} ?item wdt:${prop} ?v. }`);
-  const m = new Map();
-  for (const r of rows) {
-    const id = qid(r.item.value);
-    if (!m.has(id)) m.set(id, []);
-    m.get(id).push(r.v.value);
-  }
-  return m;
-}
-
 /** item → values of one property, for a list of items (in batches, so big lists don't time out). */
 async function propertyOf(items, prop) {
   const m = new Map();
@@ -90,10 +80,30 @@ async function propertyOf(items, prop) {
   return m;
 }
 
+// Page views are slow to fetch (tens of thousands of articles), so they're cached for a week.
+const VIEWS_CACHE = join(root, 'node_modules/.cache/teli-pageviews.json');
+const cache = (() => {
+  try {
+    const c = JSON.parse(readFileSync(VIEWS_CACHE, 'utf8'));
+    return Date.now() - c.at < 7 * 864e5 ? new Map(Object.entries(c.views)) : new Map();
+  } catch {
+    return new Map();
+  }
+})();
+const saveCache = () => {
+  try {
+    mkdirSync(dirname(VIEWS_CACHE), { recursive: true });
+    writeFileSync(VIEWS_CACHE, JSON.stringify({ at: Date.now(), views: Object.fromEntries(cache) }));
+  } catch {
+    /* no cache, then */
+  }
+};
+
 /** Average daily views over the last 60 days for English Wikipedia articles. */
 async function pageviews(titles) {
   const out = new Map();
-  const list = [...titles];
+  for (const t of titles) if (cache.has(t)) out.set(t, cache.get(t));
+  const list = [...titles].filter((t) => !cache.has(t));
   for (let i = 0; i < list.length; i += 50) {
     const batch = list.slice(i, i + 50);
     const alias = new Map();
@@ -115,12 +125,18 @@ async function pageviews(titles) {
         let t = p.title;
         for (let hops = 0; alias.has(t) && hops < 3; hops++) t = alias.get(t);
         out.set(t, Object.values(p.pageviews).reduce((a, b) => a + (b ?? 0), 0) / 60);
+        cache.set(t, out.get(t));
       }
       if (!j.continue) break;
       cont = j.continue;
     }
-    if ((i / 50) % 50 === 49) console.log(`  page views: ${i + 50}/${list.length}`);
+    for (const t of batch) if (!cache.has(t)) cache.set(t, 0);
+    if ((i / 50) % 50 === 49) {
+      console.log(`  page views: ${i + 50}/${list.length}`);
+      saveCache();
+    }
   }
+  saveCache();
   return out;
 }
 
@@ -218,6 +234,27 @@ async function showCandidates(k) {
   return kept;
 }
 
+/** Films: everything with a few sitelinks, then page views decide for the ones with fewer than `minLinks`. */
+async function movieCandidates(k) {
+  // In sitelink bands, so no single query runs into Wikidata's time limit.
+  const base = [];
+  for (const [a, b] of [[k.minLinks, 100000], [12, k.minLinks], [9, 12], [k.floorLinks, 9]]) {
+    const rows = await sparql(`SELECT ?item ?article (MAX(?sl) AS ?links) WHERE {
+      ?item wdt:P31 wd:Q11424; wikibase:sitelinks ?sl. FILTER(?sl >= ${a} && ?sl < ${b})
+      ?article schema:about ?item; schema:isPartOf <https://en.wikipedia.org/>.
+    } GROUP BY ?item ?article`);
+    base.push(...rows.map((r) => ({ item: qid(r.item.value), wiki: articleOf(r.article.value), links: Number(r.links.value) })));
+    console.log(`  movie: ${rows.length} with ${a}–${b - 1} sitelinks`);
+  }
+  const few = [...new Set(base.filter((b) => b.links < k.minLinks).map((b) => b.wiki))];
+  console.log(`movie: ${base.length} candidates; checking page views for ${few.length}`);
+  const views = await pageviews(few);
+  const kept = base.filter((b) => b.links >= k.minLinks || (views.get(b.wiki) ?? 0) >= k.minViews);
+  for (const b of kept) b.pop = b.links >= k.minLinks ? b.links : Math.max(b.links, Math.round(10 * Math.sqrt((views.get(b.wiki) ?? 0) / 500)));
+  console.log(`movie: kept ${kept.length}`);
+  return kept;
+}
+
 const out = [];
 for (const [type, k] of Object.entries(KINDS)) {
   if (only && only !== type) {
@@ -225,10 +262,8 @@ for (const [type, k] of Object.entries(KINDS)) {
     continue;
   }
   console.log(`${type}: querying…`);
-  const base = type === 'tv' ? await showCandidates(k)
-    : (await sparql(`SELECT ?item ?article (MAX(?sl) AS ?links) WHERE { ${scope(k)} } GROUP BY ?item ?article`))
-      .map((r) => ({ item: qid(r.item.value), wiki: articleOf(r.article.value), links: Number(r.links.value) }));
-  const get = type === 'tv' ? (prop) => propertyOf([...new Set(base.flatMap((b) => (b.src ? [b.item, b.src] : [b.item])))], prop) : (prop) => property(k, prop);
+  const base = type === 'tv' ? await showCandidates(k) : await movieCandidates(k);
+  const get = (prop) => propertyOf([...new Set(base.flatMap((b) => (b.src ? [b.item, b.src] : [b.item])))], prop);
   const dates = await get(k.date);
   const pub = type === 'tv' ? await get('P577') : new Map();
   const genres = await get('P136');

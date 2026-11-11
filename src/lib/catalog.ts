@@ -4,6 +4,8 @@ import aliases from '../data/aliases.json';
 import type { Title } from '../types';
 
 const IMAGES = images as unknown as Record<string, Title['image']>;
+/** How many titles ship in the catalog; hand-added ones go after these. */
+export const SHIPPED_COUNT = (raw as Title[]).length;
 export const CATALOG: Title[] = (raw as Title[]).map((t) => (IMAGES[t.id] ? { ...t, image: IMAGES[t.id] } : t));
 export const BY_ID = new Map(CATALOG.map((t) => [t.id, t]));
 const ALIASES = aliases as Record<string, string>;

@@ -61,6 +61,11 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   const [statsOpen, setStatsOpen] = useState(false);
 
   const rated = useMemo(() => [...ratings.values()].filter((r) => r.type === tab), [ratings, tab]);
+  // What's on your watchlist now, with when you saved it (0 if from before that was kept).
+  const saved = useMemo(
+    () => data.watchlist.filter((id) => BY_ID.get(id)?.type === tab).map((id) => data.saved[id] ?? 0),
+    [data.watchlist, data.saved, tab],
+  );
   // Rated titles: good, then ok, then bad, or by when you rated them. The watchlist keeps the order you saved in.
   const list = useMemo(
     () => (watching
@@ -116,7 +121,8 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
             genre={genre} genres={genres} onGenre={setGenre} query={query} onQuery={setQuery}
             placeholder={`Search your ${watching ? 'saved ' : ''}${noun}`}
             option={watching ? undefined : { label: 'Sort', value: sort, initial: 'verdict', choices: SORTS, onChange: (v) => setSort(v as Sort) }}
-            stats={watching ? undefined : <Stats rated={rated} noun={noun} />} onStats={setStatsOpen}
+            stats={<Stats rated={rated} saved={saved} noun={noun} />} statsOpen={statsOpen}
+            onStats={(open) => { setStatsOpen(open); if (open) setWatching(false); }}
             more={watching ? undefined : {
               panel: <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />,
               chips: <ReviewFilterChips value={rf} onChange={setRf} />,
@@ -124,12 +130,12 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
               onClear: () => setRf(NO_FILTER),
             }}
             extra={
-              <button className={`icon-btn tool ${watching ? 'on' : ''}`} onClick={() => { setWatching((v) => !v); setGenre(null); setRf(NO_FILTER); }}
+              <button className={`icon-btn tool ${watching ? 'on' : ''}`} onClick={() => { setWatching((v) => !v); setStatsOpen(false); setGenre(null); setRf(NO_FILTER); }}
                 aria-pressed={watching} aria-label="Watchlist">
                 <BookmarkIcon size={17} filled={watching} />
               </button>
             } />
-          {statsOpen && !watching ? null : list.length ? (
+          {statsOpen ? null : list.length ? (
             shown.length ? (
               <>
                 {(narrowed || watching) && (
@@ -183,8 +189,8 @@ function top(keys: string[], n = 3) {
  * Charts of the movies or shows you've rated, in place of the list: a few big numbers, the
  * good / ok / bad split as a ring, ratings per day over the last 30 days, and top genres and tags as bars.
  */
-function Stats({ rated, noun }: { rated: Rating[]; noun: string }) {
-  if (!rated.length) return <div className="stats-panel"><p className="stats-empty">Rate a few {noun} to see your stats.</p></div>;
+function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun: string }) {
+  if (!rated.length && !saved.length) return <div className="stats-panel"><p className="stats-empty">Rate a few {noun} to see your stats.</p></div>;
   const done = rated.filter((r) => !r.pending);
   const n = countVerdicts(done);
   const today = new Date().setHours(0, 0, 0, 0);
@@ -251,7 +257,43 @@ function Stats({ rated, noun }: { rated: Rating[]; noun: string }) {
           <Bars rows={tags.map(([t, k]) => [TAG_LABEL.get(t)!, k])} />
         </figure>
       )}
+      <Watchlist rated={done} saved={saved} />
     </div>
+  );
+}
+
+/**
+ * How much you bookmark and how much of it you get round to: everything you've saved (still
+ * waiting, or rated since) as one bar, with the watched part filled in.
+ */
+function Watchlist({ rated, saved }: { rated: Rating[]; saved: number[] }) {
+  const watched = rated.filter((r) => r.fromList !== undefined);
+  const total = watched.length + saved.length;
+  if (!total) return null;
+  const since = Date.now() - 30 * DAY;
+  const savedLately = saved.filter((at) => at >= since).length + watched.filter((r) => r.fromList! >= since).length;
+  const watchedLately = watched.filter((r) => r.at >= since).length;
+  const waits = watched.filter((r) => r.fromList! > 0).map((r) => (r.at - r.fromList!) / DAY);
+  const wait = waits.length ? Math.round(waits.reduce((a, b) => a + b, 0) / waits.length) : null;
+  const pct = Math.round((watched.length / total) * 100);
+  return (
+    <figure className="stat-chart">
+      <figcaption>Watchlist</figcaption>
+      <div className="stat-funnel" role="img" aria-label={`${total} saved, ${watched.length} watched (${pct}%)`}>
+        <span className="funnel-bar"><b style={{ width: `${pct}%` }} /></span>
+        <strong>{pct}%</strong>
+      </div>
+      <div className="stat-minis">
+        <span><b>{total}</b>saved</span>
+        <span><b>{watched.length}</b>watched</span>
+        <span><b>{saved.length}</b>waiting</span>
+        {wait !== null && <span><b>{wait}d</b>to watch</span>}
+      </div>
+      <div className="stat-minis lately">
+        <span><b>+{savedLately}</b>saved, 30 days</span>
+        <span><b>{watchedLately}</b>watched, 30 days</span>
+      </div>
+    </figure>
   );
 }
 

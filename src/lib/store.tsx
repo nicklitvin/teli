@@ -10,6 +10,8 @@ export interface Data {
   dismissed: string[];
   /** Titles you added by hand because the catalog didn't have them. */
   custom: Title[];
+  /** When each title on your watchlist was saved. */
+  saved: Record<string, number>;
 }
 
 const KEY = DATA_KEY;
@@ -17,7 +19,12 @@ const KEY = DATA_KEY;
 const OLD_KEY = 'teli:data:v1';
 const OLD_VERDICT: Record<string, Verdict> = { liked: 'good', fine: 'ok', disliked: 'bad' };
 
-export const emptyData = (): Data => ({ reviews: {}, watchlist: [], dismissed: [], custom: [] });
+export const emptyData = (): Data => ({ reviews: {}, watchlist: [], dismissed: [], custom: [], saved: {} });
+
+const without = (o: Record<string, number>, id: string) => {
+  const { [id]: _, ...rest } = o;
+  return rest;
+};
 
 /**
  * Accepts anything (localStorage, an imported file, a crewmate's row) and returns a valid Data,
@@ -28,7 +35,7 @@ export const emptyData = (): Data => ({ reviews: {}, watchlist: [], dismissed: [
  */
 export function sanitize(x: unknown): Data {
   const d = emptyData();
-  const src = (x ?? {}) as { reviews?: unknown; ranks?: unknown; watchlist?: unknown; dismissed?: unknown; custom?: unknown };
+  const src = (x ?? {}) as { reviews?: unknown; ranks?: unknown; watchlist?: unknown; dismissed?: unknown; custom?: unknown; saved?: unknown };
   if (Array.isArray(src.custom)) d.custom = addCustom(src.custom.map(cleanCustom).filter((t) => !!t));
   const add = (raw: string, r: Review) => {
     const id = resolveId(raw);
@@ -45,6 +52,7 @@ export function sanitize(x: unknown): Data {
         again: v.again === true,
         at: typeof v.at === 'number' && Number.isFinite(v.at) ? v.at : 0,
         ...(v.pending === true ? { pending: true } : {}),
+        ...(typeof v.fromList === 'number' && Number.isFinite(v.fromList) ? { fromList: v.fromList } : {}),
       });
     }
   } else if (src.ranks && typeof src.ranks === 'object') {
@@ -65,6 +73,11 @@ export function sanitize(x: unknown): Data {
       ? [...new Set(a.filter((id): id is string => typeof id === 'string').map(resolveId).filter((id) => BY_ID.has(id)))]
       : [];
   d.watchlist = ids(src.watchlist).filter((id) => !d.reviews[id]);
+  const saved = (src.saved && typeof src.saved === 'object' ? src.saved : {}) as Record<string, unknown>;
+  for (const [raw, at] of Object.entries(saved)) {
+    const id = resolveId(raw);
+    if (typeof at === 'number' && Number.isFinite(at) && d.watchlist.includes(id)) d.saved[id] = at;
+  }
   d.dismissed = ids(src.dismissed);
   return d;
 }
@@ -134,12 +147,20 @@ export function StoreProvider({ children }: { children: ReactNode }) {
 
   const rate = useCallback((id: string, r: Pick<Review, 'verdict' | 'tags' | 'again'>) => {
     if (!BY_ID.has(id)) return;
-    setData((prev) => ({
-      reviews: { ...prev.reviews, [id]: { verdict: r.verdict, tags: r.tags, again: r.again, at: prev.reviews[id]?.at ?? Date.now() } },
-      watchlist: prev.watchlist.filter((x) => x !== id),
-      dismissed: prev.dismissed.filter((x) => x !== id),
-      custom: keep(prev.custom, id),
-    }));
+    setData((prev) => {
+      // Rating something off your watchlist counts as watching it from there.
+      const fromList = prev.reviews[id]?.fromList ?? (prev.watchlist.includes(id) ? prev.saved[id] ?? 0 : undefined);
+      return {
+        reviews: {
+          ...prev.reviews,
+          [id]: { verdict: r.verdict, tags: r.tags, again: r.again, at: prev.reviews[id]?.at ?? Date.now(), ...(fromList !== undefined ? { fromList } : {}) },
+        },
+        watchlist: prev.watchlist.filter((x) => x !== id),
+        dismissed: prev.dismissed.filter((x) => x !== id),
+        custom: keep(prev.custom, id),
+        saved: without(prev.saved, id),
+      };
+    });
   }, []);
 
   const unrate = useCallback((id: string) => setData((prev) => {
@@ -154,6 +175,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       watchlist: prev.watchlist.includes(id) ? prev.watchlist.filter((x) => x !== id) : [id, ...prev.watchlist],
       dismissed: prev.dismissed.filter((x) => x !== id),
       custom: keep(prev.custom, id),
+      saved: prev.watchlist.includes(id) ? without(prev.saved, id) : { ...prev.saved, [id]: Date.now() },
     }));
   }, []);
 
@@ -162,6 +184,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       ...prev,
       dismissed: prev.dismissed.includes(id) ? prev.dismissed.filter((x) => x !== id) : [...prev.dismissed, id],
       watchlist: prev.watchlist.filter((x) => x !== id),
+      saved: without(prev.saved, id),
     }));
   }, []);
 

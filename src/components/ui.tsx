@@ -57,7 +57,7 @@ export function Segmented<T extends string>({ value, options, onChange }: {
  * and the panel stays open while you pick; active filters stay visible as removable chips once it's
  * closed. `extra` puts more buttons in the row, after the stats button and before the filters.
  */
-export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, stats, onStats, extra }: {
+export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, onGenre, query, onQuery, placeholder, option, more, stats, statsOpen = false, onStats, extra }: {
   tab: T;
   tabs: { value: T; label: string }[];
   onTab: (t: T) => void;
@@ -67,24 +67,31 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   query?: string;
   onQuery?: (q: string) => void;
   placeholder?: string;
-  /** An extra single-choice filter shown above the genres; anything but `initial` counts as active. */
+  /** An extra single-choice filter shown above the genres. `initial` has no chip: it's what you get with none picked. */
   option?: { label: string; value: string; initial: string; choices: { value: string; label: string }[]; onChange: (v: string) => void };
   /** More filter groups shown above the genres, with their own removable chips. */
   more?: { panel: ReactNode; chips: ReactNode; active: boolean; onClear: () => void };
   /** Shown in a panel behind a chart button. */
   stats?: ReactNode;
-  /** Told when the stats panel opens or closes, so the list under it can step aside. */
+  /** Whether the stats panel is open; the screen owns this, so its list can step aside and other buttons can close it. */
+  statsOpen?: boolean;
   onStats?: (open: boolean) => void;
   extra?: ReactNode;
 }) {
-  type Tool = 'search' | 'genre' | 'stats';
-  const [open, setOpen] = useState<Tool | null>(null);
+  type Tool = 'search' | 'genre';
+  const [panel, setOpen] = useState<Tool | null>(null);
+  // One panel at a time: opening stats closes the filters or search, and the other way round.
+  const open = statsOpen && stats ? 'stats' : panel;
   const optionOn = !!option && option.value !== option.initial;
   const anyOn = !!genre || optionOn || !!more?.active;
-  const toggle = (k: Tool) => {
-    const next = open === k ? null : k;
-    setOpen(next);
-    onStats?.(next === 'stats');
+  const toggle = (k: Tool | 'stats') => {
+    if (k === 'stats') {
+      setOpen(null);
+      onStats?.(!statsOpen);
+      return;
+    }
+    if (statsOpen) onStats?.(false);
+    setOpen(open === k ? null : k);
   };
   const clearAll = () => {
     onGenre(null);
@@ -134,9 +141,9 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
             <div className="filter-group" role="group" aria-label={option.label}>
               <p className="filter-label">{option.label}</p>
               <div className="genre-wrap">
-                {option.choices.map((c) => (
+                {option.choices.filter((c) => c.value !== option.initial).map((c) => (
                   <button key={c.value} className={`chip toggle any ${option.value === c.value ? 'on' : ''}`}
-                    onClick={() => option.onChange(c.value)} aria-pressed={option.value === c.value}>{c.label}</button>
+                    onClick={() => option.onChange(option.value === c.value ? option.initial : c.value)} aria-pressed={option.value === c.value}>{c.label}</button>
                 ))}
               </div>
             </div>
@@ -145,8 +152,6 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
           <div className="filter-group" role="group" aria-label="Genres">
             <p className="filter-label">Genre</p>
             <div className="genre-wrap">
-              <button className={`chip toggle any ${genre ? '' : 'on'}`} onClick={() => onGenre(null)}
-                aria-pressed={!genre}>Any genre</button>
               {genres.map((g) => (
                 <button key={g} className={`chip toggle ${genre === g ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
                   onClick={() => onGenre(genre === g ? null : g)} aria-pressed={genre === g}>{g}</button>

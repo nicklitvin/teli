@@ -77,16 +77,15 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
           <div className="filter-group" role="group" aria-label="Type">
             <p className="filter-label">Type</p>
             <div className="genre-wrap">
-              {TYPES.map((o) => (
+              {TYPES.filter((o) => o.value !== 'all').map((o) => (
                 <button key={o.value} className={`chip toggle any ${filter === o.value ? 'on' : ''}`}
-                  onClick={() => setFilter(o.value)} aria-pressed={filter === o.value}>{o.label}</button>
+                  onClick={() => setFilter(filter === o.value ? 'all' : o.value)} aria-pressed={filter === o.value}>{o.label}</button>
               ))}
             </div>
           </div>
           <div className="filter-group" role="group" aria-label="Genres">
             <p className="filter-label">Genres{genres.length > 1 ? ' · any of these' : ''}</p>
             <div className="genre-wrap">
-              <button className={`chip toggle any ${genres.length ? '' : 'on'}`} onClick={() => setGenres([])} aria-pressed={!genres.length}>Any genre</button>
               {GENRES.map((g) => (
                 <button key={g} className={`chip toggle ${genres.includes(g) ? 'on' : ''}`} style={{ ['--c' as string]: GENRE_COLORS[g] }}
                   onClick={() => toggleGenre(g)} aria-pressed={genres.includes(g)}>{g}</button>

@@ -25,6 +25,8 @@ export interface Review {
   at: number;
   /** Carried over from the old ranking system and not reviewed yet. */
   pending?: boolean;
+  /** It was on your watchlist when you rated it: when you'd saved it (0 if that wasn't kept). */
+  fromList?: number;
 }
 
 export interface Rating extends Review {
