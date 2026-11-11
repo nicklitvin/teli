@@ -5,7 +5,7 @@ import react from '@vitejs/plugin-react';
 export default defineConfig({
   base: './',
   // The catalog JSON is bundled on purpose; shipping it as a JSON.parse string parses faster.
-  build: { chunkSizeWarningLimit: 6000 },
+  build: { chunkSizeWarningLimit: 10000 },
   json: { stringify: true },
   plugins: [react()],
   server: { host: true },

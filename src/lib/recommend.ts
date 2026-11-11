@@ -97,7 +97,20 @@ export interface Rec {
   close?: boolean;
 }
 
+/** The last result for each ratings map, so screens asking with the same ratings and hidden titles share one pass. */
+const recent = new WeakMap<Map<string, Rating>, { key: string; size: number; recs: Rec[] }>();
+
 export function recommend(ratings: Map<string, Rating>, dismissed: Set<string>, type?: MediaType): Rec[] {
+  const key = [...dismissed].sort().join('|');
+  let hit = recent.get(ratings);
+  if (!hit || hit.key !== key || hit.size !== CATALOG.length) {
+    hit = { key, size: CATALOG.length, recs: score(ratings, dismissed) };
+    recent.set(ratings, hit);
+  }
+  return type ? hit.recs.filter((r) => r.title.type === type) : hit.recs;
+}
+
+function score(ratings: Map<string, Rating>, dismissed: Set<string>): Rec[] {
   const rated = [...ratings.values()].map((r) => ({ t: BY_ID.get(r.id)!, w: pull(r), good: r.verdict === 'good' }));
   if (!rated.length) return [];
   index();
@@ -138,7 +151,7 @@ export function recommend(ratings: Map<string, Rating>, dismissed: Set<string>, 
   for (let i = 0; i < N; i++) {
     if (total[i] <= 0) continue;
     const t = CATALOG[i];
-    if (ratings.has(t.id) || dismissed.has(t.id) || (type && t.type !== type)) continue;
+    if (ratings.has(t.id) || dismissed.has(t.id)) continue;
     const prior = 0.04 * (1 - i / N);
     out.push({ title: t, score: total[i] / scale + prior, because: because[i] >= 0 ? rated[because[i]].t : undefined });
   }

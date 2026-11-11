@@ -54,15 +54,19 @@ export const DATA_KEY = 'teli:data:v2';
 
 const plain = (s: string) =>
   s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/&/g, ' and ').replace(/[^a-z0-9]+/g, ' ').trim();
-const SHIPPED = new Map<string, Title[]>();
-for (const t of CATALOG) {
-  const k = `${t.type}:${plain(t.title)}`;
-  SHIPPED.set(k, [...(SHIPPED.get(k) ?? []), t]);
-}
+let shipped: Map<string, Title[]> | null = null;
 
 /** The catalog's own entry for this title, if it has one. */
 export function findShipped(type: Title['type'], title: string, year: number): Title | undefined {
-  return SHIPPED.get(`${type}:${plain(title)}`)?.find((t) => Math.abs(t.year - year) <= (type === 'tv' ? 2 : 1));
+  if (!shipped) {
+    // Built the first time it's needed: a lookup by type and plain name over the shipped catalog.
+    shipped = new Map();
+    for (const t of CATALOG.slice(0, SHIPPED_COUNT)) {
+      const k = `${t.type}:${plain(t.title)}`;
+      shipped.set(k, [...(shipped.get(k) ?? []), t]);
+    }
+  }
+  return shipped.get(`${type}:${plain(title)}`)?.find((t) => Math.abs(t.year - year) <= (type === 'tv' ? 2 : 1));
 }
 
 export const isCustom = (id: string) => id.startsWith('u-');

@@ -52,7 +52,8 @@ export function Together({ active, invite }: { active: boolean; invite: string |
     ...cloud.members.map((m, i) => toMember(friendName(m.name, i), m.data)),
     ...group.people.map((p, i) => toMember(friendName(p.name, cloud.members.length + i), p.data)),
   ], [group, data, cloud.members]);
-  const picks = useMemo(() => (members.length ? groupPicks(members, seen) : []), [members, seen]);
+  // Picks need two or more people; scoring the whole catalog for one is wasted work.
+  const picks = useMemo(() => (members.length >= 2 ? groupPicks(members, seen) : []), [members, seen]);
   const ofType = useMemo(() => picks.filter((p) => filter === 'all' || p.title.type === filter), [picks, filter]);
   const shown = ofType.filter((p) => !genre || p.title.genres.includes(genre));
   // Only offer genres that actually show up in the group's picks, most common first.

@@ -27,8 +27,10 @@ const entry = (t: Title, order: number): Entry => {
     order,
   };
 };
-const INDEX: Entry[] = CATALOG.map(entry);
-/** Titles added by hand during the session go on the end of the catalog; index any new ones. */
+// Built on the first search rather than at startup, and extended when hand-added titles join
+// the end of the catalog.
+const INDEX: Entry[] = [];
+/** Indexes any titles not indexed yet. */
 const catchUp = () => {
   for (let i = INDEX.length; i < CATALOG.length; i++) INDEX.push(entry(CATALOG[i], i));
 };
