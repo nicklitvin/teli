@@ -104,8 +104,8 @@ async function pageviews(titles) {
   const out = new Map();
   for (const t of titles) if (cache.has(t)) out.set(t, cache.get(t));
   const list = [...titles].filter((t) => !cache.has(t));
-  for (let i = 0; i < list.length; i += 50) {
-    const batch = list.slice(i, i + 50);
+  // One batch of 50 articles, following the API's continuation until every page is in.
+  const one = async (batch) => {
     const alias = new Map();
     let cont = {};
     for (let guard = 0; guard < 60; guard++) {
@@ -116,7 +116,7 @@ async function pageviews(titles) {
       for (let attempt = 1; ; attempt++) {
         const res = await fetch(`https://en.wikipedia.org/w/api.php?${params}`, { headers: { 'User-Agent': UA } });
         if (res.ok) { j = await res.json(); break; }
-        if (attempt < 5) { await sleep(2000 * attempt); continue; }
+        if (attempt < 6) { await sleep(2000 * attempt); continue; }
         throw new Error(`Wikipedia ${res.status}`);
       }
       for (const n of [...(j.query?.normalized ?? []), ...(j.query?.redirects ?? [])]) alias.set(n.to, n.from);
@@ -131,11 +131,21 @@ async function pageviews(titles) {
       cont = j.continue;
     }
     for (const t of batch) if (!cache.has(t)) cache.set(t, 0);
-    if ((i / 50) % 50 === 49) {
-      console.log(`  page views: ${i + 50}/${list.length}`);
-      saveCache();
+  };
+  // Three batches at a time: much quicker, and still gentle on the API.
+  const batches = [];
+  for (let i = 0; i < list.length; i += 50) batches.push(list.slice(i, i + 50));
+  let next = 0;
+  let done = 0;
+  await Promise.all([0, 1, 2].map(async () => {
+    while (next < batches.length) {
+      await one(batches[next++]);
+      if (++done % 50 === 0) {
+        console.log(`  page views: ${done * 50}/${list.length}`);
+        saveCache();
+      }
     }
-  }
+  }));
   saveCache();
   return out;
 }
