@@ -13,6 +13,27 @@ const ALIASES = aliases as Record<string, string>;
 const CUSTOM_ALIAS = new Map<string, string>();
 /** Ids of duplicate entries that were merged away (or hand-added titles the catalog now has) point at the entry that was kept. */
 export const resolveId = (id: string) => ALIASES[id] ?? CUSTOM_ALIAS.get(id) ?? id;
+// Image paths are short: "en/8/81/File.jpg" or "commons/…" for a file on Wikimedia, "tvm/1/4600.jpg"
+// for a TVmaze poster. Wikimedia serves originals to other sites slowly and rate-limits them hard,
+// so we always ask its thumbnail server for one of the widths it keeps ready (anything else is refused).
+const STEPS = [120, 250, 330, 500];
+
+/** The URL to load a title's image at about `px` wide. */
+export function imageSrc([path, w]: NonNullable<Title['image']>, px: number): string {
+  if (path.startsWith('tvm/')) {
+    return `https://static.tvmaze.com/uploads/images/${px > 330 ? 'original_untouched' : 'medium_portrait'}/${path.slice(4)}`;
+  }
+  const [project, a, b, name] = path.split('/');
+  // No point blowing a small original up much past its own size.
+  const step = STEPS.find((s) => s >= Math.min(px, w * 0.9)) ?? STEPS[STEPS.length - 1];
+  const ext = name.slice(name.lastIndexOf('.') + 1).toLowerCase();
+  const file = ext === 'svg' ? `${step}px-${name}.png`
+    : ext === 'webm' || ext === 'ogv' ? `${step}px--${name}.jpg`
+    : ext === 'tif' || ext === 'tiff' ? `lossy-page1-${step}px-${name}.jpg`
+    : `${step}px-${name}`;
+  return `https://thumb.wikimedia.org/wikipedia/${project}/thumb/${a}/${b}/${name}/${file}`;
+}
+
 /** Position in the catalog file — used as a weak popularity prior. */
 export const ORDER = new Map(CATALOG.map((t, i) => [t.id, i]));
 

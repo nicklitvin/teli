@@ -1,5 +1,6 @@
 import { useState, type CSSProperties } from 'react';
 import type { Review, Title } from '../types';
+import { imageSrc } from '../lib/catalog';
 import { VERDICT_LABEL } from '../lib/rating';
 
 function hash(s: string) {
@@ -47,20 +48,32 @@ interface PosterProps {
   style?: CSSProperties;
 }
 
-/** Image URLs that failed this session (offline, removed upstream), so we don't retry them every render. */
-const BROKEN = new Set<string>();
+/** About how wide (in image pixels, allowing for sharp screens) each poster size needs its image. */
+export const POSTER_PX: Record<NonNullable<PosterProps['size']>, number> = { xs: 120, sm: 120, md: 330, lg: 330, xl: 330, fill: 500 };
 
-/** The Wikipedia image when there is one, drawn over generated art that doubles as placeholder and fallback. */
+/**
+ * Failed loads this session, per URL. A failure is often just the image host asking us to slow
+ * down, so try again a couple of times, further apart each time, before settling for the art.
+ */
+const FAILS = new Map<string, number>();
+const RETRIES = 2;
+
+/** The poster image when there is one, drawn over generated art that doubles as placeholder and fallback. */
 export function Poster({ t, size = 'md', cover, rating, className = '', style }: PosterProps) {
   const art = posterArt(t);
   const tiny = size === 'xs' || size === 'sm';
-  const [, setBroken] = useState(0);
-  const img = t.image && !BROKEN.has(t.image[0]) ? t.image : null;
+  const [, setTick] = useState(0);
+  const url = t.image ? imageSrc(t.image, POSTER_PX[size]) : null;
+  const fails = url ? FAILS.get(url) ?? 0 : 0;
+  const img = url && fails <= RETRIES ? t.image! : null;
+  const src = fails ? `${url}?retry=${fails}` : url!;
   // Title cards and logos are landscape: show them whole over a blurred copy instead of cropping.
   const wide = !cover && !!img && img[1] / img[2] > 0.85;
   const onError = () => {
-    BROKEN.add(img![0]);
-    setBroken((n) => n + 1);
+    if ((FAILS.get(url!) ?? 0) !== fails) return; // the blurred copy and the poster share a URL
+    FAILS.set(url!, fails + 1);
+    if (fails < RETRIES) setTimeout(() => setTick((n) => n + 1), 2000 * 3 ** fails + Math.random() * 1000);
+    else setTick((n) => n + 1);
   };
   return (
     <div className={`poster poster-${size} font-${art.font} align-${art.align} ${className}`}
@@ -70,9 +83,9 @@ export function Poster({ t, size = 'md', cover, rating, className = '', style }:
       ) : (
         <span className="poster-title">{t.title}</span>
       )}
-      {img && wide && <img className="poster-img blur" src={img[0]} alt="" loading="lazy" decoding="async" />}
+      {img && wide && <img key={`b${src}`} className="poster-img blur" src={src} alt="" loading="lazy" decoding="async" onError={onError} />}
       {img && (
-        <img key={img[0]} className={`poster-img ${wide ? 'contain' : ''}`} src={img[0]} alt="" loading="lazy" decoding="async"
+        <img key={src} className={`poster-img ${wide ? 'contain' : ''}`} src={src} alt="" loading="lazy" decoding="async"
           onLoad={(e) => e.currentTarget.classList.add('loaded')} onError={onError} />
       )}
       {!tiny && size !== 'fill' && t.type === 'tv' && <span className="poster-tag">TV</span>}

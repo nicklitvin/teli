@@ -1,11 +1,11 @@
 import { useMemo } from 'react';
-import { BY_ID, CATALOG, GENRE_COLORS, isCustom, typeLabel } from '../lib/catalog';
+import { BY_ID, CATALOG, GENRE_COLORS, imageSrc, isCustom, typeLabel } from '../lib/catalog';
 import { TAG_LABEL } from '../lib/rating';
 import { similarTitles } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { BookmarkIcon, ChevronLeft, EyeSlashIcon, StarIcon, TrashIcon, XIcon } from './Icons';
-import { Poster, VerdictBadge, posterArt } from './Poster';
+import { POSTER_PX, Poster, VerdictBadge, posterArt } from './Poster';
 import { PosterCard, SectionHeader, Shelf } from './ui';
 
 export function DetailSheet({ id, canGoBack, onBack, onClose }: {
@@ -32,7 +32,7 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
     <div className="detail" key={id}>
       <div className="detail-hero" style={{ ['--hue' as string]: art.hue }}>
         <div className="detail-hero-bg" style={{ background: art.background }}>
-          {t.image && <img src={t.image[0]} alt="" decoding="async" onError={(e) => e.currentTarget.remove()} />}
+          {t.image && <img src={imageSrc(t.image, POSTER_PX.xl)} alt="" decoding="async" onError={(e) => e.currentTarget.remove()} />}
         </div>
         <div className="sheet-toolbar over">
           {canGoBack ? (
@@ -112,6 +112,13 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
             <SectionHeader title={t.type === 'movie' ? `More from ${t.creator}` : `More on ${t.creator}`} />
             <Shelf>{sameCreator.map((s) => <PosterCard key={s.id} t={s} />)}</Shelf>
           </>
+        )}
+        {t.image && (
+          <p className="credit">
+            Poster from {t.image[0].startsWith('tvm/')
+              ? <a href="https://www.tvmaze.com/" target="_blank" rel="noreferrer">TVmaze</a>
+              : <a href={`https://${t.image[0].startsWith('en/') ? 'en.wikipedia' : 'commons.wikimedia'}.org/wiki/File:${t.image[0].slice(t.image[0].lastIndexOf('/') + 1)}`} target="_blank" rel="noreferrer">Wikimedia</a>}
+          </p>
         )}
       </div>
     </div>

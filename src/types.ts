@@ -10,7 +10,7 @@ export interface Title {
   tags: string[];
   /** Director for movies, network for shows. */
   creator: string;
-  /** Wikipedia lead image: [url, width, height]. */
+  /** Poster or lead image: [path, width, height]. The path becomes a URL through imageSrc(). */
   image?: [string, number, number];
 }
 

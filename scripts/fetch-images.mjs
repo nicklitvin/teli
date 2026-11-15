@@ -1,13 +1,14 @@
-// Finds the lead image (usually the poster or title card) of each title's Wikipedia
-// article and writes src/data/images.json as { id: [url, width, height] }.
+// Finds a poster for each title and writes src/data/images.json as { id: [path, width, height] }.
 //
-// This only runs when you build the catalog. The app itself never calls Wikipedia's API;
-// it loads the image files straight from upload.wikimedia.org and falls back to
-// generated art when they can't load.
+// Shows get their poster from TVmaze when it knows them (Wikipedia often only has a title card,
+// a logo or a manga cover). Everything else gets the lead image of its Wikipedia article.
+// Paths are kept short ("en/8/81/File.jpg", "tvm/1/4600.jpg"); the app turns them into
+// thumbnail URLs (src/lib/catalog.ts, imageSrc) and falls back to generated art when one
+// can't load. This only runs when you build the catalog; the app never calls either API.
 //
 //   npm run images          # look up titles that don't have an image yet
 //   npm run images -- --all # look up every title again
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 
@@ -83,7 +84,12 @@ async function lookup(titles) {
   };
 }
 
-const clean = (url) => url.replace(/\?.*$/, '');
+/** A Wikimedia file URL (the original or any thumbnail of it) as "en/8/81/File.jpg". */
+function short(url) {
+  const m = url.match(/\/wikipedia\/(en|commons)\/(?:thumb\/)?([0-9a-f]\/[0-9a-f]{2})\/([^/?]+)/);
+  return m ? `${m[1]}/${m[2]}/${m[3]}` : null;
+}
+
 
 /** Pages without a page image: take the infobox `image =` field instead. */
 async function infoboxImage(page) {
@@ -96,11 +102,11 @@ async function infoboxImage(page) {
   });
   const ii = info.query?.pages?.[0]?.imageinfo?.[0];
   if (!ii) return null;
-  return [clean(ii.thumburl ?? ii.url), ii.thumbwidth ?? ii.width, ii.thumbheight ?? ii.height];
+  return [short(ii.url), ii.width, ii.height];
 }
 
 async function imageFor(page) {
-  if (page.thumbnail) return [clean(page.thumbnail.source), page.thumbnail.width, page.thumbnail.height];
+  if (page.thumbnail) return [short(page.thumbnail.source), page.thumbnail.width, page.thumbnail.height];
   return infoboxImage(page);
 }
 
@@ -109,6 +115,111 @@ const WIKI = new Map();
 try {
   for (const w of JSON.parse(readFileSync(join(root, 'data/wikidata.json'), 'utf8'))) WIKI.set(w.id, w.wiki);
 } catch { /* no Wikidata import yet */ }
+
+// Older runs stored full URLs.
+for (const [id, v] of Object.entries(images)) {
+  if (/^https?:/.test(v[0])) {
+    const p = short(v[0]);
+    if (p) images[id] = [p, v[1], v[2]];
+    else delete images[id];
+  }
+}
+
+// ---- TVmaze: its whole show index is a few hundred pages, so fetch it all and match locally ----
+const TVM_CACHE = join(root, 'node_modules/.cache/teli-tvmaze.json');
+async function tvmazeIndex() {
+  try {
+    const c = JSON.parse(readFileSync(TVM_CACHE, 'utf8'));
+    if (Date.now() - c.at < 7 * 864e5) return c.shows;
+  } catch { /* no cache yet */ }
+  const shows = [];
+  for (let page = 0; ; page++) {
+    const res = await fetch(`https://api.tvmaze.com/shows?page=${page}`, { headers: { 'User-Agent': UA } });
+    if (res.status === 404) break;
+    if (res.status === 429) {
+      await sleep(5000);
+      page--;
+      continue;
+    }
+    if (!res.ok) throw new Error(`TVmaze ${res.status}`);
+    for (const s of await res.json()) {
+      const year = Number(s.premiered?.slice(0, 4));
+      const m = s.image?.medium?.match(/\/images\/[a-z_]+\/(\d+\/\d+\.\w+)$/);
+      if (m && year) shows.push([s.name, year, m[1], s.weight ?? 0]);
+    }
+    if (page % 50 === 0) console.log(`  TVmaze index: page ${page}, ${shows.length} shows with posters`);
+    await sleep(550); // they allow about 20 requests every 10 seconds
+  }
+  mkdirSync(dirname(TVM_CACHE), { recursive: true });
+  writeFileSync(TVM_CACHE, JSON.stringify({ at: Date.now(), shows }));
+  return shows;
+}
+
+{
+  const exact = new Map();
+  const loose = new Map();
+  const add = (m, k, s) => {
+    if (!k) return;
+    if (!m.has(k)) m.set(k, []);
+    m.get(k).push(s);
+  };
+  for (const s of await tvmazeIndex()) {
+    add(exact, norm(s[0]), s);
+    // TVmaze often names a show with its brand or subtitle: "Marvel's Daredevil",
+    // "Tom Clancy's Jack Ryan", "Arcane: League of Legends".
+    const bare = s[0].replace(/^[A-Z][\w.]*(?: [A-Z][\w.]*)?['’]s /, '');
+    if (bare !== s[0]) add(loose, norm(bare), s);
+    if (s[0].includes(':')) add(loose, norm(s[0].slice(0, s[0].indexOf(':'))), s);
+  }
+  // Same name and starting within a year of ours (or a few years, for an exact name); if a few
+  // fit, the one more people follow.
+  const pick = (m, k, years, year) =>
+    (m.get(k) ?? []).filter((s) => Math.abs(s[1] - year) <= years).sort((a, b) => b[3] - a[3])[0];
+  let matched = 0;
+  for (const t of catalog) {
+    if (t.type !== 'tv' || images[t.id]?.[0].startsWith('tvm/')) continue;
+    const k = norm(t.title);
+    const k2 = norm(t.title.replace(/\s*\([^)]*\)\s*$/, '')); // "The Office (UK)"
+    const best = pick(exact, k, 1, t.year) ?? pick(exact, k2, 1, t.year) ?? pick(loose, k, 1, t.year)
+      ?? pick(exact, k, 3, t.year);
+    if (!best) continue;
+    images[t.id] = [`tvm/${best[2]}`, 210, 295];
+    matched++;
+  }
+  console.log(`TVmaze posters for ${matched} more shows`);
+
+  // The rest may go by another name there ("Money Heist" is "La Casa de Papel"): its search knows
+  // other names. Take one of the top few results that started within a year of ours.
+  const SEARCH_CACHE = join(root, 'node_modules/.cache/teli-tvmaze-search.json');
+  let seen = {};
+  try { seen = JSON.parse(readFileSync(SEARCH_CACHE, 'utf8')); } catch { /* none yet */ }
+  const left = catalog.filter((t) => t.type === 'tv' && !images[t.id]?.[0].startsWith('tvm/'));
+  console.log(`searching TVmaze for ${left.length} shows by their other names`);
+  let found = 0;
+  for (const [i, t] of left.entries()) {
+    if (!seen[t.id]) {
+      const res = await fetch(`https://api.tvmaze.com/search/shows?q=${encodeURIComponent(t.title)}`, { headers: { 'User-Agent': UA } });
+      if (res.status === 429) {
+        await sleep(5000);
+        continue; // picked up next run
+      }
+      if (!res.ok) continue;
+      seen[t.id] = (await res.json()).slice(0, 3).flatMap(({ score, show }) => {
+        const m = show.image?.medium?.match(/\/images\/[a-z_]+\/(\d+\/\d+\.\w+)$/);
+        return m && show.premiered ? [[Number(show.premiered.slice(0, 4)), m[1], score]] : [];
+      });
+      await sleep(550);
+      if (i % 200 === 0) writeFileSync(SEARCH_CACHE, JSON.stringify(seen));
+    }
+    const hit = seen[t.id].find(([year, , score]) => Math.abs(year - t.year) <= 1 && score >= 0.4);
+    if (hit) {
+      images[t.id] = [`tvm/${hit[1]}`, 210, 295];
+      found++;
+    }
+  }
+  writeFileSync(SEARCH_CACHE, JSON.stringify(seen));
+  console.log(`  found ${found} that way`);
+}
 
 const todo = catalog.filter((t) => !images[t.id]);
 console.log(`${todo.length} of ${catalog.length} titles need an image`);
@@ -158,7 +269,7 @@ await Promise.all(Array.from({ length: 4 }, async () => {
     const [id, page] = next;
     try {
       const img = await imageFor(page);
-      if (img) images[id] = img;
+      if (img?.[0]) images[id] = img;
     } catch (e) {
       console.warn(`  ${id}: ${e.message}`);
     }
