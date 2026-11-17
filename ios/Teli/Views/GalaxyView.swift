@@ -1,23 +1,34 @@
 import SwiftUI
 
 /// The galaxy: every title on one map, similar ones together, your ratings lit up as
-/// constellations. Drag to pan, pinch to zoom, tap a dot (or, in bubbles, a neighbourhood).
-/// Filters set the look (dots or bubbles, names on or off) and highlight a genre, theme, decade or
-/// creator. Uncharted flies you to a neighbourhood you've barely rated that holds a lot of your picks.
+/// constellations. Drag to pan, pinch to zoom. Only things with a name showing can be tapped: a
+/// title's name (or its dot) opens it, a neighbourhood's name opens its card. Filters show what
+/// you've seen, haven't, or both, turn names off, and highlight any mix of genres, decades, themes
+/// and creators. Uncharted flies you to a neighbourhood you've barely rated that holds a lot of your picks.
 struct GalaxyView: View {
-    enum Look: String, CaseIterable { case dots, bubbles }
+    enum Show: String, CaseIterable, Identifiable {
+        case all = "Both", seen = "Seen", unseen = "Not seen"
+        var id: String { rawValue }
+    }
     enum Dimension: String, CaseIterable, Identifiable {
-        case genres = "Genres", themes = "Themes", decades = "Decades", creators = "Creators"
+        case genres = "Genres", decades = "Decades", themes = "Themes", creators = "Creators"
         var id: String { rawValue }
     }
     enum Focus: Equatable { case title(Int), hood(Int) }
 
+    /// What the last frame drew a name for, in screen points: all a tap can land on. A class, so the
+    /// Canvas can fill it in as it draws without making the view draw again.
+    final class Targets {
+        var titles: [(i: Int, dot: CGPoint, box: CGRect)] = []
+        var hoods: [(id: Int, box: CGRect)] = []
+    }
+
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
-    @AppStorage("teli.sky.look") private var look: Look = .dots
     @AppStorage("teli.sky.names") private var names = true
-    @State private var dim: Dimension = .genres
-    @State private var key: String?
+    @State private var picks: [Dimension: Set<String>] = [:]
+    @State private var lit: Set<Int>?
+    @State private var show: Show = .all
     @State private var focus: Focus?
     @State private var showFilters = false
     @State private var cam = Camera()
@@ -25,6 +36,8 @@ struct GalaxyView: View {
     @State private var lastHood: Int?
     @State private var dragLast: CGSize = .zero
     @State private var pinchLast: CGFloat = 1
+    @State private var mapSize: CGSize = .zero
+    @State private var targets = Targets()
 
     private let sky = SkyData.shared
     private let catalog = Catalog.shared
@@ -42,16 +55,24 @@ struct GalaxyView: View {
                         Text("The map needs rebuilding: run npm run map.").foregroundStyle(Theme.text2)
                             .frame(maxWidth: .infinity, maxHeight: .infinity)
                     }
-                    topBar(size: geo.size)
+                    VStack(alignment: .leading, spacing: 10) {
+                        topBar(size: geo.size)
+                        if anyFilter { activeChips }
+                    }
                     VStack { Spacer(); card }
                 }
-                .onAppear { if cam.s == 0 { fitAll(geo.size) } }
+                .onAppear {
+                    mapSize = geo.size
+                    if cam.s == 0 { fitAll(geo.size) }
+                }
+                .onChange(of: geo.size) { mapSize = geo.size }
             }
             .background(RadialGradient(colors: [Color(hex: 0x0B0D24), Color(hex: 0x04050E)], center: .center, startRadius: 0, endRadius: 600).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showFilters) {
                 filters.presentationDetents([.medium, .large]).presentationBackground(.ultraThinMaterial)
             }
+            .onChange(of: picks) { lit = Self.highlight(picks, sky: sky, catalog: catalog) }
         }
     }
 
@@ -62,8 +83,9 @@ struct GalaxyView: View {
         return all.filter { $0.i < sky.count }
     }
     private var watchIdx: [Int] { store.data.watchlist.compactMap { catalog.order(of: $0) }.filter { $0 < sky.count } }
+    private var seenSet: Set<Int> { Set(ratedIdx.map(\.i)) }
 
-    private func keys(_ t: Title) -> [String] {
+    static func keys(_ dim: Dimension, _ t: Title) -> [String] {
         switch dim {
         case .genres: t.genres
         case .themes: t.tags
@@ -71,7 +93,7 @@ struct GalaxyView: View {
         case .creators: t.creator.isEmpty ? [] : [t.creator]
         }
     }
-    private var universe: [String] {
+    private func universe(_ dim: Dimension) -> [String] {
         switch dim {
         case .genres: catalog.genres
         case .themes: catalog.themes
@@ -79,9 +101,29 @@ struct GalaxyView: View {
         case .creators: catalog.creators
         }
     }
-    private var highlight: Set<Int>? {
-        guard let key else { return nil }
-        return Set((0..<sky.count).filter { keys(catalog.titles[$0]).contains(key) })
+
+    /// Titles matching the picks: any of a section's picks, and every section that has one.
+    static func highlight(_ picks: [Dimension: Set<String>], sky: SkyData, catalog: Catalog) -> Set<Int>? {
+        let active = picks.filter { !$0.value.isEmpty }
+        guard !active.isEmpty else { return nil }
+        return Set((0..<sky.count).filter { i in
+            let t = catalog.titles[i]
+            return active.allSatisfy { entry in keys(entry.key, t).contains { entry.value.contains($0) } }
+        })
+    }
+
+    private var pickCount: Int { picks.values.reduce(0) { $0 + $1.count } }
+    private var anyFilter: Bool { pickCount > 0 || show != .all }
+    /// "Comedy / Romance · 1990s", or when that's too long for the card, "Comedy + 2 more".
+    private var pickName: String {
+        let parts = Dimension.allCases.compactMap { d -> String? in
+            let ks = (picks[d] ?? []).sorted()
+            return ks.isEmpty ? nil : ks.joined(separator: " / ")
+        }
+        let full = parts.joined(separator: " · ")
+        guard full.count > 22, pickCount > 1 else { return full }
+        let first = Dimension.allCases.lazy.compactMap { (self.picks[$0] ?? []).sorted().first }.first ?? full
+        return "\(first) + \(pickCount - 1) more"
     }
 
     // MARK: Map
@@ -98,21 +140,24 @@ struct GalaxyView: View {
     }
 
     private func map(size: CGSize) -> some View {
-        let rated = ratedIdx
-        let watch = watchIdx
-        let lit = highlight
+        let all = ratedIdx
+        let rated = show == .unseen ? [] : all
+        let watch = show == .seen ? [] : watchIdx
+        let seen = Set(all.map(\.i))
+        let lit = self.lit
         let links = Self.constellations(rated.map(\.i), sky: sky)
         let byHood = Self.byHood(sky)
-        let bubbles = look == .bubbles
+        let show = self.show
         let focusHood = focusedHood
         let selected = selectedTitle
-        let bottom: CGFloat = focus == nil && key == nil ? 0 : 230
+        let bottom: CGFloat = focus == nil && lit == nil ? 0 : 230
+        let targets = self.targets
 
         return TimelineView(.animation(paused: flight == nil)) { tl in
             let c = currentCam(tl.date)
             Canvas { ctx, sz in
-                Self.draw(ctx: &ctx, size: sz, cam: c, sky: sky, byHood: byHood, rated: rated, watch: watch, links: links,
-                          highlight: lit, bubbles: bubbles, names: names, focusHood: focusHood, selected: selected, bottom: bottom)
+                Self.draw(ctx: &ctx, size: sz, cam: c, sky: sky, byHood: byHood, rated: rated, watch: watch, links: links, seen: seen,
+                          highlight: lit, show: show, names: names, focusHood: focusHood, selected: selected, bottom: bottom, targets: targets)
             }
         }
         .contentShape(Rectangle())
@@ -136,7 +181,7 @@ struct GalaxyView: View {
                     }
                     .onEnded { _ in pinchLast = 1 })
         )
-        .simultaneousGesture(SpatialTapGesture().onEnded { v in tap(v.location, size: size, rated: rated, watch: watch, lit: lit) })
+        .simultaneousGesture(SpatialTapGesture().onEnded { v in tap(v.location) })
         .accessibilityLabel("Map of every title, with your ratings as constellations")
     }
 
@@ -180,21 +225,50 @@ struct GalaxyView: View {
         }
     }
 
-    private func tap(_ p: CGPoint, size: CGSize, rated: [(i: Int, v: Verdict)], watch: [Int], lit: Set<Int>?) {
-        let wx = cam.x + (p.x - size.width / 2) / cam.s
-        let wy = cam.y + (p.y - size.height / 2) / cam.s
-        let w = CGPoint(x: wx, y: wy)
-        let reach = 18 / cam.s
-        if let i = sky.nearest(to: w, within: 10 / cam.s, among: rated.map(\.i)) { return focus = .title(i) }
-        if look == .bubbles {
-            let pool = watch + (lit.map { Array($0) } ?? [])
-            if let i = sky.nearest(to: w, within: reach, among: pool) { return focus = .title(i) }
-            if let h = sky.hood(under: w) { return focus = .hood(h.id) }
-            return focus = nil
+    /// The middle and size of a set of titles (ignoring the farthest tenth), for flying to them.
+    private func frameOf(_ ids: [Int]) -> (center: CGPoint, span: Double)? {
+        guard !ids.isEmpty else { return nil }
+        let xs = ids.map { sky.xs[$0] }.sorted()
+        let ys = ids.map { sky.ys[$0] }.sorted()
+        let lo = Int(Double(ids.count) * 0.05)
+        let hi = max(lo, Int((Double(ids.count) * 0.95).rounded(.up)) - 1)
+        return (CGPoint(x: xs[ids.count / 2], y: ys[ids.count / 2]), max(xs[hi] - xs[lo], ys[hi] - ys[lo], 0.004))
+    }
+
+    /// A tap only lands on something with a name showing: the title whose dot is within reach (the
+    /// nearest, if several) or whose name it's on, else the neighbourhood whose name it's on.
+    private func tap(_ p: CGPoint) {
+        func on(_ r: CGRect) -> Bool { !r.isEmpty && r.insetBy(dx: -6, dy: -6).contains(p) }
+        var pick: Int?
+        var best = Double.infinity
+        for t in targets.titles {
+            let d = Double(hypot(t.dot.x - p.x, t.dot.y - p.y))
+            let score = d <= 18 ? d : on(t.box) ? 19 : .infinity
+            if score < best { best = score; pick = t.i }
         }
-        if let i = sky.nearest(to: w, within: reach, among: lit.map { Array($0) }) { return focus = .title(i) }
+        if let pick { return focus = .title(pick) }
+        if let h = targets.hoods.first(where: { on($0.box) }) { return focus = .hood(h.id) }
         if case .hood = focus { return }
         focus = nil
+    }
+
+    /// Adds or removes a pick, and flies to wherever the highlighted titles now are.
+    private func togglePick(_ d: Dimension, _ k: String) {
+        var next = picks
+        var set = next[d] ?? []
+        if set.contains(k) { set.remove(k) } else { set.insert(k) }
+        next[d] = set
+        picks = next
+        focus = nil
+        guard mapSize != .zero, let ids = Self.highlight(next, sky: sky, catalog: catalog) else { return }
+        let seen = seenSet
+        let shown = ids.filter { show == .all || seen.contains($0) == (show == .seen) }
+        if let f = frameOf(Array(shown)) { fly(to: f.center, span: f.span, size: mapSize, bottom: 230) }
+    }
+
+    private func clearFilters() {
+        picks = [:]
+        show = .all
     }
 
     // MARK: Drawing
@@ -231,7 +305,10 @@ struct GalaxyView: View {
     }
 
     static func draw(ctx: inout GraphicsContext, size: CGSize, cam c: Camera, sky: SkyData, byHood: [[Int]], rated: [(i: Int, v: Verdict)],
-                     watch: [Int], links: [(Int, Int)], highlight: Set<Int>?, bubbles: Bool, names: Bool, focusHood: Int?, selected: Int?, bottom: CGFloat) {
+                     watch: [Int], links: [(Int, Int)], seen: Set<Int>, highlight: Set<Int>?, show: Show, names: Bool,
+                     focusHood: Int?, selected: Int?, bottom: CGFloat, targets: Targets) {
+        targets.titles = []
+        targets.hoods = []
         guard c.s > 0 else { return }
         func sx(_ x: Double) -> CGFloat { (x - c.x) * c.s + size.width / 2 }
         func sy(_ y: Double) -> CGFloat { (y - c.y) * c.s + size.height / 2 }
@@ -239,50 +316,32 @@ struct GalaxyView: View {
         let grow = min(2.2, pow(zoom, 0.35))
         let n = Double(Catalog.shared.titles.count)
         let onScreen = { (x: CGFloat, y: CGFloat, m: CGFloat) in x > -m && y > -m && x < size.width + m && y < size.height + m }
+        let faded = { (i: Int) in highlight.map { !$0.contains(i) } ?? false }
 
-        if bubbles {
-            for h in sky.hoods {
-                let on = focusHood == h.id
-                for p in h.parts {
-                    let r = max(6, p.r * c.s)
-                    let rect = CGRect(x: sx(p.x) - r, y: sy(p.y) - r, width: r * 2, height: r * 2)
-                    guard rect.intersects(CGRect(origin: .zero, size: size)) else { continue }
-                    ctx.fill(Path(ellipseIn: rect), with: .color(h.color.opacity(on ? 0.23 : highlight != nil ? 0.06 : 0.11)))
-                    ctx.stroke(Path(ellipseIn: rect), with: .color(h.color.opacity(on ? 0.82 : highlight != nil ? 0.25 : 0.44)), lineWidth: on ? 2 : 1.2)
-                }
+        // Nebulae: a soft glow of each neighbourhood's colour, so the sky reads as regions.
+        for h in sky.hoods {
+            for p in h.parts {
+                let r = sqrt(Double(p.n)) * 0.0042 * c.s
+                let center = CGPoint(x: sx(p.x), y: sy(p.y))
+                ctx.fill(Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)),
+                         with: .radialGradient(Gradient(colors: [h.color.opacity(0.15), h.color.opacity(0)]), center: center, startRadius: 0, endRadius: r))
             }
-            if let lit = highlight {
-                for (hid, ids) in byHood.enumerated() {
-                    var path = Path()
-                    for i in ids where lit.contains(i) {
-                        let x = sx(sky.xs[i]), y = sy(sky.ys[i])
-                        if onScreen(x, y, 4) { path.addEllipse(in: CGRect(x: x - grow, y: y - grow, width: grow * 2, height: grow * 2)) }
-                    }
-                    ctx.fill(path, with: .color(sky.hoods[hid].color.opacity(0.9)))
-                }
-            }
-        } else {
-            // Nebulae: a soft glow of each neighbourhood's colour, so the sky reads as regions.
-            for h in sky.hoods {
-                for p in h.parts {
-                    let r = sqrt(Double(p.n)) * 0.0042 * c.s
-                    let center = CGPoint(x: sx(p.x), y: sy(p.y))
-                    ctx.fill(Path(ellipseIn: CGRect(x: center.x - r, y: center.y - r, width: r * 2, height: r * 2)),
-                             with: .radialGradient(Gradient(colors: [h.color.opacity(0.15), h.color.opacity(0)]), center: center, startRadius: 0, endRadius: r))
-                }
-            }
-            // Dots: well-known titles a little bigger, everything a bit bigger as you zoom in.
+        }
+        // Dots: well-known titles a little bigger, everything a bit bigger as you zoom in. Showing only
+        // what you've seen leaves them out (your stars are drawn below); only what you haven't skips yours.
+        if show != .seen {
             for (hid, ids) in byHood.enumerated() {
                 var dim = Path()
                 var bright = Path()
                 for i in ids {
+                    if show == .unseen && seen.contains(i) { continue }
                     let x = sx(sky.xs[i]), y = sy(sky.ys[i])
                     guard onScreen(x, y, 4) else { continue }
                     let pop = 1 - Double(i) / n
-                    let lit = highlight?.contains(i) ?? true
-                    let r = (0.45 + 1.3 * pop * pop * pop) * grow * (highlight != nil && lit ? 1.25 : 1)
+                    let isLit = highlight?.contains(i) ?? true
+                    let r = (0.45 + 1.3 * pop * pop * pop) * grow * (highlight != nil && isLit ? 1.25 : 1)
                     let rect = CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)
-                    if !lit {
+                    if !isLit {
                         dim.addRect(rect)
                     } else if r < 1.1 {
                         bright.addRect(rect)
@@ -296,7 +355,7 @@ struct GalaxyView: View {
             }
         }
 
-        // Constellations, watchlist rings, then your stars.
+        // Constellations, watchlist rings, then your stars; ones outside the highlight fade back.
         var lines = Path()
         for (a, b) in links {
             lines.move(to: CGPoint(x: sx(sky.xs[a]), y: sy(sky.ys[a])))
@@ -307,7 +366,8 @@ struct GalaxyView: View {
             let x = sx(sky.xs[i]), y = sy(sky.ys[i])
             guard onScreen(x, y, 10) else { continue }
             let r = 3.6 + grow * 0.6
-            ctx.stroke(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)), with: .color(Color(hex: 0xA79BFF).opacity(0.85)), lineWidth: 1.3)
+            ctx.stroke(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)),
+                       with: .color(Color(hex: 0xA79BFF).opacity(faded(i) ? 0.22 : 0.85)), lineWidth: 1.3)
         }
         for (i, v) in rated {
             let x = sx(sky.xs[i]), y = sy(sky.ys[i])
@@ -315,6 +375,7 @@ struct GalaxyView: View {
             let big = v == .good ? 1.25 : v == .ok ? 1 : 0.8
             let halo = (5 + grow) * big, core = (1.8 + grow * 0.45) * big
             let color = Theme.verdict(v)
+            ctx.opacity = faded(i) ? 0.22 : 1
             ctx.fill(Path(ellipseIn: CGRect(x: x - halo, y: y - halo, width: halo * 2, height: halo * 2)), with: .color(color.opacity(0.25)))
             ctx.fill(Path(ellipseIn: CGRect(x: x - core, y: y - core, width: core * 2, height: core * 2)), with: .color(color))
             if v == .good {
@@ -322,11 +383,16 @@ struct GalaxyView: View {
                 ctx.fill(Path(ellipseIn: CGRect(x: x - w, y: y - w, width: w * 2, height: w * 2)), with: .color(.white))
             }
         }
+        ctx.opacity = 1
         if let s = selected, s < sky.count {
             let x = sx(sky.xs[s]), y = sy(sky.ys[s]), r = 9 + grow
             ctx.stroke(Path(ellipseIn: CGRect(x: x - r, y: y - r, width: r * 2, height: r * 2)), with: .color(.white), lineWidth: 2)
         }
-        guard names else { return }
+        guard names else {
+            // No names to tap, so your own stars and watchlist rings are the targets.
+            targets.titles = (rated.map(\.i) + watch).map { (i: $0, dot: CGPoint(x: sx(sky.xs[$0]), y: sy(sky.ys[$0])), box: CGRect.zero) }
+            return
+        }
 
         // Labels, skipping any that would overlap one already placed, each on a dark pill so it reads over bright patches.
         var boxes: [CGRect] = []
@@ -336,7 +402,18 @@ struct GalaxyView: View {
             boxes.append(r)
             return true
         }
-        let hoodAlpha = bubbles ? 1 : max(0, min(1, (5 - zoom) / 2.5))
+        // The tapped title's name goes first, so nothing covers it; it's drawn last, on top.
+        var selectedLabel: (text: GraphicsContext.ResolvedText, rect: CGRect)?
+        if let s = selected, s < sky.count {
+            let text = ctx.resolve(Text(Catalog.shared.titles[s].title).font(.system(size: 13.5, weight: .semibold)).foregroundColor(.white))
+            let ts = text.measure(in: CGSize(width: 400, height: 40))
+            let dot = CGPoint(x: sx(sky.xs[s]), y: sy(sky.ys[s]))
+            let rect = CGRect(x: dot.x - ts.width / 2 - 9, y: dot.y - 34, width: ts.width + 18, height: 24)
+            boxes.append(rect)
+            targets.titles.append((i: s, dot: dot, box: rect))
+            selectedLabel = (text, rect)
+        }
+        let hoodAlpha = max(0, min(1, (5 - zoom) / 2.5))
         if hoodAlpha > 0 {
             for h in sky.hoods.sorted(by: { $0.n > $1.n }) {
                 let text = ctx.resolve(Text(h.label).font(.system(size: 12, weight: .semibold)).foregroundColor(.white))
@@ -344,6 +421,7 @@ struct GalaxyView: View {
                 let w = ts.width + 30
                 let rect = CGRect(x: sx(h.x) - w / 2, y: sy(h.y) - 12, width: w, height: 24)
                 guard fits(rect) else { continue }
+                if hoodAlpha > 0.4 { targets.hoods.append((id: h.id, box: rect)) }
                 ctx.opacity = hoodAlpha * (highlight != nil ? 0.6 : 1)
                 ctx.fill(Path(roundedRect: rect, cornerRadius: 12), with: .color(Color(hex: 0x050610).opacity(focusHood == h.id ? 0.95 : 0.78)))
                 if focusHood == h.id { ctx.stroke(Path(roundedRect: rect, cornerRadius: 12), with: .color(h.color), lineWidth: 1.5) }
@@ -352,17 +430,21 @@ struct GalaxyView: View {
                 ctx.opacity = 1
             }
         }
-        if zoom > 3 || (bubbles && !rated.isEmpty) {
-            let titleAlpha = bubbles ? 1 : min(1, (zoom - 3) / 2)
+        // Zoomed in: titles, your stars first (highlighted ones before the rest), then the best known.
+        // Showing only what you've seen, your stars are named at any zoom.
+        let onlyMine = show == .seen
+        if zoom > 3 || (onlyMine && !rated.isEmpty) {
+            let titleAlpha = onlyMine ? 1 : min(1, (zoom - 3) / 2)
             let mine = Set(rated.map(\.i))
-            var picks = rated.map(\.i)
-            if !bubbles {
+            var picks = rated.map(\.i).filter { !faded($0) } + rated.map(\.i).filter(faded)
+            if !onlyMine {
                 // Visible dots, best known first (catalog order is popularity order).
                 let x0 = c.x - size.width / 2 / c.s, x1 = c.x + size.width / 2 / c.s
                 let y0 = c.y - size.height / 2 / c.s, y1 = c.y + size.height / 2 / c.s
                 var i = 0
                 while i < sky.count && picks.count < 600 {
-                    if sky.xs[i] >= x0 && sky.xs[i] <= x1 && sky.ys[i] >= y0 && sky.ys[i] <= y1 && (highlight?.contains(i) ?? true) && !mine.contains(i) {
+                    if sky.xs[i] >= x0 && sky.xs[i] <= x1 && sky.ys[i] >= y0 && sky.ys[i] <= y1 && !faded(i) && !mine.contains(i)
+                        && !(show == .unseen && seen.contains(i)) {
                         picks.append(i)
                     }
                     i += 1
@@ -379,19 +461,17 @@ struct GalaxyView: View {
                 let x = sx(sky.xs[i]) + 8, y = sy(sky.ys[i])
                 let rect = CGRect(x: x - 3, y: y - 9, width: ts.width + 6, height: 18)
                 guard fits(rect) else { continue }
-                ctx.opacity = titleAlpha * (mine.contains(i) ? 1 : 0.85)
+                if titleAlpha > 0.4 { targets.titles.append((i: i, dot: CGPoint(x: x - 8, y: y), box: rect)) }
+                ctx.opacity = titleAlpha * (mine.contains(i) ? 1 : 0.85) * (faded(i) ? 0.5 : 1)
                 ctx.fill(Path(roundedRect: rect, cornerRadius: 5), with: .color(Color(hex: 0x04050E).opacity(0.7)))
                 ctx.draw(text, at: CGPoint(x: x, y: y), anchor: .leading)
                 ctx.opacity = 1
                 placed += 1
             }
         }
-        if let s = selected, s < sky.count {
-            let text = ctx.resolve(Text(Catalog.shared.titles[s].title).font(.system(size: 13.5, weight: .semibold)).foregroundColor(.white))
-            let ts = text.measure(in: CGSize(width: 400, height: 40))
-            let rect = CGRect(x: sx(sky.xs[s]) - ts.width / 2 - 9, y: sy(sky.ys[s]) - 34, width: ts.width + 18, height: 24)
-            ctx.fill(Path(roundedRect: rect, cornerRadius: 12), with: .color(Color(hex: 0x050610).opacity(0.88)))
-            ctx.draw(text, at: CGPoint(x: rect.midX, y: rect.midY), anchor: .center)
+        if let label = selectedLabel {
+            ctx.fill(Path(roundedRect: label.rect, cornerRadius: 12), with: .color(Color(hex: 0x050610).opacity(0.88)))
+            ctx.draw(label.text, at: CGPoint(x: label.rect.midX, y: label.rect.midY), anchor: .center)
         }
     }
 
@@ -415,11 +495,11 @@ struct GalaxyView: View {
         openHood(hood, size: size)
     }
 
+    /// Opens a neighbourhood's card and flies to its biggest patch, close enough in to read titles.
     private func openHood(_ hood: SkyData.Hood, size: CGSize) {
         focus = .hood(hood.id)
         let p = hood.parts[0]
-        let span = look == .bubbles ? max(0.06, p.r * 3) : min(0.12, max(0.03, p.r * 2.2))
-        fly(to: CGPoint(x: p.x, y: p.y), span: span, size: size, bottom: 230)
+        fly(to: CGPoint(x: p.x, y: p.y), span: min(0.12, max(0.03, p.r * 2.2)), size: size, bottom: 230)
     }
 
     // MARK: Chrome
@@ -440,7 +520,7 @@ struct GalaxyView: View {
             .accessibilityLabel("Show the whole map")
             Button { showFilters = true } label: {
                 Image(systemName: "line.3.horizontal.decrease").frame(width: 42, height: 42)
-                    .background(Circle().fill(key != nil ? AnyShapeStyle(Theme.accent.opacity(0.4)) : AnyShapeStyle(.ultraThinMaterial)))
+                    .background(Circle().fill(anyFilter ? AnyShapeStyle(Theme.accent.opacity(0.4)) : AnyShapeStyle(.ultraThinMaterial)))
             }
             .accessibilityLabel("Filters")
         }
@@ -449,45 +529,76 @@ struct GalaxyView: View {
         .padding(.top, 6)
     }
 
+    /// The filters in use, as chips you can tap to remove.
+    private var activeChips: some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: 6) {
+                if show != .all {
+                    Chip(label: "\(show == .seen ? "Seen only" : "Not seen only")  ✕", on: true, tint: Theme.accent) { show = .all; focus = nil }
+                }
+                ForEach(Dimension.allCases) { d in
+                    ForEach((picks[d] ?? []).sorted(), id: \.self) { k in
+                        Chip(label: "\(k)  ✕", on: true, tint: d == .genres ? Catalog.color(forGenre: k) : Theme.accent) { togglePick(d, k) }
+                            .accessibilityLabel("Stop highlighting \(k)")
+                    }
+                }
+            }
+            .padding(.horizontal, 16)
+        }
+        .scrollIndicators(.hidden)
+    }
+
+    private var showHint: String {
+        let base: String = switch show {
+        case .all: "Every title, with yours lit up."
+        case .seen: "Only titles you’ve rated."
+        case .unseen: "Only titles you haven’t rated yet."
+        }
+        let off = names ? "" : " Names are off: tap your own stars."
+        let across = picks.values.filter { !$0.isEmpty }.count > 1 ? " Highlighting titles that match every section you picked from." : ""
+        return base + off + across
+    }
+
     private var filters: some View {
         NavigationStack {
             Form {
                 Section {
-                    Picker("Look", selection: $look) {
-                        Text("Dots").tag(Look.dots)
-                        Text("Bubbles").tag(Look.bubbles)
+                    Picker("Show", selection: $show) {
+                        ForEach(Show.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
+                    .onChange(of: show) { focus = nil }
                     Toggle("Names", isOn: $names)
-                } header: { Text("Look") } footer: {
-                    Text(look == .bubbles ? "Each neighbourhood is a bubble; only your titles show." : "Every title is a dot, coloured by neighbourhood.")
-                }
-                Section("Highlight") {
-                    Picker("By", selection: $dim) {
-                        ForEach(Dimension.allCases) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .onChange(of: dim) { key = nil }
-                    ScrollView {
-                        FlowLayout {
-                            ForEach(universe, id: \.self) { k in
-                                Chip(label: k, on: key == k, tint: dim == .genres ? Catalog.color(forGenre: k) : Theme.accent) {
-                                    key = key == k ? nil : k
-                                    focus = nil
-                                }
-                            }
+                } header: { Text("Show") } footer: { Text(showHint) }
+                ForEach(Dimension.allCases) { d in
+                    Section {
+                        if universe(d).count > 24 {
+                            ScrollView { chips(d).padding(.vertical, 8) }.frame(maxHeight: 150)
+                        } else {
+                            chips(d).padding(.vertical, 8)
                         }
-                        .padding(.vertical, 6)
+                    } header: {
+                        Text((picks[d]?.count ?? 0) > 1 ? "\(d.rawValue) · any of these" : d.rawValue)
+                            .padding(.bottom, 4)
                     }
-                    .frame(maxHeight: 260)
                 }
             }
             .scrollContentBackground(.hidden)
             .navigationTitle("Map filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if key != nil { ToolbarItem(placement: .cancellationAction) { Button("Clear") { key = nil } } }
+                if anyFilter { ToolbarItem(placement: .cancellationAction) { Button("Clear all") { clearFilters() } } }
                 ToolbarItem(placement: .confirmationAction) { Button("Done") { showFilters = false } }
+            }
+        }
+    }
+
+    private func chips(_ d: Dimension) -> some View {
+        FlowLayout {
+            ForEach(universe(d), id: \.self) { k in
+                Chip(label: k, on: picks[d]?.contains(k) ?? false, tint: d == .genres ? Catalog.color(forGenre: k) : Theme.accent) {
+                    togglePick(d, k)
+                }
             }
         }
     }
@@ -518,8 +629,10 @@ struct GalaxyView: View {
         case .hood(let id):
             groupCard(label: sky.hoods[id].label, color: sky.hoods[id].color, total: sky.hoods[id].n) { _, i in sky.hoodOf[i] == id }
         case nil:
-            if let key {
-                groupCard(label: key, color: dim == .genres ? Catalog.color(forGenre: key) : Theme.accent, total: highlight?.count ?? 0) { t, _ in keys(t).contains(key) }
+            if let lit {
+                let genres = picks[.genres] ?? []
+                groupCard(label: pickName, color: genres.count == 1 && pickCount == 1 ? Catalog.color(forGenre: genres.first!) : Theme.accent,
+                          total: lit.count) { _, i in lit.contains(i) }
             }
         }
     }
@@ -537,12 +650,14 @@ struct GalaxyView: View {
             HStack(spacing: 10) {
                 Circle().fill(color).frame(width: 26, height: 26)
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(label).font(.system(size: 16, weight: .bold))
+                    Text(label).font(.system(size: 16, weight: .bold)).lineLimit(1)
                     Text("\(total.formatted()) titles · \(mine.isEmpty ? "uncharted for you" : "you’ve rated \(mine.count)")")
                         .font(.system(size: 12.5)).foregroundStyle(Theme.text2)
                 }
                 Spacer()
-                Button { focus = nil; key = nil } label: { Image(systemName: "xmark").foregroundStyle(Theme.text2) }.accessibilityLabel("Close")
+                Button {
+                    if focus == nil { self.picks = [:] } else { focus = nil }
+                } label: { Image(systemName: "xmark").foregroundStyle(Theme.text2) }.accessibilityLabel("Close")
             }
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 10) {

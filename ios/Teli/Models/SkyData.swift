@@ -68,28 +68,4 @@ final class SkyData {
     }
 
     func hood(at i: Int) -> Hood? { i < hoodOf.count && hoodOf[i] < hoods.count ? hoods[hoodOf[i]] : nil }
-
-    /// The patch under a point (the nearest whose bubble holds it).
-    func hood(under p: CGPoint) -> Hood? {
-        var best: (Hood, Double)?
-        for h in hoods {
-            for part in h.parts {
-                let d = hypot(part.x - p.x, part.y - p.y) / max(part.r, 1e-4)
-                if d < 1 && d < (best?.1 ?? .infinity) { best = (h, d) }
-            }
-        }
-        return best?.0
-    }
-
-    /// The nearest title to a point within `r`, from `candidates` if given.
-    func nearest(to p: CGPoint, within r: Double, among candidates: [Int]? = nil) -> Int? {
-        var best: (Int, Double)?
-        let check = { (i: Int) in
-            guard i < self.xs.count else { return }
-            let d = hypot(self.xs[i] - p.x, self.ys[i] - p.y)
-            if d <= r && d < (best?.1 ?? .infinity) { best = (i, d) }
-        }
-        if let c = candidates { c.forEach(check) } else { (0..<xs.count).forEach(check) }
-        return best?.0
-    }
 }

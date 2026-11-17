@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Rating } from '../types';
 import { CATALOG, ORDER } from '../lib/catalog';
-import { EXTENT, HOODS, near, patchAt, sky, type Hood } from '../lib/skymap';
+import { EXTENT, HOODS, sky, type Hood } from '../lib/skymap';
 
 /** Where to point the view: a spot and how much of the map around it to show. `key` makes a repeat request fly again. */
 export interface FlyTo { x: number; y: number; w: number; h: number; key: number }
@@ -9,6 +9,10 @@ export interface FlyTo { x: number; y: number; w: number; h: number; key: number
 const VERDICT_COLOR = { good: '#2fd393', ok: '#f8b940', bad: '#fb6b8a' };
 const LINK = 0.045; // constellation lines longer than this (in map units) aren't drawn
 const MAX_ZOOM = 140;
+const REACH = 16; // how far from a dot (in screen pixels) a tap still counts as on it
+
+/** Which titles the map shows: everything, only what you've rated, or only what you haven't. */
+export type Show = 'all' | 'seen' | 'unseen';
 const reduceMotion = () => typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 /**
@@ -41,6 +45,12 @@ function constellations(ids: number[]): [number, number][] {
 
 const FONT = '"Inter Variable", system-ui, sans-serif';
 
+/** A label's box on screen: x, y, width, height. */
+type Box = [number, number, number, number];
+const NO_BOX: Box = [0, 0, 0, 0];
+/** A title you can tap: its dot and its name's box. */
+interface Target { i: number; x: number; y: number; box: Box }
+
 /** A rounded rectangle path (canvas roundRect where there is one). */
 function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
   ctx.beginPath();
@@ -51,12 +61,16 @@ function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h:
 /**
  * The whole library as a sky of dots, coloured by neighbourhood, with your rated titles as bright
  * stars joined into constellations and your watchlist as rings. Drag to pan, pinch or scroll to
- * zoom, tap a dot to pick it. Neighbourhood names show when zoomed out, titles when zoomed in.
- * `bubbles` swaps the dots for one bubble per neighbourhood patch, so only your own titles stand
- * out (and a tap on empty space picks the bubble); `names` off hides every label.
+ * zoom. Neighbourhood names show when zoomed out, titles when zoomed in, and only named things can
+ * be tapped: a title's name (or its dot) picks it, a neighbourhood's name opens it. With `names`
+ * off, your own stars and watchlist rings are what you can tap. `show` narrows the dots to the
+ * titles you've rated (`seen`, the indices of all of them) or the ones you haven't.
  */
-export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fly, size, bottom = 0, bubbles = false, names = true, focusHood = null }: {
+export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHood, fly, size, bottom = 0, show = 'all', names = true, focusHood = null }: {
+  /** The ratings drawn as stars (already narrowed by any rating filters). */
   ratings: Map<string, Rating>;
+  /** Every title you've rated, by map index, so `show: 'unseen'` can leave them out. */
+  seen: Set<number>;
   watch: Set<string>;
   /** Only these titles stay bright; the rest fade back. */
   highlight: Set<number> | null;
@@ -67,9 +81,9 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
   size: number;
   /** Pixels at the bottom covered by a card: labels stay out of it and flights centre above it. */
   bottom?: number;
-  bubbles?: boolean;
+  show?: Show;
   names?: boolean;
-  /** In bubbles: a tap that isn't on one of your titles picks the neighbourhood under it. */
+  /** A tap on a neighbourhood's name. */
   onHood?: (h: Hood) => void;
   /** The neighbourhood whose card is open, drawn brighter. */
   focusHood?: number | null;
@@ -90,20 +104,30 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
     return HOODS.map((h) => ({ h, ids: m.get(h.id) ?? [] }));
   }, [size]);
 
-  const rated = useMemo(() => [...ratings.values()].map((r) => ({ i: ORDER.get(r.id)!, r })).filter((x) => x.i !== undefined && x.i < size), [ratings, size]);
+  const rated = useMemo(
+    () => (show === 'unseen' ? [] : [...ratings.values()].map((r) => ({ i: ORDER.get(r.id)!, r })).filter((x) => x.i !== undefined && x.i < size)),
+    [ratings, size, show],
+  );
   const links = useMemo(() => constellations(rated.map((x) => x.i)), [rated]);
-  const watched = useMemo(() => [...watch].map((id) => ORDER.get(id)).filter((i): i is number => i !== undefined && i < size), [watch, size]);
+  const watched = useMemo(
+    () => (show === 'seen' ? [] : [...watch].map((id) => ORDER.get(id)).filter((i): i is number => i !== undefined && i < size)),
+    [watch, size, show],
+  );
 
   // Everything the draw call reads, kept in a ref so pointer handlers and animation see the latest.
-  const state = useRef({ byHood, rated, links, watched, highlight, selected, bottom, bubbles, names, focusHood });
-  state.current = { byHood, rated, links, watched, highlight, selected, bottom, bubbles, names, focusHood };
+  const state = useRef({ byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, focusHood });
+  state.current = { byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, focusHood };
+  // What the last frame drew a name for, in screen pixels: these are all a tap can land on.
+  const targets = useRef<{ titles: Target[]; hoods: { h: Hood; box: Box }[] }>({ titles: [], hoods: [] });
 
   const draw = () => {
     const el = canvas.current;
     const c = cam.current;
     if (!el || !c.w || !c.s) return;
     const ctx = el.getContext('2d')!;
-    const { byHood, rated, links, watched, highlight, selected, bottom, bubbles, names, focusHood } = state.current;
+    const { byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, focusHood } = state.current;
+    const hit: typeof targets.current = { titles: [], hoods: [] };
+    targets.current = hit;
     ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0);
     ctx.clearRect(0, 0, c.w, c.h);
     const sx = (x: number) => (x - c.x) * c.s + c.w / 2;
@@ -112,83 +136,48 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
     const N = CATALOG.length;
 
     const grow = Math.min(2.2, zoom ** 0.35);
-    if (bubbles) {
-      // One bubble per patch, sized to hold most of its titles. Only highlighted titles keep a dot.
-      for (const { h } of byHood) {
-        const on = focusHood === h.id;
-        for (const p of h.parts) {
-          const x = sx(p.x);
-          const y = sy(p.y);
-          const r = Math.max(6, p.r * c.s);
-          if (x + r < 0 || y + r < 0 || x - r > c.w || y - r > c.h) continue;
-          ctx.beginPath();
-          ctx.arc(x, y, r, 0, Math.PI * 2);
-          ctx.fillStyle = `${h.color}${on ? '3a' : highlight ? '10' : '1c'}`;
-          ctx.fill();
-          ctx.lineWidth = on ? 2 : 1.2;
-          ctx.strokeStyle = `${h.color}${on ? 'd0' : highlight ? '40' : '70'}`;
-          ctx.stroke();
-        }
+    // Nebulae: a soft glow of each neighbourhood's colour, so the sky reads as regions.
+    ctx.globalCompositeOperation = 'lighter';
+    for (const { h } of byHood) {
+      for (const p of h.parts) {
+        const r = Math.sqrt(p.n) * 0.0042 * c.s;
+        const g = ctx.createRadialGradient(sx(p.x), sy(p.y), 0, sx(p.x), sy(p.y), r);
+        g.addColorStop(0, `${h.color}26`);
+        g.addColorStop(1, `${h.color}00`);
+        ctx.fillStyle = g;
+        ctx.fillRect(sx(p.x) - r, sy(p.y) - r, r * 2, r * 2);
       }
-      if (highlight) {
-        ctx.globalAlpha = 0.9;
-        for (const { h, ids } of byHood) {
-          ctx.fillStyle = h.color;
-          ctx.beginPath();
-          for (const i of ids) {
-            if (!highlight.has(i)) continue;
-            const x = sx(sky.x[i]);
-            const y = sy(sky.y[i]);
-            if (x < -4 || y < -4 || x > c.w + 4 || y > c.h + 4) continue;
-            const r = 0.9 * grow;
+    }
+    ctx.globalCompositeOperation = 'source-over';
+
+    // Dots: well-known titles a little bigger, everything grows a bit as you zoom in. Showing only
+    // what you've seen leaves the dots out (your stars are drawn below); only what you haven't
+    // skips the ones you've rated.
+    for (const { h, ids } of show === 'seen' ? [] : byHood) {
+      ctx.fillStyle = h.color;
+      for (const pass of highlight ? [0, 1] : [1]) {
+        ctx.beginPath();
+        ctx.globalAlpha = highlight ? (pass ? 0.95 : 0.08) : 0.55;
+        for (const i of ids) {
+          if (highlight && highlight.has(i) !== !!pass) continue;
+          if (show === 'unseen' && seen.has(i)) continue;
+          const x = sx(sky.x[i]);
+          const y = sy(sky.y[i]);
+          if (x < -4 || y < -4 || x > c.w + 4 || y > c.h + 4) continue;
+          const pop = 1 - i / N;
+          const r = (0.45 + 1.3 * pop * pop * pop) * grow * (highlight && pass ? 1.25 : 1);
+          // Tiny dots as squares (cheap, and they look the same); bigger ones round.
+          if (r < 1.1) ctx.fillRect(x - r, y - r, r * 2, r * 2);
+          else {
             ctx.moveTo(x + r, y);
             ctx.arc(x, y, r, 0, Math.PI * 2);
           }
-          ctx.fill();
         }
-        ctx.globalAlpha = 1;
+        ctx.fill();
+        ctx.beginPath();
       }
-    } else {
-      // Nebulae: a soft glow of each neighbourhood's colour, so the sky reads as regions.
-      ctx.globalCompositeOperation = 'lighter';
-      for (const { h } of byHood) {
-        for (const p of h.parts) {
-          const r = Math.sqrt(p.n) * 0.0042 * c.s;
-          const g = ctx.createRadialGradient(sx(p.x), sy(p.y), 0, sx(p.x), sy(p.y), r);
-          g.addColorStop(0, `${h.color}26`);
-          g.addColorStop(1, `${h.color}00`);
-          ctx.fillStyle = g;
-          ctx.fillRect(sx(p.x) - r, sy(p.y) - r, r * 2, r * 2);
-        }
-      }
-      ctx.globalCompositeOperation = 'source-over';
-
-      // Dots: well-known titles a little bigger, everything grows a bit as you zoom in.
-      for (const { h, ids } of byHood) {
-        ctx.fillStyle = h.color;
-        for (const pass of highlight ? [0, 1] : [1]) {
-          ctx.beginPath();
-          ctx.globalAlpha = highlight ? (pass ? 0.95 : 0.08) : 0.55;
-          for (const i of ids) {
-            if (highlight && highlight.has(i) !== !!pass) continue;
-            const x = sx(sky.x[i]);
-            const y = sy(sky.y[i]);
-            if (x < -4 || y < -4 || x > c.w + 4 || y > c.h + 4) continue;
-            const pop = 1 - i / N;
-            const r = (0.45 + 1.3 * pop * pop * pop) * grow * (highlight && pass ? 1.25 : 1);
-            // Tiny dots as squares (cheap, and they look the same); bigger ones round.
-            if (r < 1.1) ctx.fillRect(x - r, y - r, r * 2, r * 2);
-            else {
-              ctx.moveTo(x + r, y);
-              ctx.arc(x, y, r, 0, Math.PI * 2);
-            }
-          }
-          ctx.fill();
-          ctx.beginPath();
-        }
-      }
-      ctx.globalAlpha = 1;
     }
+    ctx.globalAlpha = 1;
 
     // Constellations, then your stars on top.
     ctx.strokeStyle = 'rgba(220, 225, 255, 0.32)';
@@ -206,17 +195,19 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
       const x = sx(sky.x[i]);
       const y = sy(sky.y[i]);
       if (x < -10 || y < -10 || x > c.w + 10 || y > c.h + 10) continue;
+      ctx.globalAlpha = highlight && !highlight.has(i) ? 0.25 : 1;
       ctx.beginPath();
       ctx.arc(x, y, 3.6 + grow * 0.6, 0, Math.PI * 2);
       ctx.stroke();
     }
+    ctx.globalAlpha = 1;
 
     for (const { i, r } of rated) {
       const x = sx(sky.x[i]);
       const y = sy(sky.y[i]);
       if (x < -12 || y < -12 || x > c.w + 12 || y > c.h + 12) continue;
       const big = r.verdict === 'good' ? 1.25 : r.verdict === 'ok' ? 1 : 0.8;
-      ctx.globalAlpha = r.verdict === 'bad' ? 0.7 : 1;
+      ctx.globalAlpha = (r.verdict === 'bad' ? 0.7 : 1) * (highlight && !highlight.has(i) ? 0.22 : 1);
       ctx.fillStyle = `${VERDICT_COLOR[r.verdict]}40`;
       ctx.beginPath();
       ctx.arc(x, y, (5 + grow) * big, 0, Math.PI * 2);
@@ -242,7 +233,11 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
       ctx.arc(sx(sky.x[selected]), sy(sky.y[selected]), 9 + grow, 0, Math.PI * 2);
       ctx.stroke();
     }
-    if (!names) return;
+    if (!names) {
+      // No names to tap, so your own stars and watchlist rings are the targets.
+      for (const i of [...rated.map((x) => x.i), ...watched]) hit.titles.push({ i, x: sx(sky.x[i]), y: sy(sky.y[i]), box: NO_BOX });
+      return;
+    }
 
     // Labels in screen space, skipping any that would overlap one already placed. Each sits on a
     // dark pill or halo so it reads over bright patches.
@@ -262,6 +257,7 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
       const text = CATALOG[selected].title;
       const w = ctx.measureText(text).width + 18;
       boxes.push([x - w / 2, y - 34, w, 24]);
+      hit.titles.push({ i: selected, x, y, box: [x - w / 2, y - 34, w, 24] });
       ctx.fillStyle = 'rgba(5, 6, 16, 0.88)';
       pill(ctx, x - w / 2, y - 34, w, 24);
       ctx.fill();
@@ -269,9 +265,8 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
       ctx.textAlign = 'center';
       ctx.fillText(text, x, y - 21.5);
     }
-    // Neighbourhood names: on the biggest patch of each, fading out as titles take over (in
-    // bubbles they stay, since there are no other titles to show).
-    const hoodAlpha = bubbles ? 1 : Math.max(0, Math.min(1, (5 - zoom) / 2.5));
+    // Neighbourhood names: on the biggest patch of each, fading out as titles take over.
+    const hoodAlpha = Math.max(0, Math.min(1, (5 - zoom) / 2.5));
     if (hoodAlpha > 0) {
       ctx.font = `650 12px ${FONT}`;
       const order = [...byHood].sort((a, b) => b.h.n - a.h.n);
@@ -281,6 +276,7 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
         const x = sx(h.x);
         const y = sy(h.y);
         if (!fits(x - w / 2, y - 12, w, 24)) continue;
+        if (hoodAlpha > 0.4) hit.hoods.push({ h, box: [x - w / 2, y - 12, w, 24] });
         ctx.globalAlpha = hoodAlpha * (highlight ? 0.6 : 1);
         ctx.fillStyle = focusHood === h.id ? 'rgba(10, 12, 30, 0.95)' : 'rgba(5, 6, 16, 0.78)';
         pill(ctx, x - w / 2, y - 12, w, 24);
@@ -300,13 +296,15 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
       }
       ctx.globalAlpha = 1;
     }
-    // Zoomed in: titles, your stars first, then the best known. In bubbles, only yours.
-    if (zoom > 3 || (bubbles && rated.length)) {
-      const titleAlpha = bubbles ? 1 : Math.min(1, (zoom - 3) / 2);
+    // Zoomed in: titles, your stars first (highlighted ones before the rest), then the best known.
+    // Showing only what you've seen, your stars are named at any zoom.
+    const onlyMine = show === 'seen';
+    if (zoom > 3 || (onlyMine && rated.length)) {
+      const titleAlpha = onlyMine ? 1 : Math.min(1, (zoom - 3) / 2);
       ctx.textAlign = 'left';
       const picks: [number, number][] = [];
-      for (const { i } of rated) picks.push([i, -1e9]);
-      if (!bubbles) {
+      for (const { i } of rated) picks.push([i, highlight && !highlight.has(i) ? -1e8 : -1e9]);
+      if (!onlyMine) {
         // Visible dots, best known first (catalog order is popularity order).
         const x0 = c.x - c.w / 2 / c.s;
         const x1 = c.x + c.w / 2 / c.s;
@@ -315,10 +313,11 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
         for (let i = 0; i < sky.n && picks.length < 600; i++) {
           if (sky.x[i] < x0 || sky.x[i] > x1 || sky.y[i] < y0 || sky.y[i] > y1) continue;
           if (highlight && !highlight.has(i)) continue;
+          if (show === 'unseen' && seen.has(i)) continue;
           picks.push([i, i]);
         }
-        picks.sort((a, b) => a[1] - b[1]);
       }
+      picks.sort((a, b) => a[1] - b[1]);
       let placed = 0;
       const ratedSet = new Set(rated.map((x) => x.i));
       for (const [i] of picks) {
@@ -330,7 +329,8 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
         const x = sx(sky.x[i]) + 8;
         const y = sy(sky.y[i]);
         if (!fits(x - 2, y - 8, w + 4, 16)) continue;
-        ctx.globalAlpha = titleAlpha * (mine ? 1 : 0.85);
+        if (titleAlpha > 0.4) hit.titles.push({ i, x: x - 8, y, box: [x - 2, y - 8, w + 4, 16] });
+        ctx.globalAlpha = titleAlpha * (mine ? 1 : 0.85) * (highlight && !highlight.has(i) ? 0.5 : 1);
         ctx.strokeStyle = 'rgba(4, 5, 14, 0.92)';
         ctx.lineWidth = 4;
         ctx.strokeText(text, x, y);
@@ -467,24 +467,20 @@ export function SkyMap({ ratings, watch, highlight, selected, onPick, onHood, fl
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 1) gesture.current.dist = 0;
     if (!was || pointers.current.size || gesture.current.moved > 8 || performance.now() - gesture.current.t > 500) return;
-    // A tap: the nearest dot within a finger's reach, favouring your own stars.
-    const c = cam.current;
+    // A tap only lands on something with a name showing: the title whose dot is within reach (the
+    // nearest, if several) or whose name it's on, else the neighbourhood whose name it's on.
     const p = local(e);
-    const wx = c.x + (p.x - c.w / 2) / c.s;
-    const wy = c.y + (p.y - c.h / 2) / c.s;
-    const hits = near(wx, wy, 18 / c.s);
-    const mine = new Set(state.current.rated.map((x) => x.i));
-    const { highlight, bubbles, watched } = state.current;
-    const pick = hits.find((i) => mine.has(i) && Math.hypot(sky.x[i] - wx, sky.y[i] - wy) < 10 / c.s)
-      ?? (bubbles
-        // Bubbles show only your titles (and highlighted ones), so only those can be tapped.
-        ? hits.find((i) => mine.has(i) || watched.includes(i) || !!highlight?.has(i))
-        : hits.find((i) => !highlight || highlight.has(i)));
-    if (pick === undefined && bubbles && onHood) {
-      const under = patchAt(wx, wy);
-      if (under) return onHood(under.hood);
+    const on = ([x, y, w, h]: Box) => w > 0 && p.x >= x - 6 && p.x <= x + w + 6 && p.y >= y - 6 && p.y <= y + h + 6;
+    let pick: number | null = null;
+    let best = Infinity;
+    for (const t of targets.current.titles) {
+      const d = Math.hypot(t.x - p.x, t.y - p.y);
+      const score = d <= REACH ? d : on(t.box) ? REACH + 1 : Infinity;
+      if (score < best) { best = score; pick = t.i; }
     }
-    onPick(pick ?? null);
+    const hood = pick === null ? targets.current.hoods.find((t) => on(t.box)) : undefined;
+    if (hood && onHood) return onHood(hood.h);
+    onPick(pick);
   };
 
   useEffect(() => {

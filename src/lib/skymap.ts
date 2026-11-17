@@ -89,52 +89,6 @@ export function syncSky() {
   sky.c = grow(sky.c, (k) => new Uint8Array(k));
   for (let i = sky.n; i < n; i++) [sky.x[i], sky.y[i], sky.c[i]] = place(CATALOG[i]);
   sky.n = n;
-  grid = null;
-}
-
-// ---- Finding the title under a tap: a coarse grid over the map ----
-const G = 160;
-let grid: number[][] | null = null;
-function buildGrid() {
-  grid = Array.from({ length: G * G }, () => []);
-  for (let i = 0; i < sky.n; i++) {
-    const gx = Math.min(G - 1, Math.max(0, Math.floor(sky.x[i] * G)));
-    const gy = Math.min(G - 1, Math.max(0, Math.floor(sky.y[i] * G)));
-    grid[gy * G + gx].push(i);
-  }
-  return grid;
-}
-
-/** The neighbourhood patch under a point (the nearest whose bubble holds it), if any. */
-export function patchAt(x: number, y: number): { hood: Hood; part: Patch } | null {
-  let best: { hood: Hood; part: Patch } | null = null;
-  let bd = Infinity;
-  for (const hood of HOODS) {
-    for (const part of hood.parts) {
-      const d = Math.hypot(part.x - x, part.y - y) / Math.max(part.r, 1e-4);
-      if (d < 1 && d < bd) [best, bd] = [{ hood, part }, d];
-    }
-  }
-  return best;
-}
-
-/** Titles within `r` (in map units) of a point, nearest first. */
-export function near(x: number, y: number, r: number): number[] {
-  const g = grid ?? buildGrid();
-  const out: [number, number][] = [];
-  const x0 = Math.max(0, Math.floor((x - r) * G));
-  const x1 = Math.min(G - 1, Math.floor((x + r) * G));
-  const y0 = Math.max(0, Math.floor((y - r) * G));
-  const y1 = Math.min(G - 1, Math.floor((y + r) * G));
-  for (let gy = y0; gy <= y1; gy++) {
-    for (let gx = x0; gx <= x1; gx++) {
-      for (const i of g[gy * G + gx]) {
-        const d = Math.hypot(sky.x[i] - x, sky.y[i] - y);
-        if (d <= r) out.push([d, i]);
-      }
-    }
-  }
-  return out.sort((a, b) => a[0] - b[0]).map(([, i]) => i);
 }
 
 /** The middle and extent of a set of titles (ignoring the farthest tenth), for flying the view to them. */

@@ -193,7 +193,7 @@ for (let it = 0; it < 25; it++) {
   if (moved < N / 1000) break;
 }
 
-// Each neighbourhood is named after what sets it apart: its most over-represented genre and theme.
+// Each neighbourhood is named after what sets it apart: its most over-represented genre.
 const genreTotal = count((t) => t.genres);
 const groups = Array.from({ length: K }, () => []);
 for (let i = 0; i < N; i++) groups[cluster[i]].push(i);
@@ -205,16 +205,12 @@ const lift = (members, keysOf, totals, minShare) => {
     .map(([k, n]) => [k, (n / members.length) / (totals.get(k) / N) * (n / members.length)])
     .sort((a, b) => b[1] - a[1]);
 };
-const FORMATS = new Set(['sitcom', 'soap opera', 'buddy', 'miniseries', 'anthology', 'sketch comedy', 'mockumentary', 'telenovela', 'procedural', 'docuseries', 'talk show', 'game show', 'web series']);
 const parts = groups.map((members) => {
   if (!members.length) return null;
-  const g = lift(members, (t) => t.genres, genreTotal, 0.3).slice(0, 2).map(([k]) => k);
-  // A theme only names a patch when a good share of it has one, and not a format word ("Western · Sitcom").
-  const theme = lift(members, (t) => t.tags.filter((k) => !FORMATS.has(k)), tagCount, 0.3)[0]?.[0];
-  const tv = members.filter((i) => catalog[i].type === 'tv').length / members.length;
-  // Genre pairs in a fixed order, so "Romance & Drama" and "Drama & Romance" are one name.
-  let label = theme ? `${g[0] ?? 'Mixed'} · ${theme[0].toUpperCase()}${theme.slice(1)}` : [...g].sort().join(' & ') || 'Mixed';
-  if (tv > 0.7 && !/series|show/i.test(label)) label += ' shows';
+  // One genre per name, and no "shows" or theme suffix: "Comedy & Western", "Comedy · Sitcom" and
+  // "Comedy shows" would all be Comedy to anyone looking, so they're all just Comedy.
+  const genre = lift(members, (t) => t.genres, genreTotal, 0.3)[0]?.[0] ?? lift(members, (t) => t.genres, genreTotal, 0)[0]?.[0] ?? 'Drama';
+  const label = genre;
   // Its spot is the middle of the densest part (median, so stragglers don't drag it off), and
   // its size how far out three quarters of its titles reach.
   const xs = members.map((i) => xy[i][0]).sort((a, b) => a - b);
@@ -222,7 +218,7 @@ const parts = groups.map((members) => {
   const x = xs[xs.length >> 1];
   const y = ys[ys.length >> 1];
   const ds = members.map((i) => Math.hypot(xy[i][0] - x, xy[i][1] - y)).sort((a, b) => a - b);
-  return { label, genre: g[0] ?? 'Drama', x, y, r: ds[Math.floor(ds.length * 0.75)], n: members.length };
+  return { label, genre, x, y, r: ds[Math.floor(ds.length * 0.75)], n: members.length };
 });
 
 // Patches with the same name are one neighbourhood, wherever they landed: its name sits on the

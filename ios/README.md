@@ -37,7 +37,7 @@ in the target's Copy Bundle Resources.
 | `Models/Version.swift` | Version number and patch notes (keep in step with `src/lib/version.ts`) |
 | `Views/ForYouView.swift` | Full-screen paging feed with Discover and pull to refresh |
 | `Views/SearchView.swift` | Search, filters, browse by genre, back to top, add a missing title |
-| `Views/GalaxyView.swift` | The map in a Canvas: pan and pinch, dots or bubbles, names on or off, highlight, Uncharted |
+| `Views/GalaxyView.swift` | The map in a Canvas: pan and pinch, seen / not seen / both, names on or off, highlights across sections, taps on names only, Uncharted |
 | `Views/ProfileView.swift` | Logbook, filters, watchlist, stats (Swift Charts), hidden titles |
 | `Views/SettingsView.swift` | Name, rating keywords editor, export / import / reset (each confirmed), version and notes |
 | `Views/RateView.swift`, `DetailView.swift`, `CrewView.swift`, `Components.swift` | Rating sheet, title page, crew (under construction), shared pieces |

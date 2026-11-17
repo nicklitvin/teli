@@ -10,6 +10,13 @@ enum Version {
     }
 
     static let notes: [Note] = [
+        Note(version: "1.7.0", date: "2026-11-17", items: [
+            "Galaxy: one neighbourhood per genre, so no more \"Comedy\" next to \"Comedy & Western\" or \"Crime\" next to \"Crime shows\"",
+            "Galaxy: show what you’ve seen, what you haven’t, or both",
+            "Galaxy: highlight several genres, decades, themes and creators at once",
+            "Galaxy: taps only pick titles and neighbourhoods whose names are showing",
+            "Galaxy: bubbles are gone; every title is a dot",
+        ]),
         Note(version: "1.6.0", date: "2026-11-17", items: [
             "The iPhone app: everything from the web app, natively",
             "Galaxy: neighbourhoods with the same name are one place now, with easier-to-read names",

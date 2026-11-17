@@ -342,7 +342,7 @@ h1, h2, h3, p { margin: 0; }
 .icon-btn.tool.on { background: var(--accent-bg); color: var(--accent-text); border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
 .search-field.slim { height: 40px; animation: fadeIn 0.2s; }
 .genre-wrap { display: flex; flex-wrap: wrap; gap: 6px; animation: fadeIn 0.2s; }
-.filter-panel { display: flex; flex-direction: column; gap: 14px; animation: fadeIn 0.2s; }
+.filter-panel { display: flex; flex-direction: column; gap: 20px; animation: fadeIn 0.2s; }
 /* Logbook stats, behind the chart button. */
 .stats-panel {
   display: flex; flex-direction: column; gap: 12px; padding: 14px; animation: fadeIn 0.2s;
@@ -389,7 +389,7 @@ h1, h2, h3, p { margin: 0; }
 .filter-head { display: flex; align-items: center; justify-content: space-between; min-height: 24px; }
 .filter-title { font-family: var(--font-display); font-size: 15px; font-weight: 650; }
 .filter-clear { color: var(--accent-text); font-size: 13px; font-weight: 600; padding: 4px 0 4px 12px; }
-.filter-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 8px; }
+.filter-label { font-size: 11px; font-weight: 700; letter-spacing: 0.06em; text-transform: uppercase; color: var(--text-3); margin-bottom: 12px; }
 
 /* ---------- For You: full-screen feed ---------- */
 .hero-card {
@@ -606,9 +606,9 @@ h1, h2, h3, p { margin: 0; }
 .patch ul { margin: 0; padding: 0 16px 14px 34px; display: grid; gap: 6px; }
 .patch li { font-size: 13px; line-height: 1.45; color: var(--text-2); }
 
-/* Galaxy look: dots or bubbles, names on or off */
+/* Galaxy filters: seen / not seen / both, names on or off */
 .look-row { display: flex; align-items: center; gap: 8px; }
-.look-row .segmented { flex: 1; }
+.sky-panel .look-row .segmented { flex: 1; }
 .look-row .chip { flex: none; height: 36px; }
 .filter-hint { font-size: 12px; color: var(--text-3); margin-top: 8px; }
 
@@ -684,7 +684,7 @@ h1, h2, h3, p { margin: 0; }
   backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
 }
 .sky-panel .segmented { flex: none; }
-.chip-scroll { max-height: 168px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
+.chip-scroll { max-height: 122px; overflow-y: auto; overscroll-behavior: contain; padding-right: 2px; }
 .sky-chips { position: absolute; z-index: 2; left: var(--gutter); right: var(--gutter); top: calc(var(--safe-top) + 60px); }
 .sky-chips .chip { background: rgba(12, 14, 34, 0.8); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); }
 .sky-bottom { position: absolute; z-index: 2; left: var(--gutter); right: var(--gutter); bottom: calc(var(--tabbar-h) + 12px); }
