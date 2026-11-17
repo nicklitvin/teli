@@ -1,16 +1,17 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
+import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import type { MediaType, Rating, Title } from '../types';
 import { BY_ID, GENRES, metaLine } from '../lib/catalog';
 import { setName, useName } from '../lib/name';
-import { NO_FILTER, TAG_LABEL, VERDICTS, VERDICT_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
+import { DEFAULT_TAGS, MAX_TAGS, MAX_TAG_LENGTH, NO_FILTER, VERDICTS, tagId, VERDICT_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
 import { normalize } from '../lib/search';
 import { emptyData, parseBackup, pendingIds, ratedCount, useStore, type Data } from '../lib/store';
+import { NOTES, VERSION } from '../lib/version';
 import { useNav } from '../nav';
 import {
-  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, RefreshIcon, SearchIcon, TrashIcon, UploadIcon, UserIcon,
+  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, PlusIcon, RefreshIcon, SearchIcon, SparklesIcon, TrashIcon, UploadIcon, UserIcon, XIcon,
 } from '../components/Icons';
 import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
-import { Cards, Empty, ListTools, Screen, TitleRow } from '../components/ui';
+import { Cards, Confirm, Empty, ListTools, Screen, TitleRow } from '../components/ui';
 
 type Pending = { kind: 'import'; data: Data; name: string } | { kind: 'reset' };
 
@@ -43,10 +44,10 @@ const shortDate = (at: number) => new Date(at).toLocaleDateString(undefined, {
 /**
  * Your logbook: movies or shows, good first or by when you rated them, with filters for your
  * verdict, would watch again, tags and genre, plus search and stats. The bookmark button beside the
- * filters swaps in your watchlist. Backups and hidden titles sit behind the gear.
+ * filters swaps in your watchlist. The gear swaps the page for Settings.
  */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
-  const { data, ratings } = useStore();
+  const { data, ratings, tagLabel } = useStore();
   const nav = useNav();
   const name = useName().trim();
   const [rf, setRf] = useState<ReviewFilter>(NO_FILTER);
@@ -94,19 +95,18 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   return (
     <Screen title="Profile" active={active} className="profile">
       <div className="profile-head">
-        <span className="avatar avatar-lg"><UserIcon size={26} /></span>
+        <span className={`avatar avatar-lg ${settings ? 'settings-avatar' : ''}`}>{settings ? <GearIcon size={24} /> : <UserIcon size={26} />}</span>
         <div>
-          <h2>{name ? `${name}’s notebook` : 'Your logbook'}</h2>
-          <p>Saved on this device</p>
+          <h2>{settings ? 'Settings' : name ? `${name}’s notebook` : 'Your logbook'}</h2>
+          <p>{settings ? `Teli ${VERSION}` : 'Saved on this device'}</p>
         </div>
-        <button className={`icon-btn ${settings ? 'on' : ''}`} onClick={() => setSettings((v) => !v)}
-          aria-expanded={settings} aria-label="Settings">
-          <GearIcon size={18} />
+        <button className={`icon-btn gear ${settings ? 'on' : ''}`} onClick={() => setSettings((v) => !v)}
+          aria-pressed={settings} aria-label={settings ? 'Close settings' : 'Settings'}>
+          {settings ? <XIcon size={18} strokeWidth={2.4} /> : <GearIcon size={18} />}
         </button>
       </div>
 
-      {settings && <Settings onHidden={() => setHiddenPage(true)} />}
-
+      {settings ? <Settings onHidden={() => setHiddenPage(true)} /> : <>
       {toReview > 0 && (
         <button className="review-banner" onClick={() => nav.openReview()}>
           <RefreshIcon size={18} />
@@ -145,7 +145,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
                 )}
                 <Cards>
                   {shown.map((x) => (
-                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!, sort !== 'verdict')}
+                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!, sort !== 'verdict', tagLabel)}
                       actions={watching ? <Unsave id={x.id} title={x.t.title} /> : undefined} />
                   ))}
                 </Cards>
@@ -166,14 +166,15 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
           body="Rate something you've watched and it'll be logged here, good ones first."
           action={<button className="primary-btn" onClick={onSearch}>Find something</button>} />
       )}
+      </>}
     </Screen>
   );
 }
 
 /** Under a rated title: what stood out (and when you rated it, when sorted by that), or a nudge when it still needs a review. */
-function ratedDetail(t: Title, r: Rating, dated: boolean) {
+function ratedDetail(t: Title, r: Rating, dated: boolean, label: (id: string) => string) {
   if (r.pending) return 'Needs a quick review';
-  const tags = r.tags.map((x) => TAG_LABEL.get(x)!);
+  const tags = r.tags.map(label);
   if (dated) return [`Rated ${shortDate(r.at)}`, ...tags].join(' · ');
   return tags.length ? [t.year, ...tags].join(' · ') : metaLine(t);
 }
@@ -190,6 +191,7 @@ function top(keys: string[], n = 3) {
  * good / ok / bad split as a ring, ratings per day over the last 30 days, and top genres and tags as bars.
  */
 function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun: string }) {
+  const { tagLabel } = useStore();
   if (!rated.length && !saved.length) return <div className="stats-panel"><p className="stats-empty">Rate a few {noun} to see your stats.</p></div>;
   const done = rated.filter((r) => !r.pending);
   const n = countVerdicts(done);
@@ -254,7 +256,7 @@ function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun:
       {tags.length > 0 && (
         <figure className="stat-chart">
           <figcaption>Tags</figcaption>
-          <Bars rows={tags.map(([t, k]) => [TAG_LABEL.get(t)!, k])} />
+          <Bars rows={tags.map(([t, k]) => [tagLabel(t), k])} />
         </figure>
       )}
       <Watchlist rated={done} saved={saved} />
@@ -355,7 +357,10 @@ function HiddenTitles({ onBack }: { onBack: () => void }) {
   );
 }
 
-/** Backups: export, import (replaces everything) and reset, each confirmed first. Also the way into hidden titles. */
+/**
+ * Settings, in place of the logbook: your name, your rating keywords, backups (import and reset
+ * ask first), hidden titles, and the version with what's new.
+ */
 function Settings({ onHidden }: { onHidden: () => void }) {
   const { data, replace } = useStore();
   const name = useName();
@@ -403,6 +408,7 @@ function Settings({ onHidden }: { onHidden: () => void }) {
 
   return (
     <div className="settings-panel">
+      <p className="panel-label">You</p>
       <div className="list settings">
         <label className="setting">
           <UserIcon size={18} />
@@ -410,6 +416,13 @@ function Settings({ onHidden }: { onHidden: () => void }) {
           <input className="setting-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Add a name"
             maxLength={40} autoComplete="nickname" enterKeyHint="done" />
         </label>
+      </div>
+
+      <p className="panel-label">Rating keywords</p>
+      <Keywords />
+
+      <p className="panel-label">Your data</p>
+      <div className="list settings">
         <button className="setting" onClick={exportData}>
           <DownloadIcon size={18} />
           <span><strong>Export backup</strong><small>Download your ratings and watchlist, or send it to your crew</small></span>
@@ -419,37 +432,147 @@ function Settings({ onHidden }: { onHidden: () => void }) {
           <span><strong>Import backup</strong><small>Replace everything here with a backup file</small></span>
           <input type="file" className="visually-hidden" onChange={pickFile} />
         </label>
-        <button className="setting danger" onClick={() => { setPending({ kind: 'reset' }); setNote(null); }}>
-          <TrashIcon size={18} />
-          <span><strong>Reset everything</strong><small>Erase all ratings, watchlist and hidden titles</small></span>
-        </button>
         <button className="setting" onClick={onHidden}>
           <EyeSlashIcon size={18} />
           <span><strong>Not interested</strong><small>{hiddenCount ? plural(hiddenCount, 'hidden title') : 'Nothing hidden'}</small></span>
           <ChevronRight size={16} className="setting-go" />
         </button>
+        <button className="setting danger" onClick={() => { setPending({ kind: 'reset' }); setNote(null); }}>
+          <TrashIcon size={18} />
+          <span><strong>Reset everything</strong><small>Erase all ratings, watchlist, hidden titles and keywords</small></span>
+        </button>
       </div>
-
-      {pending && (
-        <div className={`confirm ${pending.kind === 'reset' ? 'danger' : ''}`} role="alertdialog" aria-label="Confirm">
-          <p>
-            {pending.kind === 'import'
-              ? <>Replace your {plural(ratedCount(data), 'rating')} with {plural(ratedCount(pending.data), 'rating')} and {plural(pending.data.watchlist.length, 'watchlist title')} from <b>{pending.name}</b>?</>
-              : <>Erase {plural(ratedCount(data), 'rating')} and {plural(data.watchlist.length, 'watchlist title')}? This can't be undone.</>}
-          </p>
-          <div className="confirm-actions">
-            <button className="secondary-btn" onClick={() => setPending(null)}>Cancel</button>
-            <button className={pending.kind === 'reset' ? 'danger-btn' : 'primary-btn'} onClick={confirm}>
-              {pending.kind === 'import' ? 'Import' : 'Erase'}
-            </button>
-          </div>
-        </div>
-      )}
       {note && (
         <p className={`note ${note.error ? 'error' : ''}`} role="status">
           {!note.error && <CheckIcon size={15} />} {note.text}
         </p>
       )}
+
+      <p className="panel-label">About</p>
+      <About />
+
+      {pending?.kind === 'import' && (
+        <Confirm title="Import this backup?" confirm="Import" onConfirm={confirm} onCancel={() => setPending(null)}
+          body={<>Your {plural(ratedCount(data), 'rating')} here will be replaced with {plural(ratedCount(pending.data), 'rating')} and {plural(pending.data.watchlist.length, 'watchlist title')} from <b>{pending.name}</b>.</>} />
+      )}
+      {pending?.kind === 'reset' && (
+        <Confirm title="Reset everything?" confirm="Erase all" danger onConfirm={confirm} onCancel={() => setPending(null)}
+          body={<>This erases {[
+            ratedCount(data) && plural(ratedCount(data), 'rating'),
+            data.watchlist.length && plural(data.watchlist.length, 'watchlist title'),
+            hiddenCount && plural(hiddenCount, 'hidden title'),
+          ].filter(Boolean).concat('your keywords').join(', ').replace(/, ([^,]*)$/, ' and $1')} from this device. <b>It can’t be undone.</b> Export a backup first if you might want them back.</>} />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Your rating keywords: rename one in place, remove it, or add your own, up to MAX_TAGS. Ratings
+ * keep a keyword you remove (it just stops being offered), and renaming one renames it everywhere.
+ */
+function Keywords() {
+  const { data, tags, setTags } = useStore();
+  const [draft, setDraft] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const uses = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const r of Object.values(data.reviews)) for (const t of r.tags) m.set(t, (m.get(t) ?? 0) + 1);
+    return m;
+  }, [data.reviews]);
+  const isDefault = tags.length === DEFAULT_TAGS.length && tags.every((t, i) => t.id === DEFAULT_TAGS[i].id && t.label === DEFAULT_TAGS[i].label);
+  const full = tags.length >= MAX_TAGS;
+
+  /** What's wrong with this label, if anything (`self` is the keyword being renamed). */
+  const problem = (label: string, self?: string) => {
+    if (!label) return 'Type a keyword first.';
+    if (!tagId(label)) return 'Use at least one letter or number.';
+    const twin = tags.find((t) => t.id !== self && (t.label.toLowerCase() === label.toLowerCase() || t.id === tagId(label)));
+    return twin ? `You already have “${twin.label}”.` : null;
+  };
+
+  const rename = (id: string, raw: string) => {
+    const label = raw.trim();
+    const old = tags.find((t) => t.id === id);
+    if (!old || label === old.label) return true;
+    const p = problem(label, id);
+    if (p) {
+      setError(p);
+      return false;
+    }
+    setError(null);
+    setTags(tags.map((t) => (t.id === id ? { ...t, label } : t)));
+    return true;
+  };
+
+  const add = () => {
+    const label = draft.trim();
+    if (full) return setError(`That’s the most you can have (${MAX_TAGS}). Remove one to add another.`);
+    const p = problem(label);
+    if (p) return setError(p);
+    setError(null);
+    setTags([...tags, { id: tagId(label), label }]);
+    setDraft('');
+  };
+
+  const enter = (e: KeyboardEvent<HTMLInputElement>, go: () => void) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      go();
+    }
+  };
+
+  return (
+    <div className="keywords">
+      <p className="keywords-intro">The words you can pick when you rate something. Up to {MAX_TAGS}, {MAX_TAG_LENGTH} letters each.</p>
+      <div className="list settings keyword-list">
+        {tags.map((t) => (
+          <div className="keyword" key={`${t.id}:${t.label}`}>
+            <input defaultValue={t.label} maxLength={MAX_TAG_LENGTH} aria-label={`Rename ${t.label}`} enterKeyHint="done"
+              onBlur={(e) => { if (!rename(t.id, e.target.value)) e.target.value = t.label; }}
+              onKeyDown={(e) => enter(e, () => e.currentTarget.blur())} />
+            {uses.get(t.id) ? <small aria-label={`used ${uses.get(t.id)} times`}>{uses.get(t.id)}×</small> : null}
+            <button className="icon-btn ghost" onClick={() => { setError(null); setTags(tags.filter((x) => x.id !== t.id)); }} aria-label={`Remove ${t.label}`}>
+              <XIcon size={15} />
+            </button>
+          </div>
+        ))}
+        {!tags.length && <p className="keyword-none">No keywords: rating skips “What stood out?”.</p>}
+        <div className="keyword add">
+          <input value={draft} onChange={(e) => { setDraft(e.target.value); setError(null); }} maxLength={MAX_TAG_LENGTH} enterKeyHint="done"
+            placeholder={full ? `${MAX_TAGS} of ${MAX_TAGS}: remove one to add more` : 'Add a keyword'} disabled={full} aria-label="New keyword"
+            onKeyDown={(e) => enter(e, add)} />
+          <button className="icon-btn tool" onClick={add} disabled={full || !draft.trim()} aria-label="Add keyword"><PlusIcon size={16} /></button>
+        </div>
+      </div>
+      <div className="keywords-foot">
+        <span className={error ? 'error' : ''} role={error ? 'alert' : undefined}>{error ?? `${tags.length} of ${MAX_TAGS}`}</span>
+        {!isDefault && <button className="text-btn" onClick={() => { setError(null); setTags(undefined); }}><RefreshIcon size={14} /> Restore defaults</button>}
+      </div>
+    </div>
+  );
+}
+
+/** The version, and what changed in each release (the latest open). */
+function About() {
+  const day = (d: string, long?: boolean) =>
+    new Date(`${d}T12:00`).toLocaleDateString(undefined, long ? { month: 'long', day: 'numeric', year: 'numeric' } : { month: 'short', day: 'numeric' });
+  return (
+    <div className="list settings about">
+      <div className="setting static">
+        <SparklesIcon size={18} />
+        <span><strong>Teli {VERSION}</strong><small>Updated {day(NOTES[0].date, true)}</small></span>
+      </div>
+      {NOTES.map((n, i) => (
+        <details key={n.version} className="patch" open={i === 0}>
+          <summary>
+            <strong>{i === 0 ? 'What’s new' : n.version}</strong>
+            <small>{i === 0 ? n.version : day(n.date)}</small>
+            <ChevronRight size={15} className="patch-caret" />
+          </summary>
+          <ul>{n.items.map((x) => <li key={x}>{x}</li>)}</ul>
+        </details>
+      ))}
     </div>
   );
 }

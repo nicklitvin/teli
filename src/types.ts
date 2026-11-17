@@ -17,7 +17,7 @@ export interface Title {
 /** What you thought of a title. */
 export interface Review {
   verdict: Verdict;
-  /** What stood out, as ids from `TAGS`. */
+  /** What stood out, as keyword ids (see Tag in lib/rating). */
   tags: string[];
   /** Would you watch it again? */
   again: boolean;

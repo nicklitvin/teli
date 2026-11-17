@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { Verdict } from '../types';
 import { BY_ID, metaLine } from '../lib/catalog';
-import { TAGS, VERDICTS, VERDICT_LABEL } from '../lib/rating';
+import { VERDICTS, VERDICT_LABEL } from '../lib/rating';
 import { pendingIds, useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { CheckIcon, MehIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
@@ -75,17 +75,19 @@ function RatePage({ id, progress, onDone, onSkip, onClose }: {
   onClose: () => void;
 }) {
   const t = BY_ID.get(id)!;
-  const { data, rate } = useStore();
+  const { data, rate, tags: keywords, tagLabel } = useStore();
   const prev = data.reviews[id];
   const [verdict, setVerdict] = useState<Verdict | null>(prev?.verdict ?? null);
   const [tags, setTags] = useState<string[]>(prev?.tags ?? []);
   const [again, setAgain] = useState(prev?.again ?? false);
   const last = !progress || progress.at === progress.of;
+  // Your keywords, plus any this rating already has that you've since removed from the list.
+  const choices = [...keywords, ...(prev?.tags ?? []).filter((x) => !keywords.some((k) => k.id === x)).map((id) => ({ id, label: tagLabel(id) }))];
 
   const toggleTag = (tag: string) => setTags((ts) => (ts.includes(tag) ? ts.filter((x) => x !== tag) : [...ts, tag]));
   const finish = () => {
     if (!verdict) return;
-    rate(id, { verdict, tags: TAGS.map((x) => x.id).filter((x) => tags.includes(x)), again });
+    rate(id, { verdict, tags: choices.map((x) => x.id).filter((x) => tags.includes(x)), again });
     onDone(t.title, verdict);
   };
 
@@ -117,13 +119,17 @@ function RatePage({ id, progress, onDone, onSkip, onClose }: {
           ))}
         </div>
 
-        <h3 className="rate-q">What stood out? <span>Optional</span></h3>
-        <div className="genre-wrap rate-tags" role="group" aria-label="Tags">
-          {TAGS.map((x) => (
-            <button key={x.id} className={`chip toggle tag ${tags.includes(x.id) ? 'on' : ''}`} onClick={() => toggleTag(x.id)}
-              aria-pressed={tags.includes(x.id)}>{x.label}</button>
-          ))}
-        </div>
+        {choices.length > 0 && (
+          <>
+            <h3 className="rate-q">What stood out? <span>Optional</span></h3>
+            <div className="genre-wrap rate-tags" role="group" aria-label="Tags">
+              {choices.map((x) => (
+                <button key={x.id} className={`chip toggle tag ${tags.includes(x.id) ? 'on' : ''}`} onClick={() => toggleTag(x.id)}
+                  aria-pressed={tags.includes(x.id)}>{x.label}</button>
+              ))}
+            </div>
+          </>
+        )}
 
         <label className={`again-row ${again ? 'on' : ''}`}>
           <input type="checkbox" checked={again} onChange={(e) => setAgain(e.target.checked)} />

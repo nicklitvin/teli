@@ -1,6 +1,5 @@
 import { useMemo } from 'react';
 import { BY_ID, CATALOG, GENRE_COLORS, imageSrc, isCustom, typeLabel } from '../lib/catalog';
-import { TAG_LABEL } from '../lib/rating';
 import { similarTitles } from '../lib/recommend';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
@@ -15,7 +14,7 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
   onClose: () => void;
 }) {
   const t = BY_ID.get(id)!;
-  const { data, ratings, toggleWatchlist, toggleDismissed, unrate } = useStore();
+  const { data, ratings, toggleWatchlist, toggleDismissed, unrate, tagLabel } = useStore();
   const nav = useNav();
   const r = ratings.get(id);
   const saved = data.watchlist.includes(id);
@@ -58,7 +57,7 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
             <div className="your-score-text">
               <strong>{r.pending ? 'Needs a quick review' : 'Your take'}</strong>
               <span>{r.pending ? 'Carried over from your old rankings'
-                : [r.again && 'Would watch again', ...r.tags.map((x) => TAG_LABEL.get(x))].filter(Boolean).join(' · ') || 'No tags added'}</span>
+                : [r.again && 'Would watch again', ...r.tags.map(tagLabel)].filter(Boolean).join(' · ') || 'No tags added'}</span>
             </div>
             <button className="text-btn" onClick={() => nav.openRate(id)}>{r.pending ? 'Review' : 'Edit'}</button>
           </div>

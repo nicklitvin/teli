@@ -4,18 +4,21 @@ import { CATALOG, GENRE_COLORS, ORDER, SHIPPED_COUNT } from './catalog';
 
 /**
  * The sky: every title placed so similar ones sit together (built offline by
- * scripts/build-map.mjs). Positions run 0–1 on both axes. Neighbourhoods are the clusters the
- * build found, each with a name, a colour from its main genre and a centre.
+ * scripts/build-map.mjs). Positions run 0–1 on both axes. A neighbourhood is every patch the
+ * build gave the same name, with a colour from its main genre; `x`, `y` is its biggest patch.
  */
-export interface Hood { id: number; label: string; color: string; x: number; y: number; n: number }
+export interface Patch { x: number; y: number; r: number; n: number }
+export interface Hood { id: number; label: string; color: string; x: number; y: number; n: number; parts: Patch[] }
 
-const MAP = raw as { n: number; clusters: ({ label: string; genre: string; x: number; y: number; n: number } | null)[]; points: string };
+const MAP = raw as { n: number; clusters: { label: string; genre: string; n: number; parts: [number, number, number, number][] }[]; points: string };
 const SCALE = 65535;
 /** The map lines up with the catalog by position; if they've drifted apart, there's no map until it's rebuilt. */
 export const HAS_MAP = MAP.n === SHIPPED_COUNT;
 
-export const HOODS: Hood[] = MAP.clusters.flatMap((c, id) =>
-  c ? [{ id, label: c.label, color: GENRE_COLORS[c.genre] ?? '#8C8C8C', x: c.x / SCALE, y: c.y / SCALE, n: c.n }] : []);
+export const HOODS: Hood[] = MAP.clusters.map((c, id) => {
+  const parts = c.parts.map(([x, y, r, n]) => ({ x: x / SCALE, y: y / SCALE, r: r / SCALE, n }));
+  return { id, label: c.label, color: GENRE_COLORS[c.genre] ?? '#8C8C8C', x: parts[0].x, y: parts[0].y, n: c.n, parts };
+});
 const HOOD_BY_ID = new Map(HOODS.map((h) => [h.id, h]));
 export const hoodOf = (i: number) => HOOD_BY_ID.get(sky.c[i]);
 
@@ -100,6 +103,19 @@ function buildGrid() {
     grid[gy * G + gx].push(i);
   }
   return grid;
+}
+
+/** The neighbourhood patch under a point (the nearest whose bubble holds it), if any. */
+export function patchAt(x: number, y: number): { hood: Hood; part: Patch } | null {
+  let best: { hood: Hood; part: Patch } | null = null;
+  let bd = Infinity;
+  for (const hood of HOODS) {
+    for (const part of hood.parts) {
+      const d = Math.hypot(part.x - x, part.y - y) / Math.max(part.r, 1e-4);
+      if (d < 1 && d < bd) [best, bd] = [{ hood, part }, d];
+    }
+  }
+  return best;
 }
 
 /** Titles within `r` (in map units) of a point, nearest first. */

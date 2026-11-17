@@ -1,5 +1,6 @@
 import type { Verdict } from '../types';
-import { TAGS, TAG_LABEL, VERDICTS, VERDICT_LABEL, type ReviewFilter } from '../lib/rating';
+import { VERDICTS, VERDICT_LABEL, type ReviewFilter } from '../lib/rating';
+import { useStore } from '../lib/store';
 import { XIcon } from './Icons';
 
 const COLOR: Record<Verdict, string> = { good: 'var(--liked)', ok: 'var(--fine)', bad: 'var(--disliked)' };
@@ -8,7 +9,10 @@ const toggle = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x
 
 /** Filter groups for your ratings: verdicts, would watch again, and the tags you've used (`tags`). */
 export function ReviewFilterGroups({ value, onChange, tags }: { value: ReviewFilter; onChange: (f: ReviewFilter) => void; tags: string[] }) {
-  const used = TAGS.filter((t) => tags.includes(t.id) || value.tags.includes(t.id));
+  const { tags: keywords, tagLabel } = useStore();
+  // Tags you've used, in your keyword order, then any you've since removed from the list.
+  const ids = new Set([...tags, ...value.tags]);
+  const used = [...keywords.filter((k) => ids.has(k.id)), ...[...ids].filter((id) => !keywords.some((k) => k.id === id)).map((id) => ({ id, label: tagLabel(id) }))];
   return (
     <>
       <div className="filter-group" role="group" aria-label="Rating">
@@ -45,6 +49,7 @@ export function ReviewFilterGroups({ value, onChange, tags }: { value: ReviewFil
 
 /** The active rating filters as removable chips. */
 export function ReviewFilterChips({ value, onChange }: { value: ReviewFilter; onChange: (f: ReviewFilter) => void }) {
+  const { tagLabel } = useStore();
   return (
     <>
       {value.verdicts.map((v) => (
@@ -60,9 +65,9 @@ export function ReviewFilterChips({ value, onChange }: { value: ReviewFilter; on
         </button>
       )}
       {value.tags.map((t) => (
-        <button key={t} className="chip removable" aria-label={`Remove ${TAG_LABEL.get(t)} filter`}
+        <button key={t} className="chip removable" aria-label={`Remove ${tagLabel(t)} filter`}
           onClick={() => onChange({ ...value, tags: value.tags.filter((x) => x !== t) })}>
-          {TAG_LABEL.get(t)} <XIcon size={12} strokeWidth={3} />
+          {tagLabel(t)} <XIcon size={12} strokeWidth={3} />
         </button>
       ))}
     </>

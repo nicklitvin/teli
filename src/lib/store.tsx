@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import type { Rating, Review, Title, Verdict } from '../types';
 import { BY_ID, DATA_KEY, addCustom, cleanCustom, customId, findShipped, isCustom, resolveId } from './catalog';
-import { OLD_TAGS, TAG_LABEL, VERDICTS } from './rating';
+import { DEFAULT_TAGS, OLD_TAGS, VERDICTS, cleanTags, isTagId, tagLabel, type Tag } from './rating';
 
 export interface Data {
   /** Your rating for each title you've watched. */
@@ -12,6 +12,8 @@ export interface Data {
   custom: Title[];
   /** When each title on your watchlist was saved. */
   saved: Record<string, number>;
+  /** Your rating keywords, once you've changed them in Settings (until then, the defaults). */
+  tags?: Tag[];
 }
 
 const KEY = DATA_KEY;
@@ -35,7 +37,7 @@ const without = (o: Record<string, number>, id: string) => {
  */
 export function sanitize(x: unknown): Data {
   const d = emptyData();
-  const src = (x ?? {}) as { reviews?: unknown; ranks?: unknown; watchlist?: unknown; dismissed?: unknown; custom?: unknown; saved?: unknown };
+  const src = (x ?? {}) as { reviews?: unknown; ranks?: unknown; watchlist?: unknown; dismissed?: unknown; custom?: unknown; saved?: unknown; tags?: unknown };
   if (Array.isArray(src.custom)) d.custom = addCustom(src.custom.map(cleanCustom).filter((t) => !!t));
   const add = (raw: string, r: Review) => {
     const id = resolveId(raw);
@@ -48,7 +50,7 @@ export function sanitize(x: unknown): Data {
       if (!v || !VERDICTS.includes(verdict as Verdict)) continue;
       add(id, {
         verdict: verdict!,
-        tags: Array.isArray(v.tags) ? [...new Set(v.tags.map((t) => OLD_TAGS[t] ?? t).filter((t) => typeof t === 'string' && TAG_LABEL.has(t)))] : [],
+        tags: Array.isArray(v.tags) ? [...new Set(v.tags.map((t) => OLD_TAGS[t] ?? t).filter(isTagId))] : [],
         again: v.again === true,
         at: typeof v.at === 'number' && Number.isFinite(v.at) ? v.at : 0,
         ...(v.pending === true ? { pending: true } : {}),
@@ -79,6 +81,8 @@ export function sanitize(x: unknown): Data {
     if (typeof at === 'number' && Number.isFinite(at) && d.watchlist.includes(id)) d.saved[id] = at;
   }
   d.dismissed = ids(src.dismissed);
+  const tags = cleanTags(src.tags);
+  if (tags) d.tags = tags;
   return d;
 }
 
@@ -130,6 +134,12 @@ interface Store {
   replace(d: Data): void;
   /** Adds a title the catalog doesn't have and returns its id (or the existing one's, if it's already there). */
   addTitle(t: Omit<Title, 'id' | 'tags'>): string;
+  /** Your rating keywords, in order. */
+  tags: Tag[];
+  /** Replace your keywords; undefined goes back to the defaults. */
+  setTags(tags: Tag[] | undefined): void;
+  /** A keyword's name, including ones you've since removed. */
+  tagLabel(id: string): string;
 }
 
 const Ctx = createContext<Store | null>(null);
@@ -151,6 +161,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       // Rating something off your watchlist counts as watching it from there.
       const fromList = prev.reviews[id]?.fromList ?? (prev.watchlist.includes(id) ? prev.saved[id] ?? 0 : undefined);
       return {
+        ...prev,
         reviews: {
           ...prev.reviews,
           [id]: { verdict: r.verdict, tags: r.tags, again: r.again, at: prev.reviews[id]?.at ?? Date.now(), ...(fromList !== undefined ? { fromList } : {}) },
@@ -198,11 +209,18 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     return added.id;
   }, []);
 
+  const setTags = useCallback((tags: Tag[] | undefined) => setData((prev) => {
+    const { tags: _, ...rest } = prev;
+    return tags ? { ...rest, tags: cleanTags(tags) } : rest;
+  }), []);
+
   const ratings = useMemo(() => computeRatings(data), [data]);
+  const tags = data.tags ?? DEFAULT_TAGS;
+  const label = useCallback((id: string) => tagLabel(id, tags), [tags]);
 
   const value = useMemo(
-    () => ({ data, ratings, rate, unrate, toggleWatchlist, toggleDismissed, replace: setData, addTitle }),
-    [data, ratings, rate, unrate, toggleWatchlist, toggleDismissed, addTitle],
+    () => ({ data, ratings, rate, unrate, toggleWatchlist, toggleDismissed, replace: setData, addTitle, tags, setTags, tagLabel: label }),
+    [data, ratings, rate, unrate, toggleWatchlist, toggleDismissed, addTitle, tags, setTags, label],
   );
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

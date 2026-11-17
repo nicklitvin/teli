@@ -1,4 +1,5 @@
-import { useState, type ReactNode, type Ref } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type Ref } from 'react';
+import { createPortal } from 'react-dom';
 import type { Title } from '../types';
 import { GENRE_COLORS, metaLine } from '../lib/catalog';
 import { useStore } from '../lib/store';
@@ -243,6 +244,45 @@ export function PosterCard({ t, size = 'md', caption }: { t: Title; size?: 'md' 
 
 export function Shelf({ children }: { children: ReactNode }) {
   return <div className="shelf">{children}</div>;
+}
+
+/**
+ * A centred dialog that asks before doing something (Cancel is focused first, Escape or tapping
+ * outside cancels). Drawn over everything, tab bar included.
+ */
+export function Confirm({ title, body, confirm, danger, onConfirm, onCancel }: {
+  title: string;
+  body: ReactNode;
+  confirm: string;
+  danger?: boolean;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const cancel = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    const back = document.activeElement as HTMLElement | null;
+    cancel.current?.focus();
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onCancel();
+    window.addEventListener('keydown', onKey);
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      back?.focus?.();
+    };
+  }, [onCancel]);
+  return createPortal(
+    <div className="modal-root">
+      <div className="modal-backdrop" onClick={onCancel} />
+      <div className={`modal ${danger ? 'danger' : ''}`} role="alertdialog" aria-modal="true" aria-labelledby="modal-title" aria-describedby="modal-body">
+        <h2 id="modal-title">{title}</h2>
+        <div id="modal-body" className="modal-body">{body}</div>
+        <div className="modal-actions">
+          <button ref={cancel} className="secondary-btn" onClick={onCancel}>Cancel</button>
+          <button className={danger ? 'danger-btn' : 'primary-btn'} onClick={onConfirm}>{confirm}</button>
+        </div>
+      </div>
+    </div>,
+    document.body,
+  );
 }
 
 export function Empty({ icon, title, body, action }: { icon: ReactNode; title: string; body: string; action?: ReactNode }) {

@@ -1,7 +1,8 @@
 // Lays every catalog title out on a 2D map where similar titles sit together, like Mikey
 // Guinness's movie map (mikeyguinness.com/projects/movie-map): each title becomes a vector of
 // its genres, themes, director or network, era and type; UMAP flattens those to 2D; k-means on
-// the flattened map finds neighbourhoods, each named after what its titles share.
+// the flattened map finds patches, each named after what its titles share; patches with the same
+// name make up one neighbourhood.
 //
 //   npm run map   # after `npm run catalog`; writes src/data/map.json
 //
@@ -46,7 +47,8 @@ const DECADES = Array.from({ length: 14 }, (_, i) => 1900 + i * 10);
 for (const d of DECADES) add(`d:${d}`);
 add('type:tv');
 
-const W = { g: 1.0, t: 0.75, c: 0.55, d: 0.35, type: 0.45 };
+// Era only nudges: weighted more, it splits one genre into a patch per decade.
+const W = { g: 1.0, t: 0.75, c: 0.55, d: 0.16, type: 0.45 };
 function features(t) {
   const f = new Map();
   const block = (keys, w) => {
@@ -203,24 +205,47 @@ const lift = (members, keysOf, totals, minShare) => {
     .map(([k, n]) => [k, (n / members.length) / (totals.get(k) / N) * (n / members.length)])
     .sort((a, b) => b[1] - a[1]);
 };
-const named = new Map();
-const clusters = groups.map((members) => {
+const FORMATS = new Set(['sitcom', 'soap opera', 'buddy', 'miniseries', 'anthology', 'sketch comedy', 'mockumentary', 'telenovela', 'procedural', 'docuseries', 'talk show', 'game show', 'web series']);
+const parts = groups.map((members) => {
   if (!members.length) return null;
   const g = lift(members, (t) => t.genres, genreTotal, 0.3).slice(0, 2).map(([k]) => k);
-  const theme = lift(members, (t) => t.tags, tagCount, 0.2)[0]?.[0];
+  // A theme only names a patch when a good share of it has one, and not a format word ("Western · Sitcom").
+  const theme = lift(members, (t) => t.tags.filter((k) => !FORMATS.has(k)), tagCount, 0.3)[0]?.[0];
   const tv = members.filter((i) => catalog[i].type === 'tv').length / members.length;
-  const years = members.map((i) => catalog[i].year).sort((a, b) => a - b);
-  const era = years[Math.floor(years.length / 2)];
-  let label = theme ? `${g[0] ?? 'Mixed'} · ${theme[0].toUpperCase()}${theme.slice(1)}` : g.join(' & ') || 'Mixed';
+  // Genre pairs in a fixed order, so "Romance & Drama" and "Drama & Romance" are one name.
+  let label = theme ? `${g[0] ?? 'Mixed'} · ${theme[0].toUpperCase()}${theme.slice(1)}` : [...g].sort().join(' & ') || 'Mixed';
   if (tv > 0.7 && !/series|show/i.test(label)) label += ' shows';
-  // Two neighbourhoods with the same name get told apart by era.
-  if (named.has(label)) label += ` (${Math.floor(era / 10) * 10}s)`;
-  named.set(label, true);
-  // Label sits at the middle of the densest part (median, so stragglers don't drag it off).
+  // Its spot is the middle of the densest part (median, so stragglers don't drag it off), and
+  // its size how far out three quarters of its titles reach.
   const xs = members.map((i) => xy[i][0]).sort((a, b) => a - b);
   const ys = members.map((i) => xy[i][1]).sort((a, b) => a - b);
-  return { label, genre: g[0] ?? 'Drama', x: xs[xs.length >> 1], y: ys[ys.length >> 1], n: members.length };
+  const x = xs[xs.length >> 1];
+  const y = ys[ys.length >> 1];
+  const ds = members.map((i) => Math.hypot(xy[i][0] - x, xy[i][1] - y)).sort((a, b) => a - b);
+  return { label, genre: g[0] ?? 'Drama', x, y, r: ds[Math.floor(ds.length * 0.75)], n: members.length };
 });
+
+// Patches with the same name are one neighbourhood, wherever they landed: its name sits on the
+// biggest patch, and the rest share its colour.
+const byLabel = new Map();
+const hoodOf = new Uint8Array(K);
+const clusters = [];
+parts.forEach((p, k) => {
+  if (!p) return;
+  let h = byLabel.get(p.label);
+  if (h === undefined) {
+    byLabel.set(p.label, (h = clusters.length));
+    clusters.push({ label: p.label, genre: p.genre, n: 0, parts: [] });
+  }
+  clusters[h].n += p.n;
+  clusters[h].parts.push(p);
+  hoodOf[k] = h;
+});
+for (const c of clusters) {
+  c.parts.sort((a, b) => b.n - a.n);
+  c.genre = c.parts[0].genre;
+}
+for (let i = 0; i < N; i++) cluster[i] = hoodOf[cluster[i]];
 
 // ---- Pack: x, y as 16-bit ints over the bounding box, cluster as 8-bit; base64 ----
 const xsAll = xy.map((p) => p[0]).sort((a, b) => a - b);
@@ -239,9 +264,12 @@ for (let i = 0; i < N; i++) {
 }
 const out = {
   n: N,
-  clusters: clusters.map((c) => (c ? { label: c.label, genre: c.genre, x: q(c.x, x0), y: q(c.y, y0), n: c.n } : null)),
+  clusters: clusters.map((c) => ({
+    label: c.label, genre: c.genre, n: c.n,
+    parts: c.parts.map((p) => [q(p.x, x0), q(p.y, y0), Math.round((p.r / span) * 60000), p.n]),
+  })),
   points: buf.toString('base64'),
 };
 writeFileSync(join(root, 'src/data/map.json'), JSON.stringify(out) + '\n');
-console.log(`Wrote src/data/map.json: ${K} neighbourhoods, ${(JSON.stringify(out).length / 1024).toFixed(0)} KB`);
-for (const c of clusters.filter(Boolean).sort((a, b) => b.n - a.n).slice(0, 12)) console.log(`  ${c.n}\t${c.label}`);
+console.log(`Wrote src/data/map.json: ${clusters.length} neighbourhoods from ${K} patches, ${(JSON.stringify(out).length / 1024).toFixed(0)} KB`);
+for (const c of [...clusters].sort((a, b) => b.n - a.n)) console.log(`  ${c.n}\t${c.parts.length} patch${c.parts.length > 1 ? 'es' : ''}\t${c.label}`);

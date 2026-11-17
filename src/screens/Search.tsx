@@ -5,7 +5,7 @@ import { search } from '../lib/search';
 import { useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { AddTitle } from '../components/AddTitle';
-import { BookmarkIcon, FilterIcon, PlusIcon, SearchIcon, XIcon } from '../components/Icons';
+import { ArrowUpIcon, BookmarkIcon, FilterIcon, PlusIcon, SearchIcon, XIcon } from '../components/Icons';
 import { Sheet } from '../components/Sheet';
 import { Cards, Empty, Screen, TitleRow } from '../components/ui';
 
@@ -25,6 +25,9 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
   const [panel, setPanel] = useState(false);
   const [adding, setAdding] = useState(false);
   const input = useRef<HTMLInputElement>(null);
+  const scroller = useRef<HTMLDivElement>(null);
+  // Far enough down the results that getting back up is a chore: offer a way back.
+  const [deep, setDeep] = useState(false);
   const { data, toggleWatchlist, ratings } = useStore();
   const nav = useNav();
 
@@ -112,7 +115,14 @@ export function Search({ active, focusKey }: { active: boolean; focusKey: number
   );
 
   return (
-    <Screen title="Search" active={active} className="search">
+    <Screen title="Search" active={active} className="search" scrollRef={scroller}
+      onScroll={(el) => setDeep(el.scrollTop > el.clientHeight * 1.5)}
+      dock={deep && (
+        <button className="to-top glass" aria-label="Back to top"
+          onClick={() => scroller.current?.scrollTo({ top: 0, behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' })}>
+          <ArrowUpIcon size={20} strokeWidth={2.4} />
+        </button>
+      )}>
       {top}
       {browsing ? (
         <>

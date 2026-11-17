@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Title, Verdict } from '../types';
 import { BY_ID, CATALOG, ORDER, metaLine } from '../lib/catalog';
 import { NO_FILTER, VERDICTS, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
@@ -12,6 +12,30 @@ import { Poster, VerdictBadge } from '../components/Poster';
 import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
 import { SkyMap, WHOLE_SKY, type FlyTo } from '../components/SkyMap';
 import { Screen, Segmented } from '../components/ui';
+
+type Look = 'stars' | 'bubbles';
+const LOOKS: { value: Look; label: string }[] = [
+  { value: 'stars', label: 'Dots' },
+  { value: 'bubbles', label: 'Bubbles' },
+];
+
+/** How you like the map drawn, remembered on this device. */
+function usePref<T extends string>(key: string, initial: T, ok: readonly T[]) {
+  const [v, setV] = useState<T>(() => {
+    try {
+      const s = localStorage.getItem(key) as T | null;
+      return s && ok.includes(s) ? s : initial;
+    } catch {
+      return initial;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(key, v);
+    } catch { /* private mode: just this visit */ }
+  }, [key, v]);
+  return [v, setV] as const;
+}
 
 const DIMS: { value: Dimension; label: string }[] = [
   { value: 'genres', label: 'Genres' },
@@ -35,7 +59,9 @@ type Focus = { kind: 'title'; i: number } | { kind: 'hood'; hood: Hood } | null;
 /**
  * The galaxy: every title in the library on one map, similar ones together, your ratings lit up
  * as constellations. Filters highlight a genre, theme, decade or creator, or narrow which of your
- * ratings show. Uncharted flies you to a part of the map you haven't explored that it thinks you'd like.
+ * ratings show, and set the look: every title as a dot or each neighbourhood as a bubble (so only
+ * what you've watched stands out), with or without names. Uncharted flies you to a part of the
+ * map you haven't explored that it thinks you'd like.
  */
 export function TasteMap({ active }: { active: boolean }) {
   const { data, ratings, toggleWatchlist } = useStore();
@@ -48,6 +74,8 @@ export function TasteMap({ active }: { active: boolean }) {
   const [focus, setFocus] = useState<Focus>(null);
   const [fly, setFly] = useState<FlyTo | null>(null);
   const lastHood = useRef<number | null>(null);
+  const [look, setLook] = usePref<Look>('teli:sky-look', 'stars', ['stars', 'bubbles']);
+  const [names, setNames] = usePref<'on' | 'off'>('teli:sky-names', 'on', ['on', 'off']);
   const goTo = (f: Omit<FlyTo, 'key'> | null) => f && setFly({ ...f, key: Date.now() });
 
   const usedTags = useMemo(() => [...new Set([...ratings.values()].flatMap((r) => r.tags))], [ratings]);
@@ -99,12 +127,15 @@ export function TasteMap({ active }: { active: boolean }) {
     const hood = (scored.find((x) => (r -= x.s) <= 0) ?? scored[0])?.h;
     if (!hood) return;
     lastHood.current = hood.id;
+    openHood(hood);
+  };
+
+  /** Opens a neighbourhood's card and flies to its biggest patch: close enough in to read titles, or in bubbles, the whole bubble. */
+  const openHood = (hood: Hood) => {
     setFocus({ kind: 'hood', hood });
-    const ids: number[] = [];
-    for (let i = 0; i < sky.n; i++) if (sky.c[i] === hood.id) ids.push(i);
-    // Close enough in to read titles, even for a sprawling neighbourhood.
-    const f = frame(ids);
-    goTo(f && { ...f, w: Math.min(f.w, 0.12), h: Math.min(f.h, 0.12) });
+    const p = hood.parts[0];
+    const span = look === 'bubbles' ? Math.max(0.06, p.r * 3) : Math.min(0.12, Math.max(0.03, p.r * 2.2));
+    goTo({ x: p.x, y: p.y, w: span, h: span });
   };
 
   /** Titles to try in a group: your recommendations there first, then its best-known titles you haven't rated. */
@@ -194,7 +225,9 @@ export function TasteMap({ active }: { active: boolean }) {
       {HAS_MAP ? (
         <SkyMap ratings={shownRatings} watch={watch} highlight={highlight} size={sky.n}
           selected={focus?.kind === 'title' ? focus.i : null} fly={fly} bottom={focus?.kind === 'title' ? 110 : focus || key ? 220 : 0}
-          onPick={(i) => setFocus(i === null ? (focus?.kind === 'hood' ? focus : null) : { kind: 'title', i })} />
+          bubbles={look === 'bubbles'} names={names === 'on'} focusHood={focus?.kind === 'hood' ? focus.hood.id : null}
+          onHood={(h) => setFocus({ kind: 'hood', hood: h })}
+          onPick={(i) => setFocus(i === null ? (focus?.kind === 'hood' && look !== 'bubbles' ? focus : null) : { kind: 'title', i })} />
       ) : (
         <p className="theater-empty">The map needs rebuilding: run <code>npm run map</code>.</p>
       )}
@@ -218,6 +251,15 @@ export function TasteMap({ active }: { active: boolean }) {
           <div className="filter-head">
             <p className="filter-title">Map filters</p>
             {anyFilter && <button className="filter-clear" onClick={clearAll}>Clear all</button>}
+          </div>
+          <div className="filter-group" role="group" aria-label="Look">
+            <p className="filter-label">Look</p>
+            <div className="look-row">
+              <Segmented<Look> value={look} options={LOOKS} onChange={setLook} />
+              <button className={`chip toggle ${names === 'on' ? 'on' : ''}`} onClick={() => setNames(names === 'on' ? 'off' : 'on')}
+                aria-pressed={names === 'on'}>Names</button>
+            </div>
+            <p className="filter-hint">{look === 'bubbles' ? 'Each neighbourhood is a bubble; only your titles show.' : 'Every title is a dot, coloured by neighbourhood.'}</p>
           </div>
           <div className="filter-group" role="group" aria-label="Highlight">
             <p className="filter-label">Highlight</p>

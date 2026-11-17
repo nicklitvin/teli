@@ -17,6 +17,9 @@ export const SparklesIcon = (p: P) => (
     <path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8z" fill="currentColor" stroke="none" />
   </Svg>
 );
+export const ArrowUpIcon = (p: P) => (
+  <Svg {...p}><path d="M12 19V5M5 12l7-7 7 7" /></Svg>
+);
 export const SearchIcon = (p: P) => (
   <Svg {...p}><circle cx="11" cy="11" r="7" /><path d="M20 20l-3.5-3.5" /></Svg>
 );

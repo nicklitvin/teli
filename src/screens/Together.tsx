@@ -71,6 +71,7 @@ export function Together({ active, invite }: { active: boolean; invite: string |
   return (
     // With nothing but the explainer on the page, it sits in the middle of the screen.
     <Screen title="Crew" active={active} className={!cloud.code && !enough && !group.people.length ? 'crew-alone' : ''}>
+      <p className="wip-tag"><span aria-hidden="true" />Watch together is under construction</p>
       {/* In a crew: its code up top. Not in one: join or start sits under the explainer below. */}
       {(cloud.code || enough) && <CrewBox cloud={cloud} invite={invite} />}
       {/* Who's in: shown once you've started or joined a crew. */}
