@@ -1,0 +1,43 @@
+# XcodeGen spec: `brew install xcodegen && cd ios && xcodegen` writes Teli.xcodeproj.
+# The library data is read straight from the web app's src/data, so both apps always match.
+name: Teli
+options:
+  bundleIdPrefix: com.nicklitvin
+  deploymentTarget:
+    iOS: "17.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "1.6.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  Teli:
+    type: application
+    platform: iOS
+    sources:
+      - path: Teli
+      - path: ../src/data/catalog.json
+        buildPhase: resources
+      - path: ../src/data/images.json
+        buildPhase: resources
+      - path: ../src/data/aliases.json
+        buildPhase: resources
+      - path: ../src/data/map.json
+        buildPhase: resources
+    info:
+      path: Teli/Info.plist
+      properties:
+        CFBundleDisplayName: Teli
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen:
+          UIColorName: ""
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIUserInterfaceStyle: Dark
+        ITSAppUsesNonExemptEncryption: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nicklitvin.teli
+        TARGETED_DEVICE_FAMILY: "1"
+        ENABLE_PREVIEWS: YES

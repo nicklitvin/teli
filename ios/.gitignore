@@ -1,0 +1,5 @@
+*.xcodeproj/
+Teli/Info.plist
+DerivedData/
+build/
+xcuserdata/
