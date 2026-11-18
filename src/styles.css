@@ -571,29 +571,6 @@ h1, h2, h3, p { margin: 0; }
 .profile-head .icon-btn.gear.on svg { transform: none; }
 .avatar.settings-avatar { background: var(--accent-bg); color: var(--accent-text); border: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
 
-/* Rating keywords */
-.keywords-intro { font-size: 12.5px; color: var(--text-2); line-height: 1.5; padding: 0 var(--gutter) 10px; }
-.keyword-list { display: grid; grid-template-columns: 1fr 1fr; }
-.keyword { display: flex; align-items: center; gap: 4px; padding: 2px 2px 2px 12px; min-height: 44px; min-width: 0; border-bottom: 1px solid var(--border); }
-.keyword:nth-child(odd):not(.add) { border-right: 1px solid var(--border); }
-.keyword.add { grid-column: 1 / -1; border-bottom: 0; padding-right: 6px; }
-.keyword input {
-  flex: 1; min-width: 0; height: 36px; padding: 0 10px; margin-left: -10px; border-radius: var(--r-sm);
-  font: inherit; font-size: 16px; font-weight: 550; color: var(--text); background: none; border: 1px solid transparent;
-}
-.keyword input:hover { background: var(--surface-hi); }
-.keyword input:focus { outline: none; background: var(--bg-2); border-color: var(--accent); }
-.keyword small { font-size: 12px; color: var(--text-3); font-variant-numeric: tabular-nums; }
-.keyword .icon-btn { width: 32px; height: 32px; flex: none; color: var(--text-3); }
-.keyword .icon-btn:hover { color: var(--disliked); }
-.keyword.add input { font-weight: 450; }
-.keyword.add input::placeholder { color: var(--text-3); }
-.keyword.add .icon-btn.tool { width: 34px; height: 34px; color: var(--accent-text); }
-.keyword.add .icon-btn:disabled { opacity: 0.35; cursor: default; }
-.keyword-none { grid-column: 1 / -1; padding: 14px; font-size: 13px; color: var(--text-2); border-bottom: 1px solid var(--border); }
-.keywords-foot { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 36px; padding: 4px var(--gutter) 0; font-size: 12.5px; color: var(--text-3); }
-.keywords-foot .error { color: var(--disliked); font-weight: 500; }
-.keywords-foot .text-btn { font-size: 13px; flex: none; }
 
 /* About: version and patch notes */
 .patch { border-top: 1px solid var(--border); }
@@ -608,7 +585,8 @@ h1, h2, h3, p { margin: 0; }
 
 /* Galaxy filters: seen / not seen / both, names on or off */
 .look-row { display: flex; align-items: center; gap: 8px; }
-.sky-panel .look-row .segmented { flex: 1; }
+.sky-panel .look-row { margin-top: 10px; }
+.look-row .chip:disabled { opacity: 0.4; }
 .look-row .chip { flex: none; height: 36px; }
 .filter-hint { font-size: 12px; color: var(--text-3); margin-top: 8px; }
 
@@ -854,7 +832,18 @@ h1, h2, h3, p { margin: 0; }
 .react.on .react-circle { background: var(--c); color: var(--on-glow); }
 .react:active { transform: scale(0.97); background: color-mix(in srgb, var(--c) 10%, transparent); }
 .react-label { font-size: 13px; font-weight: 600; }
-.rate-tags { margin-top: 10px; }
+/* A rating's note: a two-line box with a character count in its corner. */
+.note-field { position: relative; margin-top: 10px; }
+.note-field textarea {
+  display: block; width: 100%; resize: none; padding: 11px 14px 22px; border-radius: var(--r);
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  font: inherit; font-size: 15px; line-height: 1.4;
+}
+.note-field textarea::placeholder { color: var(--text-3); }
+.note-field textarea:focus { outline: none; border-color: var(--accent); background: var(--bg-2); }
+.note-field small { position: absolute; right: 12px; bottom: 6px; font-size: 11.5px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.note-field small.full { color: var(--fine); }
+.your-note { display: block; margin-top: 4px; font-size: 13.5px; color: var(--text); font-style: italic; line-height: 1.4; overflow-wrap: anywhere; }
 .chip.toggle.tag { --c: var(--accent); padding: 7px 13px; font-size: 13.5px; }
 .again-row {
   position: relative; display: flex; align-items: center; gap: 12px; margin-top: 18px; padding: 12px 14px; cursor: pointer;

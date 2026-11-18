@@ -1,7 +1,7 @@
 import { useState, type ReactNode } from 'react';
 import type { Verdict } from '../types';
 import { BY_ID, metaLine } from '../lib/catalog';
-import { VERDICTS, VERDICT_LABEL } from '../lib/rating';
+import { MAX_NOTE, VERDICTS, VERDICT_LABEL } from '../lib/rating';
 import { pendingIds, useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { CheckIcon, MehIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
@@ -14,7 +14,7 @@ const VERDICT_ICON: Record<Verdict, ReactNode> = {
 };
 
 /**
- * Rating on one page: good, ok or bad, optional tags for what stood out, and whether you'd watch
+ * Rating on one page: good, ok or bad, an optional short note, and whether you'd watch
  * it again, then Finish. Given several `ids` it walks through them in turn (reviewing titles carried
  * over from the old rankings), and `intro` first explains why.
  */
@@ -42,7 +42,7 @@ export function RateFlow({ ids, intro = false, onClose }: { ids: string[]; intro
         <div className="rate-step rate-intro fade-in">
           <span className="intro-icon"><StarIcon size={30} /></span>
           <h2 className="rate-title">Rating got simpler</h2>
-          <p>No more ranking titles against each other. Now you say whether it was good, ok or bad, add a few tags if you like, and tick whether you’d watch it again.</p>
+          <p>No more ranking titles against each other. Now you say whether it was good, ok or bad, jot a short note if you like, and tick whether you’d watch it again.</p>
           <p>Take a quick pass over your {ids.length === 1 ? 'title' : `${ids.length} titles`} to bring {ids.length === 1 ? 'it' : 'them'} over. Until then they keep the verdict they had.</p>
         </div>
         <div className="rate-foot">
@@ -75,19 +75,16 @@ function RatePage({ id, progress, onDone, onSkip, onClose }: {
   onClose: () => void;
 }) {
   const t = BY_ID.get(id)!;
-  const { data, rate, tags: keywords, tagLabel } = useStore();
+  const { data, rate } = useStore();
   const prev = data.reviews[id];
   const [verdict, setVerdict] = useState<Verdict | null>(prev?.verdict ?? null);
-  const [tags, setTags] = useState<string[]>(prev?.tags ?? []);
+  const [note, setNote] = useState(prev?.note ?? '');
   const [again, setAgain] = useState(prev?.again ?? false);
   const last = !progress || progress.at === progress.of;
-  // Your keywords, plus any this rating already has that you've since removed from the list.
-  const choices = [...keywords, ...(prev?.tags ?? []).filter((x) => !keywords.some((k) => k.id === x)).map((id) => ({ id, label: tagLabel(id) }))];
 
-  const toggleTag = (tag: string) => setTags((ts) => (ts.includes(tag) ? ts.filter((x) => x !== tag) : [...ts, tag]));
   const finish = () => {
     if (!verdict) return;
-    rate(id, { verdict, tags: choices.map((x) => x.id).filter((x) => tags.includes(x)), again });
+    rate(id, { verdict, note, again });
     onDone(t.title, verdict);
   };
 
@@ -119,17 +116,13 @@ function RatePage({ id, progress, onDone, onSkip, onClose }: {
           ))}
         </div>
 
-        {choices.length > 0 && (
-          <>
-            <h3 className="rate-q">What stood out? <span>Optional</span></h3>
-            <div className="genre-wrap rate-tags" role="group" aria-label="Tags">
-              {choices.map((x) => (
-                <button key={x.id} className={`chip toggle tag ${tags.includes(x.id) ? 'on' : ''}`} onClick={() => toggleTag(x.id)}
-                  aria-pressed={tags.includes(x.id)}>{x.label}</button>
-              ))}
-            </div>
-          </>
-        )}
+        <label className="rate-q" htmlFor={`note-${id}`}>A note <span>Optional</span></label>
+        <div className="note-field">
+          <textarea id={`note-${id}`} value={note} maxLength={MAX_NOTE} rows={2} placeholder="What stuck with you?"
+            onChange={(e) => setNote(e.target.value.replace(/\n/g, ' '))} enterKeyHint="done"
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); e.currentTarget.blur(); } }} />
+          <small className={note.length >= MAX_NOTE ? 'full' : ''} aria-live="polite">{note.length}/{MAX_NOTE}</small>
+        </div>
 
         <label className={`again-row ${again ? 'on' : ''}`}>
           <input type="checkbox" checked={again} onChange={(e) => setAgain(e.target.checked)} />

@@ -8,7 +8,8 @@
 //
 // The output lines up with src/data/catalog.json by position, so rebuild it whenever the catalog
 // changes (the app checks the count and leaves the map empty if they disagree).
-import { readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { UMAP } from 'umap-js';
@@ -80,96 +81,132 @@ const vectors = catalog.map((t) => {
 });
 console.log(`${N} titles, ${index.size} features → ${D} dims`);
 
-// ---- UMAP to 2D ----
-const t0 = Date.now();
-const umap = new UMAP({ nComponents: 2, nNeighbors: 18, minDist: 0.35, spread: 1.4, random: rand });
-const epochs = umap.initializeFit(vectors);
-for (let e = 0; e < epochs; e++) {
-  umap.step();
-  if (e % 100 === 0) console.log(`  umap epoch ${e}/${epochs} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
-}
-const xy = umap.getEmbedding();
-console.log(`umap done in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
-
-// Stand the map up: turn it so its long side runs top to bottom, to suit a phone screen.
-{
-  const mx = xy.reduce((a, p) => a + p[0], 0) / N;
-  const my = xy.reduce((a, p) => a + p[1], 0) / N;
-  let sxx = 0, syy = 0, sxy = 0;
-  for (const [x, y] of xy) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
-  const long = 0.5 * Math.atan2(2 * sxy, sxx - syy); // angle of the long axis
-  const turn = Math.PI / 2 - long;
-  const [c, s] = [Math.cos(turn), Math.sin(turn)];
-  for (const p of xy) {
-    const [x, y] = [p[0] - mx, p[1] - my];
-    p[0] = x * c - y * s;
-    p[1] = x * s + y * c;
+// ---- Layout: UMAP to 2D, stood up and nudged apart. Cached by catalog and weights, since it's the
+// slow part (about a minute) and naming the neighbourhoods doesn't need it redone. ----
+const cacheFile = join(root, 'node_modules/.cache/teli-map-layout.json');
+const layoutKey = createHash('sha1').update(JSON.stringify(catalog)).update(JSON.stringify(W)).digest('hex');
+function layout() {
+  // ---- UMAP to 2D ----
+  const t0 = Date.now();
+  const umap = new UMAP({ nComponents: 2, nNeighbors: 18, minDist: 0.35, spread: 1.4, random: rand });
+  const epochs = umap.initializeFit(vectors);
+  for (let e = 0; e < epochs; e++) {
+    umap.step();
+    if (e % 100 === 0) console.log(`  umap epoch ${e}/${epochs} (${((Date.now() - t0) / 1000).toFixed(0)}s)`);
   }
-}
+  const xy = umap.getEmbedding();
+  console.log(`umap done in ${((Date.now() - t0) / 1000).toFixed(0)}s`);
 
-// Titles with near-identical features land on top of each other. Nudge apart anything closer
-// than a dot's width, a few rounds over a grid, so tight clumps open up into readable patches.
-{
-  const xs0 = xy.map((p) => p[0]).sort((a, b) => a - b);
-  const ys0 = xy.map((p) => p[1]).sort((a, b) => a - b);
-  const span0 = Math.max(xs0[Math.floor(N * 0.998)] - xs0[Math.floor(N * 0.002)], ys0[Math.floor(N * 0.998)] - ys0[Math.floor(N * 0.002)]);
-  const gap = span0 * 0.0032;
-  for (let round = 0; round < 40; round++) {
-    const cells = new Map();
-    const cell = (x, y) => `${Math.floor(x / gap)},${Math.floor(y / gap)}`;
-    xy.forEach((p, i) => {
-      const k = cell(p[0], p[1]);
-      if (!cells.has(k)) cells.set(k, []);
-      cells.get(k).push(i);
-    });
-    let moved = 0;
-    for (let i = 0; i < N; i++) {
-      const [x, y] = xy[i];
-      const cx = Math.floor(x / gap);
-      const cy = Math.floor(y / gap);
-      for (let dx = -1; dx <= 1; dx++) {
-        for (let dy = -1; dy <= 1; dy++) {
-          for (const j of cells.get(`${cx + dx},${cy + dy}`) ?? []) {
-            if (j <= i) continue;
-            let ddx = xy[j][0] - xy[i][0];
-            let ddy = xy[j][1] - xy[i][1];
-            let d = Math.hypot(ddx, ddy);
-            if (d >= gap) continue;
-            if (d < 1e-9) { const a = rand() * Math.PI * 2; ddx = Math.cos(a); ddy = Math.sin(a); d = 1; }
-            const push = ((gap - Math.min(d, gap)) / 2) * 0.5;
-            const ux = ddx / d;
-            const uy = ddy / d;
-            xy[i][0] -= ux * push; xy[i][1] -= uy * push;
-            xy[j][0] += ux * push; xy[j][1] += uy * push;
-            moved++;
+  // Stand the map up: turn it so its long side runs top to bottom, to suit a phone screen.
+  {
+    const mx = xy.reduce((a, p) => a + p[0], 0) / N;
+    const my = xy.reduce((a, p) => a + p[1], 0) / N;
+    let sxx = 0, syy = 0, sxy = 0;
+    for (const [x, y] of xy) { sxx += (x - mx) ** 2; syy += (y - my) ** 2; sxy += (x - mx) * (y - my); }
+    const long = 0.5 * Math.atan2(2 * sxy, sxx - syy); // angle of the long axis
+    const turn = Math.PI / 2 - long;
+    const [c, s] = [Math.cos(turn), Math.sin(turn)];
+    for (const p of xy) {
+      const [x, y] = [p[0] - mx, p[1] - my];
+      p[0] = x * c - y * s;
+      p[1] = x * s + y * c;
+    }
+  }
+
+  // Titles with near-identical features land on top of each other. Nudge apart anything closer
+  // than a dot's width, a few rounds over a grid, so tight clumps open up into readable patches.
+  {
+    const xs0 = xy.map((p) => p[0]).sort((a, b) => a - b);
+    const ys0 = xy.map((p) => p[1]).sort((a, b) => a - b);
+    const span0 = Math.max(xs0[Math.floor(N * 0.998)] - xs0[Math.floor(N * 0.002)], ys0[Math.floor(N * 0.998)] - ys0[Math.floor(N * 0.002)]);
+    const gap = span0 * 0.0032;
+    for (let round = 0; round < 40; round++) {
+      const cells = new Map();
+      const cell = (x, y) => `${Math.floor(x / gap)},${Math.floor(y / gap)}`;
+      xy.forEach((p, i) => {
+        const k = cell(p[0], p[1]);
+        if (!cells.has(k)) cells.set(k, []);
+        cells.get(k).push(i);
+      });
+      let moved = 0;
+      for (let i = 0; i < N; i++) {
+        const [x, y] = xy[i];
+        const cx = Math.floor(x / gap);
+        const cy = Math.floor(y / gap);
+        for (let dx = -1; dx <= 1; dx++) {
+          for (let dy = -1; dy <= 1; dy++) {
+            for (const j of cells.get(`${cx + dx},${cy + dy}`) ?? []) {
+              if (j <= i) continue;
+              let ddx = xy[j][0] - xy[i][0];
+              let ddy = xy[j][1] - xy[i][1];
+              let d = Math.hypot(ddx, ddy);
+              if (d >= gap) continue;
+              if (d < 1e-9) { const a = rand() * Math.PI * 2; ddx = Math.cos(a); ddy = Math.sin(a); d = 1; }
+              const push = ((gap - Math.min(d, gap)) / 2) * 0.5;
+              const ux = ddx / d;
+              const uy = ddy / d;
+              xy[i][0] -= ux * push; xy[i][1] -= uy * push;
+              xy[j][0] += ux * push; xy[j][1] += uy * push;
+              moved++;
+            }
           }
         }
       }
+      if (moved < N / 200) break;
     }
-    if (moved < N / 200) break;
   }
+  return xy;
 }
+let xy;
+try {
+  const c = JSON.parse(readFileSync(cacheFile, 'utf8'));
+  if (c.key === layoutKey) xy = c.xy;
+} catch { /* no cache yet */ }
+if (xy) console.log('layout from cache (delete node_modules/.cache/teli-map-layout.json to redo it)');
+else {
+  xy = layout();
+  mkdirSync(dirname(cacheFile), { recursive: true });
+  writeFileSync(cacheFile, JSON.stringify({ key: layoutKey, xy: xy.map(([x, y]) => [x, y]) }));
+}
+// Its own seed from here, so the patches come out the same whether or not the layout was cached.
+seed = 20261118;
 
 // ---- Neighbourhoods: k-means on the map itself, so each one is a patch you can see ----
-const K = Math.round(Math.sqrt(N / 10));
+// Small patches, so one doesn't straddle two islands (a horror island named after the documentaries next to it).
+const K = Math.round(Math.sqrt(N / 10) * 2.5);
+// Clustered on position plus a little of each title's genres, so where a slasher island touches a
+// western one the patch boundary falls between them instead of across both.
+const GENRE_PULL = Number(process.env.GENRE_PULL ?? 0.07);
+const spanXY = (() => {
+  const xs = xy.map((p) => p[0]).sort((a, b) => a - b);
+  const ys = xy.map((p) => p[1]).sort((a, b) => a - b);
+  return Math.max(xs[Math.floor(N * 0.99)] - xs[Math.floor(N * 0.01)], ys[Math.floor(N * 0.99)] - ys[Math.floor(N * 0.01)]);
+})();
+const pts = xy.map(([x, y], i) => {
+  const v = [x, y];
+  const gs = catalog[i].genres;
+  for (const g of genreList) v.push(gs.includes(g) ? (spanXY * GENRE_PULL) / Math.sqrt(gs.length) : 0);
+  return v;
+});
+const DIM = pts[0].length;
 const dist2 = (a, b) => {
   let s = 0;
-  for (let j = 0; j < 2; j++) s += (a[j] - b[j]) ** 2;
+  for (let j = 0; j < DIM; j++) s += (a[j] - b[j]) ** 2;
   return s;
 };
 // k-means++ start
-const cents = [xy[Math.floor(rand() * N)].slice()];
+const cents = [pts[Math.floor(rand() * N)].slice()];
 const best = new Float64Array(N).fill(Infinity);
 while (cents.length < K) {
   let total = 0;
   for (let i = 0; i < N; i++) {
-    best[i] = Math.min(best[i], dist2(xy[i], cents[cents.length - 1]));
+    best[i] = Math.min(best[i], dist2(pts[i], cents[cents.length - 1]));
     total += best[i];
   }
   let r = rand() * total;
   let i = 0;
   for (; i < N - 1 && r > best[i]; i++) r -= best[i];
-  cents.push(xy[i].slice());
+  cents.push(pts[i].slice());
 }
 const cluster = new Uint16Array(N);
 for (let it = 0; it < 25; it++) {
@@ -178,16 +215,16 @@ for (let it = 0; it < 25; it++) {
     let bi = 0;
     let bd = Infinity;
     for (let c = 0; c < K; c++) {
-      const d = dist2(xy[i], cents[c]);
+      const d = dist2(pts[i], cents[c]);
       if (d < bd) { bd = d; bi = c; }
     }
     if (cluster[i] !== bi) { cluster[i] = bi; moved++; }
   }
-  const sums = Array.from({ length: K }, () => new Float64Array(2));
+  const sums = Array.from({ length: K }, () => new Float64Array(DIM));
   const ns = new Uint32Array(K);
   for (let i = 0; i < N; i++) {
     ns[cluster[i]]++;
-    for (let j = 0; j < 2; j++) sums[cluster[i]][j] += xy[i][j];
+    for (let j = 0; j < DIM; j++) sums[cluster[i]][j] += pts[i][j];
   }
   for (let c = 0; c < K; c++) if (ns[c]) cents[c] = Array.from(sums[c], (s) => s / ns[c]);
   if (moved < N / 1000) break;
@@ -205,11 +242,22 @@ const lift = (members, keysOf, totals, minShare) => {
     .map(([k, n]) => [k, (n / members.length) / (totals.get(k) / N) * (n / members.length)])
     .sort((a, b) => b[1] - a[1]);
 };
+// A patch's genre: the one most of it shares, nudged towards rarer genres (so a patch that's all
+// drama-and-crime is Crime), but never one only a minority has over one nearly all of it has.
+function named(members) {
+  const m = new Map();
+  for (const i of members) for (const g of catalog[i].genres) m.set(g, (m.get(g) ?? 0) + 1);
+  const scored = [...m].map(([g, n]) => {
+    const share = n / members.length;
+    return [g, share * share * Math.sqrt(N / genreTotal.get(g))];
+  });
+  return scored.sort((a, b) => b[1] - a[1])[0]?.[0] ?? 'Drama';
+}
 const parts = groups.map((members) => {
   if (!members.length) return null;
   // One genre per name, and no "shows" or theme suffix: "Comedy & Western", "Comedy · Sitcom" and
   // "Comedy shows" would all be Comedy to anyone looking, so they're all just Comedy.
-  const genre = lift(members, (t) => t.genres, genreTotal, 0.3)[0]?.[0] ?? lift(members, (t) => t.genres, genreTotal, 0)[0]?.[0] ?? 'Drama';
+  const genre = named(members);
   const label = genre;
   // Its spot is the middle of the densest part (median, so stragglers don't drag it off), and
   // its size how far out three quarters of its titles reach.
@@ -242,6 +290,28 @@ for (const c of clusters) {
   c.genre = c.parts[0].genre;
 }
 for (let i = 0; i < N; i++) cluster[i] = hoodOf[cluster[i]];
+
+// A title in a patch named after a genre it doesn't have (a horror film on the edge of a western
+// patch) joins the nearest patch of one of its own genres, if one is close by.
+let rehomed = 0;
+for (let i = 0; i < N; i++) {
+  const t = catalog[i];
+  if (t.genres.includes(clusters[cluster[i]].label)) continue;
+  let best = -1;
+  let bd = 2.5; // in patch radii
+  clusters.forEach((c, h) => {
+    if (!t.genres.includes(c.label)) return;
+    for (const p of c.parts) {
+      const d = Math.hypot(xy[i][0] - p.x, xy[i][1] - p.y) / p.r;
+      if (d < bd) [bd, best] = [d, h];
+    }
+  });
+  if (best >= 0) [cluster[i], rehomed] = [best, rehomed + 1];
+}
+for (const c of clusters) c.n = 0;
+for (let i = 0; i < N; i++) clusters[cluster[i]].n++;
+const fit = catalog.filter((t, i) => t.genres.includes(clusters[cluster[i]].label)).length;
+console.log(`${rehomed} titles moved to a nearby neighbourhood of their own genre; ${((fit / N) * 100).toFixed(1)}% now sit in one of their genres`);
 
 // ---- Pack: x, y as 16-bit ints over the bounding box, cluster as 8-bit; base64 ----
 const xsAll = xy.map((p) => p[0]).sort((a, b) => a - b);

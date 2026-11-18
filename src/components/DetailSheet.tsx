@@ -7,6 +7,8 @@ import { BookmarkIcon, ChevronLeft, EyeSlashIcon, StarIcon, TrashIcon, XIcon } f
 import { POSTER_PX, Poster, VerdictBadge, posterArt } from './Poster';
 import { PosterCard, SectionHeader, Shelf } from './ui';
 
+const VERDICT_WORD = { good: 'You liked it', ok: 'It was ok', bad: 'Not for you' } as const;
+
 export function DetailSheet({ id, canGoBack, onBack, onClose }: {
   id: string;
   canGoBack: boolean;
@@ -14,7 +16,7 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
   onClose: () => void;
 }) {
   const t = BY_ID.get(id)!;
-  const { data, ratings, toggleWatchlist, toggleDismissed, unrate, tagLabel } = useStore();
+  const { data, ratings, toggleWatchlist, toggleDismissed, unrate } = useStore();
   const nav = useNav();
   const r = ratings.get(id);
   const saved = data.watchlist.includes(id);
@@ -56,8 +58,8 @@ export function DetailSheet({ id, canGoBack, onBack, onClose }: {
             <VerdictBadge rating={r} size="lg" />
             <div className="your-score-text">
               <strong>{r.pending ? 'Needs a quick review' : 'Your take'}</strong>
-              <span>{r.pending ? 'Carried over from your old rankings'
-                : [r.again && 'Would watch again', ...r.tags.map(tagLabel)].filter(Boolean).join(' · ') || 'No tags added'}</span>
+              <span>{r.pending ? 'Carried over from your old rankings' : r.again ? 'Would watch again' : VERDICT_WORD[r.verdict]}</span>
+              {!r.pending && r.note && <q className="your-note">{r.note}</q>}
             </div>
             <button className="text-btn" onClick={() => nav.openRate(id)}>{r.pending ? 'Review' : 'Edit'}</button>
           </div>

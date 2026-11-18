@@ -17,8 +17,8 @@ export interface Title {
 /** What you thought of a title. */
 export interface Review {
   verdict: Verdict;
-  /** What stood out, as keyword ids (see Tag in lib/rating). */
-  tags: string[];
+  /** A short note about it, up to MAX_NOTE characters (lib/rating). */
+  note?: string;
   /** Would you watch it again? */
   again: boolean;
   /** When you first logged it (ms since epoch). */

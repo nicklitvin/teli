@@ -6,11 +6,39 @@ import { UNIVERSE } from './taste';
 /*
  * Content-based recommender. Each title becomes a weighted feature vector
  * (genres, tags, director/network, type, decade) and similarity is cosine.
- * A candidate's score is the sum of its similarity to everything you've rated,
- * weighted by your verdict (good pulls it up, bad pushes it down, and would-watch-again counts extra).
+ * A candidate's score comes from its similarity to what you've rated, weighted by your verdict
+ * (good pulls it up, bad pushes it down, and would-watch-again counts extra). Agreeing ratings add
+ * up with diminishing returns: the closest one counts in full, the next half, the next a quarter,
+ * so liking five Marvel films doesn't make every Marvel film outscore everything else.
  */
 
 const W = { genre: 1, tag: 1.6, creator: 2.2, type: 0.6, decade: 0.4 };
+
+/** The catalog spells some themes more than one way ("mcu" and "Marvel Cinematic Universe", "Paris" and "paris"). */
+const TAG_ALIAS: Record<string, string> = { 'marvel cinematic universe': 'mcu', 'dc extended universe': 'dc' };
+const tagKey = (tag: string) => {
+  const k = tag.toLowerCase().replace(/-/g, ' ');
+  return TAG_ALIAS[k] ?? k;
+};
+/** How many titles have each theme: a rare one (a franchise, a character) ties titles together. */
+let tagCounts: Map<string, number> | null = null;
+const tagCount = (k: string) => {
+  if (!tagCounts) {
+    tagCounts = new Map();
+    for (const t of CATALOG) for (const x of new Set(t.tags.map(tagKey))) tagCounts.set(x, (tagCounts.get(x) ?? 0) + 1);
+  }
+  return tagCounts.get(k) ?? 0;
+};
+
+/** Close enough that hiding one should keep the other away for a while: alike overall, or sharing a rare theme. */
+export function related(a: Title, b: Title): boolean {
+  if (similarity(a, b) >= 0.35) return true;
+  const ka = new Set(a.tags.map(tagKey));
+  return b.tags.some((x) => {
+    const k = tagKey(x);
+    return ka.has(k) && tagCount(k) <= 60;
+  });
+}
 
 interface Vec {
   w: Map<string, number>;
@@ -23,7 +51,7 @@ function vec(t: Title): Vec {
   if (v) return v;
   const w = new Map<string, number>();
   for (const g of t.genres) w.set('g:' + g, W.genre);
-  for (const tag of t.tags) w.set('t:' + tag, W.tag);
+  for (const tag of t.tags) w.set('t:' + tagKey(tag), W.tag);
   if (t.creator) w.set('c:' + t.creator, W.creator);
   w.set('type:' + t.type, W.type);
   w.set('d:' + Math.floor(t.year / 10), W.decade);
@@ -117,6 +145,8 @@ function score(ratings: Map<string, Rating>, dismissed: Set<string>): Rec[] {
   const N = CATALOG.length;
   const scale = Math.sqrt(rated.length);
   const total = new Float64Array(N);
+  // Each title's three biggest pulls from titles you liked, biggest first.
+  const top = new Float64Array(N * 3);
   const best = new Float64Array(N);
   const because = new Int32Array(N).fill(-1);
   const dot = new Float64Array(N);
@@ -138,7 +168,11 @@ function score(ratings: Map<string, Rating>, dismissed: Set<string>): Rec[] {
       dot[i] = 0;
       if (s < 0.15) continue;
       const c = s * s * r.w;
-      total[i] += c;
+      if (c > 0) {
+        let k = i * 3;
+        let x = c;
+        for (let j = 0; j < 3; j++, k++) if (x > top[k]) [top[k], x] = [x, top[k]];
+      } else total[i] += c;
       if (r.good && c > best[i]) {
         best[i] = c;
         because[i] = ri;
@@ -149,6 +183,7 @@ function score(ratings: Map<string, Rating>, dismissed: Set<string>): Rec[] {
 
   const out: Rec[] = [];
   for (let i = 0; i < N; i++) {
+    total[i] += top[i * 3] + 0.5 * top[i * 3 + 1] + 0.25 * top[i * 3 + 2];
     if (total[i] <= 0) continue;
     const t = CATALOG[i];
     if (ratings.has(t.id) || dismissed.has(t.id)) continue;
@@ -176,44 +211,66 @@ export const newSeed = () => Math.floor(Math.random() * 2 ** 32);
  */
 const gumbel = (seed: number, id: string) => -Math.log(-Math.log(Math.min(1 - 1e-12, Math.max(1e-12, jitter(seed, id)))));
 
-const MIX = 200;
+const MIX = 300;
 /** Titles from your last few feeds are five times less likely to come up again soon. */
 const SEEN = Math.log(0.2);
+/** Two titles this alike (same franchise, same director and kind of film) count as more of the same. */
+const ALIKE = 0.45;
+/** Each title already in the feed that's alike makes the next one this much less likely. */
+const REPEAT = Math.log(0.35);
+/** The first page of a feed: titles like ones you just said you're not interested in stay out of it. */
+export const FIRST_PAGE = 8;
 
 /**
  * Your picks in a new order for each seed. Each next card is drawn at random with odds that grow
- * with the cube of its score, so strong matches lead most feeds without always being the same
- * ones. Titles in `seen` (shown in recent feeds) sit lower, and titles picked because of the same
- * favorite, by the same director or network, or sharing a main genre with the last few shown are
- * pushed back so the feed keeps changing subject.
+ * with the square of its score, so strong matches lead most feeds without always being the same
+ * ones. Titles in `seen` (shown in recent feeds) sit lower. To keep the feed varied, a title alike
+ * to ones already in it (or picked because of the same favorite, by the same director or network,
+ * or sharing a main genre with the last few shown) is pushed back. Titles alike to any in `avoid`
+ * (ones you marked not interested, most recent first) stay out of the next page of cards and sit
+ * lower after it. `start` is the feed so far, kept as it is (the cards you've already scrolled past).
  */
-export function shuffle(recs: Rec[], seed: number, seen: Set<string> = new Set()): Rec[] {
+export function shuffle(recs: Rec[], seed: number, seen: Set<string> = new Set(), avoid: string[] = [], start: Rec[] = []): Rec[] {
   const max = recs[0]?.score || 1;
-  const left = recs.slice(0, MIX).map((r) => ({
+  const kept = new Set(start.map((r) => r.title.id));
+  const avoided = avoid.slice(0, 30).map((id) => BY_ID.get(id)).filter((t): t is Title => !!t);
+  const left = recs.slice(0, MIX).filter((r) => !kept.has(r.title.id)).map((r) => ({
     r,
-    k: 3 * Math.log(Math.max(1e-6, r.score / max)) + gumbel(seed, r.title.id) + (seen.has(r.title.id) ? SEEN : 0),
+    k: 2 * Math.log(Math.max(1e-6, r.score / max)) + gumbel(seed, r.title.id) + (seen.has(r.title.id) ? SEEN : 0),
+    alike: 0,
+    shunned: avoided.some((t) => related(t, r.title)),
   }));
   const because = new Map<string, number>();
   const creators = new Map<string, number>();
   const out: Rec[] = [];
+  const add = (r: Rec) => {
+    if (r.because) because.set(r.because.id, (because.get(r.because.id) ?? 0) + 1);
+    if (r.title.creator) creators.set(r.title.creator, (creators.get(r.title.creator) ?? 0) + 1);
+    // Variety matters most near the top; further down, skip the cost of comparing.
+    if (out.length < 60) for (const x of left) if (similarity(r.title, x.r.title) >= ALIKE) x.alike++;
+    out.push(r);
+  };
+  for (const r of start) add(r);
   while (left.length) {
     const recent = out.slice(-3).map((r) => r.title.genres[0]);
-    let best = 0;
+    // The next page's worth of cards (the first page, for a new feed) leaves out titles like ones you hid.
+    const early = out.length < start.length + FIRST_PAGE && left.some((x) => !x.shunned);
+    let best = -1;
     let bestScore = -Infinity;
     left.forEach((x, i) => {
-      let s = x.k + Math.log(0.6) * ((because.get(x.r.because?.id ?? '') ?? 0) + (creators.get(x.r.title.creator) ?? 0));
+      if (early && x.shunned) return;
+      let s = x.k + REPEAT * Math.min(4, x.alike) + Math.log(0.6) * ((because.get(x.r.because?.id ?? '') ?? 0) + (creators.get(x.r.title.creator) ?? 0));
       if (recent.includes(x.r.title.genres[0])) s += Math.log(0.75);
+      if (x.shunned) s += Math.log(0.25);
       if (s > bestScore) {
         bestScore = s;
         best = i;
       }
     });
     const [{ r }] = left.splice(best, 1);
-    if (r.because) because.set(r.because.id, (because.get(r.because.id) ?? 0) + 1);
-    if (r.title.creator) creators.set(r.title.creator, (creators.get(r.title.creator) ?? 0) + 1);
-    out.push(r);
+    add(r);
   }
-  return [...out, ...recs.slice(MIX)];
+  return [...out, ...recs.slice(MIX).filter((r) => !kept.has(r.title.id))];
 }
 
 const THEMES = new Set(UNIVERSE.themes);

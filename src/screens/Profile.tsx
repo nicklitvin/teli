@@ -1,14 +1,14 @@
-import { useMemo, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { useMemo, useState, type ChangeEvent } from 'react';
 import type { MediaType, Rating, Title } from '../types';
 import { BY_ID, GENRES, metaLine } from '../lib/catalog';
 import { setName, useName } from '../lib/name';
-import { DEFAULT_TAGS, MAX_TAGS, MAX_TAG_LENGTH, NO_FILTER, VERDICTS, tagId, VERDICT_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
+import { NO_FILTER, VERDICTS, VERDICT_LABEL, byVerdict, countVerdicts, filtering, passes, verdictSummary, type ReviewFilter } from '../lib/rating';
 import { normalize } from '../lib/search';
 import { emptyData, parseBackup, pendingIds, ratedCount, useStore, type Data } from '../lib/store';
 import { NOTES, VERSION } from '../lib/version';
 import { useNav } from '../nav';
 import {
-  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, PlusIcon, RefreshIcon, SearchIcon, SparklesIcon, TrashIcon, UploadIcon, UserIcon, XIcon,
+  BookIcon, BookmarkIcon, CheckIcon, ChevronLeft, ChevronRight, DownloadIcon, EyeSlashIcon, GearIcon, RefreshIcon, SearchIcon, SparklesIcon, TrashIcon, UploadIcon, UserIcon, XIcon,
 } from '../components/Icons';
 import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
 import { Cards, Confirm, Empty, ListTools, Screen, TitleRow } from '../components/ui';
@@ -47,7 +47,7 @@ const shortDate = (at: number) => new Date(at).toLocaleDateString(undefined, {
  * filters swaps in your watchlist. The gear swaps the page for Settings.
  */
 export function Profile({ active, onSearch }: { active: boolean; onSearch: () => void }) {
-  const { data, ratings, tagLabel } = useStore();
+  const { data, ratings } = useStore();
   const nav = useNav();
   const name = useName().trim();
   const [rf, setRf] = useState<ReviewFilter>(NO_FILTER);
@@ -75,12 +75,11 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
     [rated, data.watchlist, tab, watching, sort],
   );
   const genres = GENRES.filter((g) => list.some((x) => x.t.genres.includes(g)));
-  const usedTags = useMemo(() => [...new Set([...ratings.values()].filter((r) => r.type === tab).flatMap((r) => r.tags))], [ratings, tab]);
   const q = normalize(query.trim());
   const reviewing = !watching && filtering(rf);
   const shown = list.filter((x) => (!genre || x.t.genres.includes(genre))
     && (!reviewing || passes(ratings.get(x.id)!, rf))
-    && (!q || normalize(`${x.t.title} ${x.t.creator} ${x.t.year}`).includes(q)));
+    && (!q || normalize(`${x.t.title} ${x.t.creator} ${x.t.year} ${ratings.get(x.id)?.note ?? ''}`).includes(q)));
   const narrowed = !!genre || !!q || reviewing;
   const noun = tab === 'movie' ? 'movies' : 'shows';
 
@@ -124,7 +123,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
             stats={<Stats rated={rated} saved={saved} noun={noun} />} statsOpen={statsOpen}
             onStats={(open) => { setStatsOpen(open); if (open) setWatching(false); }}
             more={watching ? undefined : {
-              panel: <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />,
+              panel: <ReviewFilterGroups value={rf} onChange={setRf} />,
               chips: <ReviewFilterChips value={rf} onChange={setRf} />,
               active: filtering(rf),
               onClear: () => setRf(NO_FILTER),
@@ -145,7 +144,7 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
                 )}
                 <Cards>
                   {shown.map((x) => (
-                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!, sort !== 'verdict', tagLabel)}
+                    <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!, sort !== 'verdict')}
                       actions={watching ? <Unsave id={x.id} title={x.t.title} /> : undefined} />
                   ))}
                 </Cards>
@@ -171,12 +170,12 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
   );
 }
 
-/** Under a rated title: what stood out (and when you rated it, when sorted by that), or a nudge when it still needs a review. */
-function ratedDetail(t: Title, r: Rating, dated: boolean, label: (id: string) => string) {
+/** Under a rated title: your note (and when you rated it, when sorted by that), or a nudge when it still needs a review. */
+function ratedDetail(t: Title, r: Rating, dated: boolean) {
   if (r.pending) return 'Needs a quick review';
-  const tags = r.tags.map(label);
-  if (dated) return [`Rated ${shortDate(r.at)}`, ...tags].join(' · ');
-  return tags.length ? [t.year, ...tags].join(' · ') : metaLine(t);
+  const note = r.note ? `“${r.note}”` : '';
+  if (dated) return [`Rated ${shortDate(r.at)}`, note].filter(Boolean).join(' · ');
+  return note ? `${t.year} · ${note}` : metaLine(t);
 }
 
 /** The `n` keys that come up most, with how often. */
@@ -191,7 +190,6 @@ function top(keys: string[], n = 3) {
  * good / ok / bad split as a ring, ratings per day over the last 30 days, and top genres and tags as bars.
  */
 function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun: string }) {
-  const { tagLabel } = useStore();
   if (!rated.length && !saved.length) return <div className="stats-panel"><p className="stats-empty">Rate a few {noun} to see your stats.</p></div>;
   const done = rated.filter((r) => !r.pending);
   const n = countVerdicts(done);
@@ -206,7 +204,6 @@ function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun:
   const peak = Math.max(1, ...days.map((d) => d.good + d.ok + d.bad));
   const again = done.length ? Math.round((done.filter((r) => r.again).length / done.length) * 100) : 0;
   const genres = top(rated.flatMap((r) => BY_ID.get(r.id)!.genres), 4);
-  const tags = top(done.flatMap((r) => r.tags), 4);
   // The ring: each verdict's share as an arc on a circle 100 long, starting at 12 o'clock.
   let at = 0;
   const arcs = VERDICTS.filter((v) => n[v]).map((v) => {
@@ -253,12 +250,6 @@ function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun:
         <figcaption>Genres</figcaption>
         <Bars rows={genres.map(([g, k]) => [g, k])} />
       </figure>
-      {tags.length > 0 && (
-        <figure className="stat-chart">
-          <figcaption>Tags</figcaption>
-          <Bars rows={tags.map(([t, k]) => [tagLabel(t), k])} />
-        </figure>
-      )}
       <Watchlist rated={done} saved={saved} />
     </div>
   );
@@ -358,7 +349,7 @@ function HiddenTitles({ onBack }: { onBack: () => void }) {
 }
 
 /**
- * Settings, in place of the logbook: your name, your rating keywords, backups (import and reset
+ * Settings, in place of the logbook: your name, backups (import and reset
  * ask first), hidden titles, and the version with what's new.
  */
 function Settings({ onHidden }: { onHidden: () => void }) {
@@ -418,9 +409,6 @@ function Settings({ onHidden }: { onHidden: () => void }) {
         </label>
       </div>
 
-      <p className="panel-label">Rating keywords</p>
-      <Keywords />
-
       <p className="panel-label">Your data</p>
       <div className="list settings">
         <button className="setting" onClick={exportData}>
@@ -439,7 +427,7 @@ function Settings({ onHidden }: { onHidden: () => void }) {
         </button>
         <button className="setting danger" onClick={() => { setPending({ kind: 'reset' }); setNote(null); }}>
           <TrashIcon size={18} />
-          <span><strong>Reset everything</strong><small>Erase all ratings, watchlist, hidden titles and keywords</small></span>
+          <span><strong>Reset everything</strong><small>Erase all ratings, notes, watchlist and hidden titles</small></span>
         </button>
       </div>
       {note && (
@@ -461,94 +449,8 @@ function Settings({ onHidden }: { onHidden: () => void }) {
             ratedCount(data) && plural(ratedCount(data), 'rating'),
             data.watchlist.length && plural(data.watchlist.length, 'watchlist title'),
             hiddenCount && plural(hiddenCount, 'hidden title'),
-          ].filter(Boolean).concat('your keywords').join(', ').replace(/, ([^,]*)$/, ' and $1')} from this device. <b>It can’t be undone.</b> Export a backup first if you might want them back.</>} />
+          ].filter(Boolean).join(', ').replace(/, ([^,]*)$/, ' and $1')} from this device. <b>It can’t be undone.</b> Export a backup first if you might want them back.</>} />
       )}
-    </div>
-  );
-}
-
-/**
- * Your rating keywords: rename one in place, remove it, or add your own, up to MAX_TAGS. Ratings
- * keep a keyword you remove (it just stops being offered), and renaming one renames it everywhere.
- */
-function Keywords() {
-  const { data, tags, setTags } = useStore();
-  const [draft, setDraft] = useState('');
-  const [error, setError] = useState<string | null>(null);
-  const uses = useMemo(() => {
-    const m = new Map<string, number>();
-    for (const r of Object.values(data.reviews)) for (const t of r.tags) m.set(t, (m.get(t) ?? 0) + 1);
-    return m;
-  }, [data.reviews]);
-  const isDefault = tags.length === DEFAULT_TAGS.length && tags.every((t, i) => t.id === DEFAULT_TAGS[i].id && t.label === DEFAULT_TAGS[i].label);
-  const full = tags.length >= MAX_TAGS;
-
-  /** What's wrong with this label, if anything (`self` is the keyword being renamed). */
-  const problem = (label: string, self?: string) => {
-    if (!label) return 'Type a keyword first.';
-    if (!tagId(label)) return 'Use at least one letter or number.';
-    const twin = tags.find((t) => t.id !== self && (t.label.toLowerCase() === label.toLowerCase() || t.id === tagId(label)));
-    return twin ? `You already have “${twin.label}”.` : null;
-  };
-
-  const rename = (id: string, raw: string) => {
-    const label = raw.trim();
-    const old = tags.find((t) => t.id === id);
-    if (!old || label === old.label) return true;
-    const p = problem(label, id);
-    if (p) {
-      setError(p);
-      return false;
-    }
-    setError(null);
-    setTags(tags.map((t) => (t.id === id ? { ...t, label } : t)));
-    return true;
-  };
-
-  const add = () => {
-    const label = draft.trim();
-    if (full) return setError(`That’s the most you can have (${MAX_TAGS}). Remove one to add another.`);
-    const p = problem(label);
-    if (p) return setError(p);
-    setError(null);
-    setTags([...tags, { id: tagId(label), label }]);
-    setDraft('');
-  };
-
-  const enter = (e: KeyboardEvent<HTMLInputElement>, go: () => void) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      go();
-    }
-  };
-
-  return (
-    <div className="keywords">
-      <p className="keywords-intro">The words you can pick when you rate something. Up to {MAX_TAGS}, {MAX_TAG_LENGTH} letters each.</p>
-      <div className="list settings keyword-list">
-        {tags.map((t) => (
-          <div className="keyword" key={`${t.id}:${t.label}`}>
-            <input defaultValue={t.label} maxLength={MAX_TAG_LENGTH} aria-label={`Rename ${t.label}`} enterKeyHint="done"
-              onBlur={(e) => { if (!rename(t.id, e.target.value)) e.target.value = t.label; }}
-              onKeyDown={(e) => enter(e, () => e.currentTarget.blur())} />
-            {uses.get(t.id) ? <small aria-label={`used ${uses.get(t.id)} times`}>{uses.get(t.id)}×</small> : null}
-            <button className="icon-btn ghost" onClick={() => { setError(null); setTags(tags.filter((x) => x.id !== t.id)); }} aria-label={`Remove ${t.label}`}>
-              <XIcon size={15} />
-            </button>
-          </div>
-        ))}
-        {!tags.length && <p className="keyword-none">No keywords: rating skips “What stood out?”.</p>}
-        <div className="keyword add">
-          <input value={draft} onChange={(e) => { setDraft(e.target.value); setError(null); }} maxLength={MAX_TAG_LENGTH} enterKeyHint="done"
-            placeholder={full ? `${MAX_TAGS} of ${MAX_TAGS}: remove one to add more` : 'Add a keyword'} disabled={full} aria-label="New keyword"
-            onKeyDown={(e) => enter(e, add)} />
-          <button className="icon-btn tool" onClick={add} disabled={full || !draft.trim()} aria-label="Add keyword"><PlusIcon size={16} /></button>
-        </div>
-      </div>
-      <div className="keywords-foot">
-        <span className={error ? 'error' : ''} role={error ? 'alert' : undefined}>{error ?? `${tags.length} of ${MAX_TAGS}`}</span>
-        {!isDefault && <button className="text-btn" onClick={() => { setError(null); setTags(undefined); }}><RefreshIcon size={14} /> Restore defaults</button>}
-      </div>
     </div>
   );
 }

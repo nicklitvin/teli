@@ -27,7 +27,7 @@ function markSeen(id: string) {
     a.push(id);
     localStorage.setItem(SEEN_KEY, JSON.stringify(a.slice(-SEEN_MAX)));
   } catch {
-    /* storage unavailable â€” feeds just won't avoid repeats */
+    /* storage unavailable: feeds just won't avoid repeats */
   }
 }
 /** How far past the first card you pull (in px, after resistance) before letting go refreshes. */
@@ -42,11 +42,19 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
   // A new deal on every load, switch between picks and Discover, and pull to refresh: a new seed,
   // plus what you've seen lately (read once per deal, so marking cards seen doesn't reshuffle the feed).
   const [deal, setDeal] = useState(() => ({ seed: newSeed(), seen: loadSeen() }));
-  const newDeal = () => setDeal({ seed: newSeed(), seen: loadSeen() });
-  const feed = useMemo(
-    () => (mode === 'discover' ? discover(ratings, dismissed, recs, deal.seed, deal.seen) : shuffle(recs, deal.seed, deal.seen)),
-    [mode, ratings, dismissed, recs, deal],
-  );
+  // The cards you've scrolled through in this feed. Hiding one keeps them as they are and
+  // re-deals only what's ahead, steering clear of titles like the one you hid.
+  const viewed = useRef<string[]>([]);
+  const newDeal = () => {
+    viewed.current = [];
+    setDeal({ seed: newSeed(), seen: loadSeen() });
+  };
+  const feed = useMemo(() => {
+    if (mode === 'discover') return discover(ratings, dismissed, recs, deal.seed, deal.seen);
+    const byId = new Map(recs.map((r) => [r.title.id, r]));
+    const start = viewed.current.map((id) => byId.get(id)).filter((r): r is Rec => !!r);
+    return shuffle(recs, deal.seed, deal.seen, [...data.dismissed].reverse(), start);
+  }, [mode, ratings, dismissed, data.dismissed, recs, deal]);
   const lastSeen = useRef(-1);
   useEffect(() => {
     lastSeen.current = 0;
@@ -170,6 +178,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
         if (i !== lastSeen.current && feed[i]) {
           lastSeen.current = i;
           markSeen(feed[i].title.id);
+          if (i + 1 > viewed.current.length) viewed.current = feed.slice(0, i + 1).map((r) => r.title.id);
         }
         if (el.scrollTop + el.clientHeight * 2.5 > el.scrollHeight) setLimit((n) => Math.min(n + PAGE, feed.length));
       }}>
@@ -192,7 +201,7 @@ export function ForYou({ active, onSearch }: { active: boolean; onSearch: () => 
           <OrbitIcon size={40} />
           <h2>{feed.length ? 'Edge of the known universe' : 'Nothing out here yet'}</h2>
           <p>{discovering
-            ? 'Youâ€™ve seen every frontier we can chart right now. Rate more titles to open new ones.'
+            ? 'You’ve seen every frontier we can chart right now. Rate more titles to open new ones.'
             : 'Rate more titles and new picks will appear, or go looking somewhere new.'}</p>
           <button className="primary-btn" onClick={switchMode}>{discovering ? 'Back to your picks' : 'Turn on Discover'}</button>
         </div>

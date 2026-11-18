@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, type PointerEvent as ReactPointerEvent } from 'react';
 import type { Rating } from '../types';
-import { CATALOG, ORDER } from '../lib/catalog';
+import { CATALOG, ORDER, imageSrc } from '../lib/catalog';
 import { EXTENT, HOODS, sky, type Hood } from '../lib/skymap';
 
 /** Where to point the view: a spot and how much of the map around it to show. `key` makes a repeat request fly again. */
@@ -10,6 +10,26 @@ const VERDICT_COLOR = { good: '#2fd393', ok: '#f8b940', bad: '#fb6b8a' };
 const LINK = 0.045; // constellation lines longer than this (in map units) aren't drawn
 const MAX_ZOOM = 140;
 const REACH = 16; // how far from a dot (in screen pixels) a tap still counts as on it
+const MAX_TITLES = 30; // title names on screen at once
+const MAX_POSTERS = 18; // names with a poster beside them take more room
+const THUMB = { w: 22, h: 33 };
+
+/** Small posters for names on the map, loaded as they're first needed; `onLoad` redraws once each arrives. */
+const thumbs = new Map<string, HTMLImageElement | null>();
+function thumb(i: number, onLoad: () => void): HTMLImageElement | null {
+  const t = CATALOG[i];
+  if (!t.image) return null;
+  const got = thumbs.get(t.id);
+  if (got !== undefined) return got?.complete && got.naturalWidth ? got : null;
+  const img = new Image();
+  img.decoding = 'async';
+  img.onload = onLoad;
+  img.onerror = () => thumbs.set(t.id, null);
+  img.src = imageSrc(t.image, 120);
+  thumbs.set(t.id, img);
+  return null;
+}
+const FADE_MS = 260; // how long a new name takes to fade in
 
 /** Which titles the map shows: everything, only what you've rated, or only what you haven't. */
 export type Show = 'all' | 'seen' | 'unseen';
@@ -52,9 +72,9 @@ const NO_BOX: Box = [0, 0, 0, 0];
 interface Target { i: number; x: number; y: number; box: Box }
 
 /** A rounded rectangle path (canvas roundRect where there is one). */
-function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
+function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, radius = h / 2) {
   ctx.beginPath();
-  if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2);
+  if (ctx.roundRect) ctx.roundRect(x, y, w, h, radius);
   else ctx.rect(x, y, w, h);
 }
 
@@ -66,7 +86,7 @@ function pill(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h:
  * off, your own stars and watchlist rings are what you can tap. `show` narrows the dots to the
  * titles you've rated (`seen`, the indices of all of them) or the ones you haven't.
  */
-export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHood, fly, size, bottom = 0, show = 'all', names = true, focusHood = null }: {
+export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHood, fly, size, bottom = 0, show = 'all', names = true, posters = false, focusHood = null }: {
   /** The ratings drawn as stars (already narrowed by any rating filters). */
   ratings: Map<string, Rating>;
   /** Every title you've rated, by map index, so `show: 'unseen'` can leave them out. */
@@ -83,13 +103,16 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
   bottom?: number;
   show?: Show;
   names?: boolean;
+  /** A small poster beside each title's name (so fewer names fit). */
+  posters?: boolean;
   /** A tap on a neighbourhood's name. */
   onHood?: (h: Hood) => void;
   /** The neighbourhood whose card is open, drawn brighter. */
   focusHood?: number | null;
 }) {
   const canvas = useRef<HTMLCanvasElement>(null);
-  const cam = useRef({ x: 0.5, y: 0.5, s: 0, fit: 0, w: 0, h: 0, dpr: 1 });
+  // `under`: how much of the canvas the tab bar covers, so names stay above it.
+  const cam = useRef({ x: 0.5, y: 0.5, s: 0, fit: 0, w: 0, h: 0, dpr: 1, under: 0 });
   const frame = useRef(0);
   const anim = useRef(0);
 
@@ -115,9 +138,15 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
   );
 
   // Everything the draw call reads, kept in a ref so pointer handlers and animation see the latest.
-  const state = useRef({ byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, focusHood });
-  state.current = { byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, focusHood };
+  const state = useRef({ byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, posters, focusHood });
+  state.current = { byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, posters, focusHood };
   // What the last frame drew a name for, in screen pixels: these are all a tap can land on.
+  // Names on screen and when each appeared, so they keep their place as you move (instead of
+  // reshuffling every frame) and new ones fade in. While you're dragging, pinching, scrolling or
+  // flying, only names already showing are drawn; new ones wait until the map settles.
+  const labels = useRef({ titles: new Map<number, number>(), hoods: new Map<number, number>() });
+  const moving = useRef(false);
+  const settle = useRef(0);
   const targets = useRef<{ titles: Target[]; hoods: { h: Hood; box: Box }[] }>({ titles: [], hoods: [] });
 
   const draw = () => {
@@ -125,9 +154,23 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     const c = cam.current;
     if (!el || !c.w || !c.s) return;
     const ctx = el.getContext('2d')!;
-    const { byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, focusHood } = state.current;
+    const { byHood, rated, links, watched, highlight, selected, bottom, show, seen, names, posters, focusHood } = state.current;
     const hit: typeof targets.current = { titles: [], hoods: [] };
     targets.current = hit;
+    const now = performance.now();
+    const was = labels.current;
+    const next = { titles: new Map<number, number>(), hoods: new Map<number, number>() };
+    labels.current = next;
+    let fading = false;
+    /** How far a name has faded in, noting it as showing this frame; null if it can't appear yet. */
+    const appear = (memo: Map<number, number>, into: Map<number, number>, id: number) => {
+      const since = memo.get(id) ?? (moving.current ? null : now);
+      if (since === null) return null;
+      into.set(id, since);
+      const k = Math.min(1, (now - since) / FADE_MS);
+      if (k < 1) fading = true;
+      return k;
+    };
     ctx.setTransform(c.dpr, 0, 0, c.dpr, 0, 0);
     ctx.clearRect(0, 0, c.w, c.h);
     const sx = (x: number) => (x - c.x) * c.s + c.w / 2;
@@ -234,6 +277,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
       ctx.stroke();
     }
     if (!names) {
+      labels.current = { titles: new Map(), hoods: new Map() };
       // No names to tap, so your own stars and watchlist rings are the targets.
       for (const i of [...rated.map((x) => x.i), ...watched]) hit.titles.push({ i, x: sx(sky.x[i]), y: sy(sky.y[i]), box: NO_BOX });
       return;
@@ -243,7 +287,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     // dark pill or halo so it reads over bright patches.
     const boxes: [number, number, number, number][] = [];
     const fits = (x: number, y: number, w: number, h: number) => {
-      if (x < 4 || y < 64 || x + w > c.w - 4 || y + h > c.h - 4 - bottom) return false;
+      if (x < 4 || y < 64 || x + w > c.w - 4 || y + h > c.h - 4 - Math.max(bottom, c.under)) return false;
       if (boxes.some(([bx, by, bw, bh]) => x < bx + bw && x + w > bx && y < by + bh && y + h > by)) return false;
       boxes.push([x, y, w, h]);
       return true;
@@ -269,15 +313,18 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     const hoodAlpha = Math.max(0, Math.min(1, (5 - zoom) / 2.5));
     if (hoodAlpha > 0) {
       ctx.font = `650 12px ${FONT}`;
-      const order = [...byHood].sort((a, b) => b.h.n - a.h.n);
+      // Names already showing keep their spot; then the biggest neighbourhoods.
+      const order = [...byHood].sort((a, b) => Number(was.hoods.has(b.h.id)) - Number(was.hoods.has(a.h.id)) || b.h.n - a.h.n);
       for (const { h } of order) {
         const text = h.label;
         const w = ctx.measureText(text).width + 30;
         const x = sx(h.x);
         const y = sy(h.y);
+        if (!was.hoods.has(h.id) && moving.current) continue;
         if (!fits(x - w / 2, y - 12, w, 24)) continue;
-        if (hoodAlpha > 0.4) hit.hoods.push({ h, box: [x - w / 2, y - 12, w, 24] });
-        ctx.globalAlpha = hoodAlpha * (highlight ? 0.6 : 1);
+        const k = appear(was.hoods, next.hoods, h.id) ?? 0;
+        if (hoodAlpha * k > 0.4) hit.hoods.push({ h, box: [x - w / 2, y - 12, w, 24] });
+        ctx.globalAlpha = hoodAlpha * k * (highlight ? 0.6 : 1);
         ctx.fillStyle = focusHood === h.id ? 'rgba(10, 12, 30, 0.95)' : 'rgba(5, 6, 16, 0.78)';
         pill(ctx, x - w / 2, y - 12, w, 24);
         ctx.fill();
@@ -302,8 +349,18 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     if (zoom > 3 || (onlyMine && rated.length)) {
       const titleAlpha = onlyMine ? 1 : Math.min(1, (zoom - 3) / 2);
       ctx.textAlign = 'left';
+      // Order: your highlighted stars, your other stars, names already showing, then the best known.
       const picks: [number, number][] = [];
-      for (const { i } of rated) picks.push([i, highlight && !highlight.has(i) ? -1e8 : -1e9]);
+      const queued = new Set<number>();
+      const queue = (i: number, rank: number) => {
+        if (!queued.has(i)) { queued.add(i); picks.push([i, rank]); }
+      };
+      for (const { i } of rated) queue(i, highlight && !highlight.has(i) ? -2e9 : -3e9);
+      for (const i of was.titles.keys()) {
+        if (i >= sky.n || (highlight && !highlight.has(i)) || (show === 'unseen' && seen.has(i))) continue;
+        if (show === 'seen' && !seen.has(i)) continue;
+        queue(i, -1e9 + i);
+      }
       if (!onlyMine) {
         // Visible dots, best known first (catalog order is popularity order).
         const x0 = c.x - c.w / 2 / c.s;
@@ -314,32 +371,74 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
           if (sky.x[i] < x0 || sky.x[i] > x1 || sky.y[i] < y0 || sky.y[i] > y1) continue;
           if (highlight && !highlight.has(i)) continue;
           if (show === 'unseen' && seen.has(i)) continue;
-          picks.push([i, i]);
+          queue(i, i);
         }
       }
       picks.sort((a, b) => a[1] - b[1]);
       let placed = 0;
       const ratedSet = new Set(rated.map((x) => x.i));
+      // With posters, each name has a small poster between it and its dot.
+      const pw = posters ? THUMB.w + 6 : 0;
+      const ph = posters ? THUMB.h : 16;
       for (const [i] of picks) {
-        if (placed >= 45 || i === selected) continue;
+        if (placed >= (posters ? MAX_POSTERS : MAX_TITLES) || i === selected) continue;
+        if (moving.current && !was.titles.has(i)) continue;
         const mine = ratedSet.has(i);
         ctx.font = `${mine ? 650 : 550} 12px ${FONT}`;
         const text = CATALOG[i].title.length > 26 ? `${CATALOG[i].title.slice(0, 25)}…` : CATALOG[i].title;
         const w = ctx.measureText(text).width;
         const x = sx(sky.x[i]) + 8;
         const y = sy(sky.y[i]);
-        if (!fits(x - 2, y - 8, w + 4, 16)) continue;
-        if (titleAlpha > 0.4) hit.titles.push({ i, x: x - 8, y, box: [x - 2, y - 8, w + 4, 16] });
-        ctx.globalAlpha = titleAlpha * (mine ? 1 : 0.85) * (highlight && !highlight.has(i) ? 0.5 : 1);
+        const box: Box = [x - 2, y - ph / 2, pw + w + 4, ph];
+        if (!fits(...box)) continue;
+        const k = appear(was.titles, next.titles, i) ?? 0;
+        if (titleAlpha * k > 0.4) hit.titles.push({ i, x: x - 8, y, box });
+        ctx.globalAlpha = titleAlpha * k * (mine ? 1 : 0.85) * (highlight && !highlight.has(i) ? 0.5 : 1);
+        if (posters) {
+          const top = y - THUMB.h / 2;
+          ctx.save();
+          pill(ctx, x, top, THUMB.w, THUMB.h, 4);
+          ctx.fillStyle = `${HOODS.find((h) => h.id === sky.c[i])?.color ?? '#8e8e93'}55`;
+          ctx.fill();
+          ctx.clip();
+          const img = thumb(i, redraw);
+          if (img) {
+            // Cover the slot: crop the poster to its 2:3 shape from the middle.
+            const r = THUMB.w / THUMB.h;
+            const iw = img.naturalWidth;
+            const ih = img.naturalHeight;
+            const [cw, ch] = iw / ih > r ? [ih * r, ih] : [iw, iw / r];
+            ctx.drawImage(img, (iw - cw) / 2, (ih - ch) / 2, cw, ch, x, top, THUMB.w, THUMB.h);
+          }
+          ctx.restore();
+          pill(ctx, x, top, THUMB.w, THUMB.h, 4);
+          ctx.strokeStyle = mine ? 'rgba(255, 255, 255, 0.85)' : 'rgba(255, 255, 255, 0.22)';
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
         ctx.strokeStyle = 'rgba(4, 5, 14, 0.92)';
         ctx.lineWidth = 4;
-        ctx.strokeText(text, x, y);
+        ctx.strokeText(text, x + pw, y);
         ctx.fillStyle = mine ? '#ffffff' : '#d6d4f2';
-        ctx.fillText(text, x, y);
+        ctx.fillText(text, x + pw, y);
         placed++;
       }
       ctx.globalAlpha = 1;
     }
+    if (fading) redraw();
+  };
+
+  /** The map is on the move: hold the names where they are until it's been still a moment. */
+  const stir = () => {
+    moving.current = true;
+    clearTimeout(settle.current);
+  };
+  const still = (ms = 140) => {
+    clearTimeout(settle.current);
+    settle.current = window.setTimeout(() => {
+      moving.current = false;
+      redraw();
+    }, ms);
   };
 
   const redraw = () => {
@@ -362,6 +461,8 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
       if (!r.width || !r.height) return;
       const c = cam.current;
       c.dpr = Math.min(2, window.devicePixelRatio || 1);
+      const bar = document.querySelector('.tabbar')?.getBoundingClientRect();
+      c.under = bar ? Math.max(0, r.bottom - bar.top) : 0;
       c.w = r.width;
       c.h = r.height;
       el.width = Math.round(r.width * c.dpr);
@@ -394,6 +495,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     const t0 = performance.now();
     const ms = reduceMotion() ? 0 : 700;
     cancelAnimationFrame(anim.current);
+    if (ms) stir();
     const step = (now: number) => {
       const k = ms ? Math.min(1, (now - t0) / ms) : 1;
       const e = k < 0.5 ? 4 * k * k * k : 1 - (-2 * k + 2) ** 3 / 2;
@@ -403,6 +505,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
       c.s = Math.exp(Math.log(from.s) + (Math.log(s) - Math.log(from.s)) * e);
       draw();
       if (k < 1) anim.current = requestAnimationFrame(step);
+      else if (ms) still(0);
     };
     anim.current = requestAnimationFrame(step);
     return () => cancelAnimationFrame(anim.current);
@@ -448,6 +551,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     const c = cam.current;
     if (pointers.current.size === 1) {
       gesture.current.moved += Math.abs(p.x - prev.x) + Math.abs(p.y - prev.y);
+      if (gesture.current.moved > 8) stir();
       c.x -= (p.x - prev.x) / c.s;
       c.y -= (p.y - prev.y) / c.s;
       clamp();
@@ -456,6 +560,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
       return;
     }
     pointers.current.set(e.pointerId, p);
+    stir();
     const [a, b] = [...pointers.current.values()];
     const dist = Math.hypot(a.x - b.x, a.y - b.y);
     if (gesture.current.dist) zoomAt((a.x + b.x) / 2, (a.y + b.y) / 2, dist / gesture.current.dist);
@@ -466,6 +571,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     const was = pointers.current.get(e.pointerId);
     pointers.current.delete(e.pointerId);
     if (pointers.current.size === 1) gesture.current.dist = 0;
+    if (!pointers.current.size && moving.current) still();
     if (!was || pointers.current.size || gesture.current.moved > 8 || performance.now() - gesture.current.t > 500) return;
     // A tap only lands on something with a name showing: the title whose dot is within reach (the
     // nearest, if several) or whose name it's on, else the neighbourhood whose name it's on.
@@ -487,6 +593,8 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
     const el = canvas.current!;
     const wheel = (e: WheelEvent) => {
       e.preventDefault();
+      stir();
+      still(220);
       const p = local(e);
       zoomAt(p.x, p.y, Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0022)));
     };

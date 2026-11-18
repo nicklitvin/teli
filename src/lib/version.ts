@@ -1,6 +1,18 @@
 /** What changed in each release, newest first. Shown in Settings; the first entry is the current version. */
 export const NOTES: { version: string; date: string; items: string[] }[] = [
   {
+    version: '1.8.0',
+    date: '2026-11-18',
+    items: [
+      'Ratings get a short note (up to 100 characters) instead of keywords; keywords you\'d picked carry over as the note',
+      'For You is more varied: liking a few of a franchise no longer fills the feed with it',
+      'Mark something not interested and titles like it stay out of the next page of picks',
+      'Galaxy: names hold still while you move the map and fade in once it settles',
+      'Galaxy: posters beside names, an option in the filters',
+      'Galaxy: titles sit in a neighbourhood of their own genre (IT is in Horror now)',
+    ],
+  },
+  {
     version: '1.7.0',
     date: '2026-11-17',
     items: [

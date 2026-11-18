@@ -86,9 +86,9 @@ export function TasteMap({ active }: { active: boolean }) {
   const [fly, setFly] = useState<FlyTo | null>(null);
   const lastHood = useRef<number | null>(null);
   const [names, setNames] = usePref<'on' | 'off'>('teli:sky-names', 'on', ['on', 'off']);
+  const [posters, setPosters] = usePref<'on' | 'off'>('teli:sky-posters', 'off', ['on', 'off']);
   const goTo = (f: Omit<FlyTo, 'key'> | null) => f && setFly({ ...f, key: Date.now() });
 
-  const usedTags = useMemo(() => [...new Set([...ratings.values()].flatMap((r) => r.tags))], [ratings]);
   const shownRatings = useMemo(
     () => (filtering(rf) ? new Map([...ratings].filter(([, r]) => passes(r, rf))) : ratings),
     [ratings, rf],
@@ -242,7 +242,7 @@ export function TasteMap({ active }: { active: boolean }) {
       {HAS_MAP ? (
         <SkyMap ratings={shownRatings} seen={seen} watch={watch} highlight={highlight} size={sky.n}
           selected={focus?.kind === 'title' ? focus.i : null} fly={fly} bottom={focus?.kind === 'title' ? 110 : focus || highlight ? 220 : 0}
-          show={show} names={names === 'on'} focusHood={focus?.kind === 'hood' ? focus.hood.id : null}
+          show={show} names={names === 'on'} posters={posters === 'on'} focusHood={focus?.kind === 'hood' ? focus.hood.id : null}
           onHood={(h) => setFocus({ kind: 'hood', hood: h })}
           onPick={(i) => setFocus(i === null ? (focus?.kind === 'hood' ? focus : null) : { kind: 'title', i })} />
       ) : (
@@ -271,14 +271,16 @@ export function TasteMap({ active }: { active: boolean }) {
           </div>
           <div className="filter-group" role="group" aria-label="Show">
             <p className="filter-label">Show</p>
+            <Segmented<Show> value={show} options={SHOWS} onChange={(v) => { setShow(v); setFocus(null); }} />
             <div className="look-row">
-              <Segmented<Show> value={show} options={SHOWS} onChange={(v) => { setShow(v); setFocus(null); }} />
               <button className={`chip toggle ${names === 'on' ? 'on' : ''}`} onClick={() => setNames(names === 'on' ? 'off' : 'on')}
                 aria-pressed={names === 'on'}>Names</button>
+              <button className={`chip toggle ${posters === 'on' && names === 'on' ? 'on' : ''}`} disabled={names === 'off'}
+                onClick={() => setPosters(posters === 'on' ? 'off' : 'on')} aria-pressed={posters === 'on' && names === 'on'}>Posters</button>
             </div>
             <p className="filter-hint">
               {show === 'seen' ? 'Only titles you\u2019ve rated.' : show === 'unseen' ? 'Only titles you haven\u2019t rated yet.' : 'Every title, with yours lit up.'}
-              {names === 'off' && ' Names are off: tap your own stars.'}
+              {names === 'off' ? ' Names are off: tap your own stars.' : posters === 'on' ? ' Posters beside names, so fewer fit.' : ''}
             </p>
           </div>
           {DIMS.map(({ value, label }) => (
@@ -293,7 +295,7 @@ export function TasteMap({ active }: { active: boolean }) {
             </div>
           ))}
           {new Set(picked.map((p) => p.dim)).size > 1 && <p className="filter-hint">Highlighting titles that match every section you picked from.</p>}
-          {show !== 'unseen' && <ReviewFilterGroups value={rf} onChange={setRf} tags={usedTags} />}
+          {show !== 'unseen' && <ReviewFilterGroups value={rf} onChange={setRf} />}
         </div>
       ) : anyFilter && (
         <div className="sky-chips genre-wrap">
