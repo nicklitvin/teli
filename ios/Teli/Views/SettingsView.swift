@@ -1,7 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// Settings, in place of the logbook: your name, your rating keywords, backups (import and reset
+/// Settings, in place of the logbook: your name, backups (import and reset
 /// ask first), hidden titles, and the version with what's new.
 struct SettingsView: View {
     @Environment(Store.self) private var store
@@ -31,9 +31,6 @@ struct SettingsView: View {
                 .padding(14)
             }
 
-            label("Rating keywords")
-            KeywordsEditor()
-
             label("Your data")
             group {
                 VStack(spacing: 0) {
@@ -49,7 +46,7 @@ struct SettingsView: View {
                         row("eye.slash", "Not interested", store.data.dismissed.isEmpty ? "Nothing hidden" : "\(store.data.dismissed.count) hidden", chevron: true)
                     }
                     Divider().overlay(Theme.border)
-                    Button { confirmReset = true } label: { row("trash", "Reset everything", "Erase all ratings, watchlist, hidden titles and keywords", danger: true) }
+                    Button { confirmReset = true } label: { row("trash", "Reset everything", "Erase all ratings, notes, watchlist and hidden titles", danger: true) }
                 }
                 .buttonStyle(.plain)
             }
@@ -112,7 +109,7 @@ struct SettingsView: View {
         if store.ratedCount > 0 { parts.append("\(store.ratedCount) rating\(store.ratedCount == 1 ? "" : "s")") }
         if !store.data.watchlist.isEmpty { parts.append("\(store.data.watchlist.count) watchlist title\(store.data.watchlist.count == 1 ? "" : "s")") }
         if !store.data.dismissed.isEmpty { parts.append("\(store.data.dismissed.count) hidden title\(store.data.dismissed.count == 1 ? "" : "s")") }
-        parts.append("your keywords")
+        if parts.isEmpty { return "nothing" }
         return parts.count == 1 ? parts[0] : parts.dropLast().joined(separator: ", ") + " and " + parts.last!
     }
 
@@ -170,125 +167,5 @@ private struct PatchNote: View {
         }
         .padding(14)
         .onAppear { open = latest }
-    }
-}
-
-/// Your rating keywords: rename in place, remove, or add your own, up to `Tag.maxCount`. Ratings keep
-/// a keyword you remove (it just stops being offered), and renaming one renames it everywhere.
-struct KeywordsEditor: View {
-    @Environment(Store.self) private var store
-    @State private var draft = ""
-    @State private var error: String?
-
-    private var full: Bool { store.tags.count >= Tag.maxCount }
-
-    /// What's wrong with this label, if anything (`me` is the keyword being renamed).
-    private func problem(_ label: String, me: String? = nil) -> String? {
-        if label.isEmpty { return "Type a keyword first." }
-        if Tag.makeId(label).isEmpty { return "Use at least one letter or number." }
-        if let twin = store.tags.first(where: { $0.id != me && ($0.label.lowercased() == label.lowercased() || $0.id == Tag.makeId(label)) }) {
-            return "You already have “\(twin.label)”."
-        }
-        return nil
-    }
-
-    var body: some View {
-        let uses = Dictionary(store.data.reviews.values.flatMap(\.tags).map { ($0, 1) }, uniquingKeysWith: +)
-        VStack(alignment: .leading, spacing: 8) {
-            Text("The words you can pick when you rate something. Up to \(Tag.maxCount), \(Tag.maxLength) letters each.")
-                .font(.system(size: 12.5)).foregroundStyle(Theme.text2).padding(.horizontal, 4)
-            VStack(spacing: 0) {
-                LazyVGrid(columns: [GridItem(.flexible(), spacing: 0), GridItem(.flexible(), spacing: 0)], spacing: 0) {
-                    ForEach(store.tags) { tag in
-                        KeywordCell(tag: tag, uses: uses[tag.id] ?? 0) { label in
-                            if let p = problem(label, me: tag.id) { error = p; return false }
-                            error = nil
-                            store.setTags(store.tags.map { $0.id == tag.id ? Tag(id: tag.id, label: label) : $0 })
-                            return true
-                        } remove: {
-                            error = nil
-                            store.setTags(store.tags.filter { $0.id != tag.id })
-                        }
-                    }
-                }
-                if store.tags.isEmpty {
-                    Text("No keywords: rating skips “What stood out?”.").font(.system(size: 13)).foregroundStyle(Theme.text2).padding(14)
-                }
-                Divider().overlay(Theme.border)
-                HStack {
-                    TextField(full ? "\(Tag.maxCount) of \(Tag.maxCount): remove one to add more" : "Add a keyword", text: $draft)
-                        .disabled(full)
-                        .submitLabel(.done)
-                        .onSubmit(add)
-                        .onChange(of: draft) {
-                            error = nil
-                            if draft.count > Tag.maxLength { draft = String(draft.prefix(Tag.maxLength)) }
-                        }
-                    Button(action: add) { Image(systemName: "plus").frame(width: 32, height: 32).background(Circle().fill(Color.white.opacity(0.08))) }
-                        .buttonStyle(.plain)
-                        .disabled(full || draft.trimmingCharacters(in: .whitespaces).isEmpty)
-                        .accessibilityLabel("Add keyword")
-                }
-                .padding(.horizontal, 14).padding(.vertical, 8)
-            }
-            .background(RoundedRectangle(cornerRadius: 16).fill(Theme.surface))
-            .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Theme.border))
-            HStack {
-                Text(error ?? "\(store.tags.count) of \(Tag.maxCount)")
-                    .font(.system(size: 12.5, weight: error == nil ? .regular : .medium))
-                    .foregroundStyle(error == nil ? Theme.text3 : Theme.verdict(.bad))
-                Spacer()
-                if store.tags != Tag.defaults {
-                    Button { error = nil; store.setTags(nil) } label: { Label("Restore defaults", systemImage: "arrow.counterclockwise") }
-                        .font(.system(size: 13, weight: .semibold))
-                }
-            }
-            .padding(.horizontal, 4)
-        }
-    }
-
-    private func add() {
-        let label = draft.trimmingCharacters(in: .whitespaces)
-        if full { error = "That’s the most you can have (\(Tag.maxCount)). Remove one to add another."; return }
-        if let p = problem(label) { error = p; return }
-        error = nil
-        store.setTags(store.tags + [Tag(id: Tag.makeId(label), label: label)])
-        draft = ""
-    }
-}
-
-/// One keyword: tap to rename (Return or leaving the field saves; a bad name goes back), × to remove.
-private struct KeywordCell: View {
-    let tag: Tag
-    let uses: Int
-    let rename: (String) -> Bool
-    let remove: () -> Void
-    @State private var text = ""
-    @FocusState private var editing: Bool
-
-    var body: some View {
-        HStack(spacing: 4) {
-            TextField("Keyword", text: $text)
-                .font(.system(size: 16, weight: .semibold))
-                .focused($editing)
-                .submitLabel(.done)
-                .onSubmit(commit)
-                .onChange(of: editing) { if !editing { commit() } }
-                .onChange(of: text) { if text.count > Tag.maxLength { text = String(text.prefix(Tag.maxLength)) } }
-            if uses > 0 { Text("\(uses)×").font(.system(size: 12)).foregroundStyle(Theme.text3).accessibilityLabel("used \(uses) times") }
-            Button(action: remove) { Image(systemName: "xmark").font(.system(size: 13)).foregroundStyle(Theme.text3).frame(width: 30, height: 30) }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Remove \(tag.label)")
-        }
-        .padding(.leading, 14).padding(.trailing, 4).frame(height: 46)
-        .overlay(alignment: .bottom) { Rectangle().fill(Theme.border).frame(height: 1) }
-        .onAppear { text = tag.label }
-        .onChange(of: tag.label) { text = tag.label }
-    }
-
-    private func commit() {
-        let label = text.trimmingCharacters(in: .whitespaces)
-        if label == tag.label { return }
-        if !rename(label) { text = tag.label }
     }
 }

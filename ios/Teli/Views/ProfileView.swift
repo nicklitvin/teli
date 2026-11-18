@@ -19,7 +19,6 @@ struct ProfileView: View {
     @State private var sort: Sort = .verdict
     @State private var verdicts: Set<Verdict> = []
     @State private var again = false
-    @State private var keywords: Set<String> = []
     @State private var genre: String?
     @State private var query = ""
 
@@ -38,17 +37,16 @@ struct ProfileView: View {
         return sorted.compactMap { Catalog.shared[$0.id] }
     }
 
-    private var narrowing: Bool { !verdicts.isEmpty || again || !keywords.isEmpty || genre != nil || !query.isEmpty }
+    private var narrowing: Bool { !verdicts.isEmpty || again || genre != nil || !query.isEmpty }
 
     private var shown: [Title] {
         let q = SearchIndex.normalize(query)
         return list.filter { t in
             if let genre, !t.genres.contains(genre) { return false }
-            if !q.isEmpty && !SearchIndex.normalize("\(t.title) \(t.creator) \(t.year)").contains(q) { return false }
+            if !q.isEmpty && !SearchIndex.normalize("\(t.title) \(t.creator) \(t.year) \(store.data.reviews[t.id]?.note ?? "")").contains(q) { return false }
             guard !watching, let r = store.data.reviews[t.id] else { return true }
             if !verdicts.isEmpty && !verdicts.contains(r.verdict) { return false }
             if again && !r.again { return false }
-            if !keywords.isEmpty && !r.tags.contains(where: keywords.contains) { return false }
             return true
         }
     }
@@ -128,20 +126,12 @@ struct ProfileView: View {
                             }
                             Toggle("Would watch again", isOn: $again)
                         }
-                        let used = Set(rated.flatMap(\.review.tags))
-                        if !used.isEmpty {
-                            Section("Keywords") {
-                                ForEach(used.sorted(), id: \.self) { k in
-                                    Toggle(store.tagLabel(k), isOn: Binding(get: { keywords.contains(k) }, set: { if $0 { keywords.insert(k) } else { keywords.remove(k) } }))
-                                }
-                            }
-                        }
                     }
                     Picker("Genre", selection: $genre) {
                         Text("Any genre").tag(String?.none)
                         ForEach(Catalog.shared.genres.filter { g in list.contains { $0.genres.contains(g) } }, id: \.self) { Text($0).tag(String?.some($0)) }
                     }
-                    if narrowing { Button("Clear all", role: .destructive) { verdicts = []; again = false; keywords = []; genre = nil; query = "" } }
+                    if narrowing { Button("Clear all", role: .destructive) { verdicts = []; again = false; genre = nil; query = "" } }
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease")
                         .frame(width: 36, height: 36)
@@ -221,13 +211,13 @@ struct ProfileView: View {
 
     private func detail(_ t: Title, _ r: Review) -> String {
         if r.pending == true { return "Needs a quick review" }
-        let tags = r.tags.map(store.tagLabel)
-        if sort != .verdict { return (["Rated \(r.date.formatted(.dateTime.month(.abbreviated).day()))"] + tags).joined(separator: " · ") }
-        return tags.isEmpty ? t.metaLine : ([String(t.year)] + tags).joined(separator: " · ")
+        let note = r.note.map { "“\($0)”" }
+        if sort != .verdict { return (["Rated \(r.date.formatted(.dateTime.month(.abbreviated).day()))"] + [note].compactMap { $0 }).joined(separator: " · ") }
+        return note.map { "\(t.year) · \($0)" } ?? t.metaLine
     }
 }
 
-/// Charts for a tab: counts, the good / ok / bad split, the last 30 days, top genres and keywords, and the watchlist.
+/// Charts for a tab: counts, the good / ok / bad split, the last 30 days, top genres, and the watchlist.
 struct StatsView: View {
     let rated: [Rating]
     /// When each title still on your watchlist was saved (0 if from before that was kept).
@@ -275,8 +265,6 @@ struct StatsView: View {
                         .frame(height: 120)
                     }
                     bars("Genres", counts(done.flatMap { Catalog.shared[$0.id]?.genres ?? [] }))
-                    let tags = counts(done.flatMap(\.review.tags))
-                    if !tags.isEmpty { bars("Keywords", tags.map { (store.tagLabel($0.0), $0.1) }) }
                 }
                 watchlist(done: rated)
             }

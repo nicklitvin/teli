@@ -40,8 +40,11 @@ struct DetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(review.pending == true ? "Needs a quick review" : "Your take").font(.system(size: 15, weight: .semibold))
                                 Text(review.pending == true ? "Carried over from your old rankings"
-                                     : ((review.again ? ["Would watch again"] : []) + review.tags.map { store.tagLabel($0) }).joined(separator: " · ").ifEmpty("No keywords"))
+                                     : review.again ? "Would watch again" : review.verdict == .good ? "You liked it" : review.verdict == .ok ? "It was ok" : "Not for you")
                                     .font(.system(size: 13)).foregroundStyle(Theme.text2)
+                                if review.pending != true, let note = review.note {
+                                    Text("“\(note)”").font(.system(size: 14).italic()).padding(.top, 2)
+                                }
                             }
                             Spacer()
                             Button(review.pending == true ? "Review" : "Edit") { rating = true }.font(.system(size: 15, weight: .semibold))

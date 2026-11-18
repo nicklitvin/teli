@@ -2,7 +2,9 @@ import Foundation
 
 /// Content-based recommendations, the same as the web app's: each title is a weighted feature
 /// vector (genres, themes, director or network, type, decade), similarity is cosine, and a
-/// candidate's score is its similarity to everything you've rated, weighted by your verdict.
+/// candidate's score comes from its similarity to what you've rated, weighted by your verdict.
+/// Agreeing ratings add up with diminishing returns (the closest in full, the next half, the next
+/// a quarter), so liking five Marvel films doesn't make every Marvel film outscore everything else.
 final class Recommender {
     static let shared = Recommender()
     private let catalog = Catalog.shared
@@ -20,9 +22,22 @@ final class Recommender {
 
     private init() {}
 
+    /// The catalog spells some themes more than one way ("mcu" and "Marvel Cinematic Universe", "Paris" and "paris").
+    private static let tagAlias = ["marvel cinematic universe": "mcu", "dc extended universe": "dc"]
+    static func tagKey(_ tag: String) -> String {
+        let k = tag.lowercased().replacingOccurrences(of: "-", with: " ")
+        return tagAlias[k] ?? k
+    }
+    /// How many titles have each theme: a rare one (a franchise, a character) ties titles together.
+    private lazy var tagCounts: [String: Int] = {
+        var m: [String: Int] = [:]
+        for t in catalog.titles { for k in Set(t.tags.map(Self.tagKey)) { m[k, default: 0] += 1 } }
+        return m
+    }()
+
     private func features(_ t: Title) -> [(String, Double)] {
         var f: [(String, Double)] = t.genres.map { ("g:\($0)", W.genre) }
-        f += t.tags.map { ("t:\($0)", W.tag) }
+        f += t.tags.map { ("t:\(Self.tagKey($0))", W.tag) }
         if !t.creator.isEmpty { f.append(("c:\(t.creator)", W.creator)) }
         f.append(("type:\(t.type.rawValue)", W.type))
         f.append(("d:\(t.year / 10)", W.decade))
@@ -54,6 +69,26 @@ final class Recommender {
         }
     }
 
+    /// Cosine similarity of two titles, by catalog position.
+    func similarity(_ a: Int, _ b: Int) -> Double {
+        catchUp()
+        guard a < vectors.count, b < vectors.count, norms[a] > 0, norms[b] > 0 else { return 0 }
+        var dot = 0.0
+        for (f, x) in vectors[a] { for (g, y) in vectors[b] where g == f { dot += x * y } }
+        return dot / (norms[a] * norms[b])
+    }
+
+    /// Close enough that hiding one should keep the other away for a while: alike overall, or sharing a rare theme.
+    func related(_ a: Int, _ b: Int) -> Bool {
+        if similarity(a, b) >= 0.35 { return true }
+        let ta = catalog.titles[a], tb = catalog.titles[b]
+        let ka = Set(ta.tags.map(Self.tagKey))
+        return tb.tags.contains { x in
+            let k = Self.tagKey(x)
+            return ka.contains(k) && (tagCounts[k] ?? 0) <= 60
+        }
+    }
+
     /// Similarity of one title to every title (only those sharing a feature are non-zero).
     private func dots(from i: Int, into dot: inout [Double], touched: inout [Int]) {
         for (f, x) in vectors[i] {
@@ -74,6 +109,8 @@ final class Recommender {
         let n = catalog.titles.count
         let scale = Double(rated.count).squareRoot()
         var total = [Double](repeating: 0, count: n)
+        // Each title's three biggest pulls from titles you liked, biggest first.
+        var top = [Double](repeating: 0, count: n * 3)
         var best = [Double](repeating: 0, count: n)
         var because = [Int](repeating: -1, count: n)
         var dot = [Double](repeating: 0, count: n)
@@ -87,7 +124,12 @@ final class Recommender {
                 dot[j] = 0
                 guard s >= 0.15 else { continue }
                 let c = s * s * r.w
-                total[j] += c
+                if c > 0 {
+                    var x = c
+                    for k in (j * 3)..<(j * 3 + 3) where x > top[k] { swap(&x, &top[k]) }
+                } else {
+                    total[j] += c
+                }
                 if r.good && c > best[j] {
                     best[j] = c
                     because[j] = r.i
@@ -96,6 +138,7 @@ final class Recommender {
             touched.removeAll(keepingCapacity: true)
         }
 
+        for j in 0..<n { total[j] += top[j * 3] + 0.5 * top[j * 3 + 1] + 0.25 * top[j * 3 + 2] }
         var out: [Rec] = []
         for j in 0..<n where total[j] > 0 {
             let t = catalog.titles[j]
@@ -140,32 +183,60 @@ final class Recommender {
     /// Titles from your last few feeds are five times less likely to come up again soon.
     private static let seenPenalty = log(0.2)
 
+    /// Two titles this alike (same franchise, same director and kind of film) count as more of the same.
+    private static let alike = 0.45
+    /// Each title already in the feed that's alike makes the next one this much less likely.
+    private static let repeatPenalty = log(0.35)
+    /// The first page of a feed: titles like ones you just hid stay out of it.
+    static let firstPage = 8
+
     /// Your picks in a new order for each seed: strong matches lead most feeds without always being
-    /// the same ones, and repeats of the same favourite, creator or genre are spread out.
-    func shuffle(_ recs: [Rec], seed: UInt32, seen: Set<String> = []) -> [Rec] {
-        let mix = 200
+    /// the same ones. To keep it varied, a title alike to ones already in the feed (or picked because
+    /// of the same favourite, by the same creator, or sharing a main genre with the last few) is
+    /// pushed back. Titles related to any in `avoid` (ones you hid, most recent first) stay out of
+    /// the next page and sit lower after it. `start` is the feed so far, kept as it is.
+    func shuffle(_ recs: [Rec], seed: UInt32, seen: Set<String> = [], avoid: [String] = [], start: [Rec] = []) -> [Rec] {
+        catchUp()
+        let mix = 300
         let maxScore = recs.first?.score ?? 1
-        var left = recs.prefix(mix).map { r in
-            (r: r, k: 3 * log(max(1e-6, r.score / maxScore)) + Self.gumbel(seed, r.title.id) + (seen.contains(r.title.id) ? Self.seenPenalty : 0))
+        let kept = Set(start.map(\.title.id))
+        let avoided = avoid.prefix(30).compactMap { catalog.order(of: $0) }
+        struct Card { let r: Rec; let i: Int; let k: Double; var alike: Double; let shunned: Bool }
+        var left: [Card] = recs.prefix(mix).filter { !kept.contains($0.title.id) }.compactMap { r in
+            guard let i = catalog.order(of: r.title.id) else { return nil }
+            let k = 2 * log(max(1e-6, r.score / maxScore)) + Self.gumbel(seed, r.title.id) + (seen.contains(r.title.id) ? Self.seenPenalty : 0)
+            return Card(r: r, i: i, k: k, alike: 0, shunned: avoided.contains { related($0, i) })
         }
         var because: [String: Double] = [:]
         var creators: [String: Double] = [:]
         var out: [Rec] = []
-        while !left.isEmpty {
-            let recent = out.suffix(3).compactMap { $0.title.genres.first }
-            var best = 0
-            var bestScore = -Double.infinity
-            for (i, x) in left.enumerated() {
-                var s = x.k + log(0.6) * ((because[x.r.because?.id ?? ""] ?? 0) + (creators[x.r.title.creator] ?? 0))
-                if let g = x.r.title.genres.first, recent.contains(g) { s += log(0.75) }
-                if s > bestScore { bestScore = s; best = i }
-            }
-            let r = left.remove(at: best).r
+        func add(_ r: Rec) {
             if let b = r.because { because[b.id, default: 0] += 1 }
             if !r.title.creator.isEmpty { creators[r.title.creator, default: 0] += 1 }
+            // Variety matters most near the top; further down, skip the cost of comparing.
+            if out.count < 60, let i = catalog.order(of: r.title.id) {
+                for j in left.indices where similarity(i, left[j].i) >= Self.alike { left[j].alike += 1 }
+            }
             out.append(r)
         }
-        return out + recs.dropFirst(mix)
+        for r in start { add(r) }
+        while !left.isEmpty {
+            let recent = out.suffix(3).compactMap { $0.title.genres.first }
+            // The next page's worth of cards leaves out titles like ones you hid.
+            let early = out.count < start.count + Self.firstPage && left.contains { !$0.shunned }
+            var best = -1
+            var bestScore = -Double.infinity
+            for (i, x) in left.enumerated() {
+                if early && x.shunned { continue }
+                var s = x.k + Self.repeatPenalty * min(4, x.alike)
+                s += log(0.6) * ((because[x.r.because?.id ?? ""] ?? 0) + (creators[x.r.title.creator] ?? 0))
+                if let g = x.r.title.genres.first, recent.contains(g) { s += log(0.75) }
+                if x.shunned { s += log(0.25) }
+                if s > bestScore { bestScore = s; best = i }
+            }
+            add(left.remove(at: best).r)
+        }
+        return out + recs.dropFirst(mix).filter { !kept.contains($0.title.id) }
     }
 
     /// Discover: well-known titles from genres and themes you haven't rated anything in, with your

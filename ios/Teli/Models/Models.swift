@@ -84,7 +84,8 @@ struct Title: Identifiable, Hashable, Codable {
 /// What you thought of a title. Field names match the web app's backups.
 struct Review: Codable, Equatable {
     var verdict: Verdict
-    var tags: [String]
+    /// A short note about it, up to `ReviewNote.maxLength` characters.
+    var note: String?
     var again: Bool
     /// When you first logged it, in milliseconds since 1970.
     var at: Double
@@ -103,51 +104,27 @@ struct Rating: Identifiable, Equatable {
     var verdict: Verdict { review.verdict }
 }
 
-/// A rating keyword. Ratings store the id, so renaming one keeps it on them.
-struct Tag: Codable, Hashable, Identifiable {
-    var id: String
-    var label: String
+/// A rating's note: a line, not a review.
+enum ReviewNote {
+    static let maxLength = 100
 
-    static let defaults: [Tag] = ["silly", "sad", "quirky", "slog", "cozy", "tense", "funny", "beautiful", "hype", "hopeful", "creepy"]
-        .map { Tag(id: $0, label: $0.prefix(1).uppercased() + $0.dropFirst()) }
-    static let maxCount = 16
-    static let maxLength = 16
-    /// Tags from the first tag list that have a close match in the current one.
-    static let old: [String: String] = [
-        "gripping": "tense", "comfort": "cozy", "scary": "creepy", "slow": "slog", "long": "slog", "visuals": "beautiful", "moving": "sad",
-    ]
-
-    /// The id for a new keyword: its label, lowercase and hyphenated.
-    static func makeId(_ label: String) -> String {
-        let folded = label.folding(options: [.diacriticInsensitive, .caseInsensitive], locale: .init(identifier: "en")).lowercased()
-        let hyphenated = folded.replacingOccurrences(of: "[^a-z0-9]+", with: "-", options: .regularExpression)
-        let trimmed = hyphenated.trimmingCharacters(in: CharacterSet(charactersIn: "-"))
-        return String(trimmed.prefix(32))
+    /// One line, trimmed, at most `maxLength` characters; nil when empty.
+    static func clean(_ s: String?) -> String? {
+        guard let s else { return nil }
+        let line = s.split(whereSeparator: \.isWhitespace).joined(separator: " ")
+        return line.isEmpty ? nil : String(line.prefix(maxLength))
     }
 
-    static func isValidId(_ s: String) -> Bool {
-        s.range(of: "^[a-z0-9][a-z0-9-]{0,31}$", options: .regularExpression) != nil
-    }
-
-    /// A keyword's name: from your list, else the defaults, else made from its id (one you've since removed).
-    static func label(for id: String, in tags: [Tag]) -> String {
-        if let t = tags.first(where: { $0.id == id }) { return t.label }
-        if let t = defaults.first(where: { $0.id == id }) { return t.label }
-        let words = id.replacingOccurrences(of: "-", with: " ")
-        return words.prefix(1).uppercased() + words.dropFirst()
-    }
-
-    /// A valid keyword list: trimmed, unique, at most `maxCount`.
-    static func clean(_ list: [Tag]) -> [Tag] {
-        var out: [Tag] = []
-        for t in list {
-            let label = String(t.label.trimmingCharacters(in: .whitespacesAndNewlines).prefix(maxLength))
-            guard !label.isEmpty, isValidId(t.id),
-                  !out.contains(where: { $0.id == t.id || $0.label.lowercased() == label.lowercased() }) else { continue }
-            out.append(Tag(id: t.id, label: label))
-            if out.count == maxCount { break }
+    /// Ratings from before notes had keywords ("cozy", "tense", or ones renamed in `labels`); they
+    /// carry over as the note, "Cozy, tense".
+    static func from(tags: [String], labels: [String: String]) -> String? {
+        var words: [String] = []
+        for id in tags where !id.isEmpty {
+            let w = labels[id] ?? id.replacingOccurrences(of: "-", with: " ")
+            let word = words.isEmpty ? w.prefix(1).uppercased() + w.dropFirst() : w.lowercased()
+            if !words.contains(word) { words.append(word) }
         }
-        return out
+        return clean(words.joined(separator: ", "))
     }
 }
 
@@ -160,8 +137,6 @@ struct AppData: Codable, Equatable {
     var custom: [Title] = []
     /// When each title on your watchlist was saved (ms since 1970).
     var saved: [String: Double] = [:]
-    /// Your rating keywords, once you've changed them (until then, the defaults).
-    var tags: [Tag]?
 }
 
 /// One recommendation.

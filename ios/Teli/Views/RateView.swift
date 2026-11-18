@@ -1,20 +1,19 @@
 import SwiftUI
 
-/// Rating takes one page: good, ok or bad; any keywords for what stood out; would you watch it again.
+/// Rating takes one page: good, ok or bad; an optional short note; would you watch it again.
 struct RateView: View {
     let id: String
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
     @Environment(\.dismiss) private var dismiss
     @State private var verdict: Verdict?
-    @State private var picked: [String] = []
+    @State private var note = ""
+    @FocusState private var writing: Bool
     @State private var again = false
 
     var body: some View {
         if let t = Catalog.shared[id] {
             let prev = store.data.reviews[id]
-            // Your keywords, plus any this rating already has that you've since removed from the list.
-            let choices = store.tags + (prev?.tags ?? []).filter { x in !store.tags.contains { $0.id == x } }.map { Tag(id: $0, label: store.tagLabel($0)) }
             NavigationStack {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
@@ -51,18 +50,27 @@ struct RateView: View {
                             }
                         }
 
-                        if !choices.isEmpty {
-                            HStack(alignment: .firstTextBaseline) {
-                                Text("What stood out?").font(.system(size: 17, weight: .bold))
-                                Text("Optional").font(.system(size: 13)).foregroundStyle(Theme.text3)
-                            }
-                            FlowLayout {
-                                ForEach(choices) { tag in
-                                    Chip(label: tag.label, on: picked.contains(tag.id)) {
-                                        if let i = picked.firstIndex(of: tag.id) { picked.remove(at: i) } else { picked.append(tag.id) }
-                                    }
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("A note").font(.system(size: 17, weight: .bold))
+                            Text("Optional").font(.system(size: 13)).foregroundStyle(Theme.text3)
+                        }
+                        ZStack(alignment: .bottomTrailing) {
+                            TextField("What stuck with you?", text: $note, axis: .vertical)
+                                .lineLimit(2...4)
+                                .focused($writing)
+                                .submitLabel(.done)
+                                .padding(.horizontal, 14).padding(.top, 12).padding(.bottom, 24)
+                                .background(RoundedRectangle(cornerRadius: 14).fill(Theme.surface))
+                                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(writing ? Theme.accent : Theme.border))
+                                .onChange(of: note) {
+                                    // One line, at most the limit: Return finishes instead of starting a new line.
+                                    if note.contains("\n") { note = note.replacingOccurrences(of: "\n", with: " "); writing = false }
+                                    if note.count > ReviewNote.maxLength { note = String(note.prefix(ReviewNote.maxLength)) }
                                 }
-                            }
+                            Text("\(note.count)/\(ReviewNote.maxLength)")
+                                .font(.system(size: 11.5).monospacedDigit())
+                                .foregroundStyle(note.count >= ReviewNote.maxLength ? Theme.verdict(.ok) : Theme.text3)
+                                .padding(.trailing, 12).padding(.bottom, 6)
                         }
 
                         Toggle(isOn: $again) {
@@ -80,7 +88,7 @@ struct RateView: View {
                 .safeAreaInset(edge: .bottom) {
                     Button {
                         guard let verdict else { return }
-                        store.rate(id, verdict: verdict, tags: choices.map(\.id).filter(picked.contains), again: again)
+                        store.rate(id, verdict: verdict, note: note, again: again)
                         router.notify("Rated \(t.title) \(verdict.label.lowercased())")
                         dismiss()
                     } label: {
@@ -100,7 +108,7 @@ struct RateView: View {
             }
             .onAppear {
                 verdict = prev?.verdict
-                picked = prev?.tags ?? []
+                note = prev?.note ?? ""
                 again = prev?.again ?? false
             }
         }

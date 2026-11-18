@@ -10,6 +10,14 @@ enum Version {
     }
 
     static let notes: [Note] = [
+        Note(version: "1.8.0", date: "2026-11-18", items: [
+            "Ratings get a short note (up to 100 characters) instead of keywords; keywords you’d picked carry over as the note",
+            "For You is more varied: liking a few of a franchise no longer fills the feed with it",
+            "Hide something and titles like it stay out of the next page of picks",
+            "Galaxy: names hold still while you move the map and fade in once it settles",
+            "Galaxy: posters beside names, an option in the filters",
+            "Galaxy: titles sit in a neighbourhood of their own genre (IT is in Horror now)",
+        ]),
         Note(version: "1.7.0", date: "2026-11-17", items: [
             "Galaxy: one neighbourhood per genre, so no more \"Comedy\" next to \"Comedy & Western\" or \"Crime\" next to \"Crime shows\"",
             "Galaxy: show what you’ve seen, what you haven’t, or both",

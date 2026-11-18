@@ -42,8 +42,6 @@ final class Store {
         return r
     }
 
-    var tags: [Tag] { data.tags ?? Tag.defaults }
-    func tagLabel(_ id: String) -> String { Tag.label(for: id, in: tags) }
     func isSaved(_ id: String) -> Bool { data.watchlist.contains(id) }
     func isDismissed(_ id: String) -> Bool { data.dismissed.contains(id) }
     var ratedCount: Int { data.reviews.count }
@@ -54,12 +52,12 @@ final class Store {
     // MARK: Changing
 
     /// Save your rating for `id`, keeping when you first logged it. Rating something off your watchlist counts as watching it from there.
-    func rate(_ id: String, verdict: Verdict, tags: [String], again: Bool) {
+    func rate(_ id: String, verdict: Verdict, note: String, again: Bool) {
         guard catalog[id] != nil else { return }
         var d = data
         let prev = d.reviews[id]
         let fromList = prev?.fromList ?? (d.watchlist.contains(id) ? d.saved[id] ?? 0 : nil)
-        d.reviews[id] = Review(verdict: verdict, tags: tags, again: again, at: prev?.at ?? Date().ms, pending: nil, fromList: fromList)
+        d.reviews[id] = Review(verdict: verdict, note: ReviewNote.clean(note), again: again, at: prev?.at ?? Date().ms, pending: nil, fromList: fromList)
         d.watchlist.removeAll { $0 == id }
         d.dismissed.removeAll { $0 == id }
         d.saved[id] = nil
@@ -95,11 +93,6 @@ final class Store {
             d.saved[id] = nil
         }
         data = d
-    }
-
-    /// Replace your keywords; nil goes back to the defaults.
-    func setTags(_ tags: [Tag]?) {
-        data.tags = tags.map(Tag.clean)
     }
 
     /// Adds a title the catalog doesn't have and returns its id (or the existing one's).
@@ -165,7 +158,7 @@ final class Store {
     }
 
     /// Accepts anything a backup might hold and returns valid data: unknown ids dropped, merged
-    /// duplicates followed, old tag names mapped, hand-added titles joined to the catalog first.
+    /// duplicates followed, notes tidied, hand-added titles joined to the catalog first.
     static func sanitize(_ x: AppData) -> AppData {
         let catalog = Catalog.shared
         var d = AppData()
@@ -174,8 +167,7 @@ final class Store {
             let id = catalog.resolve(raw)
             guard catalog[id] != nil, d.reviews[id] == nil else { continue }
             var r = r
-            var seen = Set<String>()
-            r.tags = r.tags.map { Tag.old[$0] ?? $0 }.filter { Tag.isValidId($0) && seen.insert($0).inserted }
+            r.note = ReviewNote.clean(r.note)
             d.reviews[id] = r
         }
         var seen = Set<String>()
@@ -186,7 +178,6 @@ final class Store {
         }
         seen = []
         d.dismissed = x.dismissed.map(catalog.resolve).filter { catalog[$0] != nil && seen.insert($0).inserted }
-        if let tags = x.tags { d.tags = Tag.clean(tags) }
         return d
     }
 }
@@ -201,11 +192,19 @@ private struct LooseData: Decodable {
     }
 
     private enum Keys: String, CodingKey { case reviews, watchlist, dismissed, custom, saved, tags }
+    private struct OldTag: Decodable { let id: String; let label: String }
 
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
+        // Keyword names from before notes, to turn old keywords into notes.
+        let labels = Dictionary(((try? c.decode([Lossy<OldTag>].self, forKey: .tags)) ?? []).compactMap(\.value).map { ($0.id, $0.label) },
+                                uniquingKeysWith: { a, _ in a })
         if let reviews = try? c.decode([String: Lossy<LooseReview>].self, forKey: .reviews) {
-            for (id, r) in reviews { if let r = r.value?.review { data.reviews[id] = r } }
+            for (id, r) in reviews {
+                guard let loose = r.value, var review = loose.review else { continue }
+                if review.note == nil { review.note = ReviewNote.from(tags: loose.oldTags, labels: labels) }
+                data.reviews[id] = review
+            }
         }
         data.watchlist = (try? c.decode([String].self, forKey: .watchlist)) ?? []
         data.dismissed = (try? c.decode([String].self, forKey: .dismissed)) ?? []
@@ -213,16 +212,17 @@ private struct LooseData: Decodable {
             $0.id.range(of: "^u-[mt]-[a-z0-9-]{1,140}$", options: .regularExpression) != nil
         }
         data.saved = (try? c.decode([String: Double].self, forKey: .saved)) ?? [:]
-        data.tags = try? c.decode([Tag].self, forKey: .tags)
     }
 }
 
-/// A review from any version of the web app ("ok" was once "mid").
+/// A review from any version of the web app ("ok" was once "mid"; notes were once keywords).
 private struct LooseReview: Decodable {
-    let review: Review?
-    private enum Keys: String, CodingKey { case verdict, tags, again, at, pending, fromList }
+    var review: Review?
+    var oldTags: [String] = []
+    private enum Keys: String, CodingKey { case verdict, note, tags, again, at, pending, fromList }
     init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: Keys.self)
+        oldTags = (try? c.decode([String].self, forKey: .tags)) ?? []
         let raw = (try? c.decode(String.self, forKey: .verdict)) ?? ""
         guard let verdict = Verdict(rawValue: raw == "mid" ? "ok" : raw) else {
             review = nil
@@ -230,7 +230,7 @@ private struct LooseReview: Decodable {
         }
         review = Review(
             verdict: verdict,
-            tags: (try? c.decode([String].self, forKey: .tags)) ?? [],
+            note: ReviewNote.clean(try? c.decode(String.self, forKey: .note)),
             again: (try? c.decode(Bool.self, forKey: .again)) ?? false,
             at: (try? c.decode(Double.self, forKey: .at)) ?? 0,
             pending: (try? c.decode(Bool.self, forKey: .pending)) == true ? true : nil,

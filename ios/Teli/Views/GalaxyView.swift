@@ -1,9 +1,35 @@
 import SwiftUI
+import UIKit
+
+/// Small posters for names on the map, loaded as they're first needed. `version` changes as each
+/// arrives, so the map (which reads it) draws again.
+@Observable
+final class Thumbs {
+    static let shared = Thumbs()
+    private(set) var version = 0
+    @ObservationIgnored private var images: [String: UIImage] = [:]
+    @ObservationIgnored private var asked = Set<String>()
+
+    func image(for t: Title) -> UIImage? {
+        if let img = images[t.id] { return img }
+        guard let ref = t.image, !asked.contains(t.id), let url = Catalog.imageURL(ref, px: 120) else { return nil }
+        asked.insert(t.id)
+        Task {
+            guard let loaded = try? await URLSession.shared.data(from: url), let img = UIImage(data: loaded.0) else { return }
+            await MainActor.run {
+                self.images[t.id] = img
+                self.version += 1
+            }
+        }
+        return nil
+    }
+}
 
 /// The galaxy: every title on one map, similar ones together, your ratings lit up as
 /// constellations. Drag to pan, pinch to zoom. Only things with a name showing can be tapped: a
-/// title's name (or its dot) opens it, a neighbourhood's name opens its card. Filters show what
-/// you've seen, haven't, or both, turn names off, and highlight any mix of genres, decades, themes
+/// title's name (or its dot) opens it, a neighbourhood's name opens its card. Names hold their place
+/// while the map moves and new ones fade in once it settles. Filters show what you've seen,
+/// haven't, or both, turn names off or put posters beside them, and highlight any mix of genres, decades, themes
 /// and creators. Uncharted flies you to a neighbourhood you've barely rated that holds a lot of your picks.
 struct GalaxyView: View {
     enum Show: String, CaseIterable, Identifiable {
@@ -21,11 +47,20 @@ struct GalaxyView: View {
     final class Targets {
         var titles: [(i: Int, dot: CGPoint, box: CGRect)] = []
         var hoods: [(id: Int, box: CGRect)] = []
+        /// Names showing on the last frame and when each appeared: they keep their place as the map
+        /// moves (instead of reshuffling every frame), and new ones fade in.
+        var shownTitles: [Int: Date] = [:]
+        var shownHoods: [Int: Date] = [:]
     }
 
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
     @AppStorage("teli.sky.names") private var names = true
+    @AppStorage("teli.sky.posters") private var posters = false
+    /// Dragging or pinching: only names already showing are drawn until the map settles.
+    @State private var moving = false
+    /// Just settled: keep drawing a moment so new names fade in.
+    @State private var settledAt: Date?
     @State private var picks: [Dimension: Set<String>] = [:]
     @State private var lit: Set<Int>?
     @State private var show: Show = .all
@@ -64,6 +99,7 @@ struct GalaxyView: View {
                 .onAppear {
                     mapSize = geo.size
                     if cam.s == 0 { fitAll(geo.size) }
+                    settle()
                 }
                 .onChange(of: geo.size) { mapSize = geo.size }
             }
@@ -152,12 +188,16 @@ struct GalaxyView: View {
         let selected = selectedTitle
         let bottom: CGFloat = focus == nil && lit == nil ? 0 : 230
         let targets = self.targets
+        let still = !moving && flight == nil
+        let posters = names && self.posters
+        _ = Thumbs.shared.version  // draw again as posters arrive
 
-        return TimelineView(.animation(paused: flight == nil)) { tl in
+        return TimelineView(.animation(paused: flight == nil && settledAt == nil)) { tl in
             let c = currentCam(tl.date)
             Canvas { ctx, sz in
                 Self.draw(ctx: &ctx, size: sz, cam: c, sky: sky, byHood: byHood, rated: rated, watch: watch, links: links, seen: seen,
-                          highlight: lit, show: show, names: names, focusHood: focusHood, selected: selected, bottom: bottom, targets: targets)
+                          highlight: lit, show: show, names: names, posters: posters, focusHood: focusHood, selected: selected,
+                          bottom: bottom, targets: targets, now: tl.date, still: still)
             }
         }
         .contentShape(Rectangle())
@@ -165,27 +205,40 @@ struct GalaxyView: View {
             DragGesture(minimumDistance: 4)
                 .onChanged { v in
                     flight = nil
+                    if !moving { moving = true }
                     let d = CGSize(width: v.translation.width - dragLast.width, height: v.translation.height - dragLast.height)
                     dragLast = v.translation
                     cam.x = clamp01(cam.x - d.width / cam.s)
                     cam.y = clamp01(cam.y - d.height / cam.s)
                 }
-                .onEnded { _ in dragLast = .zero }
+                .onEnded { _ in dragLast = .zero; settle() }
                 .simultaneously(with: MagnifyGesture()
                     .onChanged { v in
                         flight = nil
+                        if !moving { moving = true }
                         let f = v.magnification / pinchLast
                         pinchLast = v.magnification
                         let anchor = CGPoint(x: v.startAnchor.x * size.width, y: v.startAnchor.y * size.height)
                         zoom(at: anchor, by: f, size: size)
                     }
-                    .onEnded { _ in pinchLast = 1 })
+                    .onEnded { _ in pinchLast = 1; settle() })
         )
         .simultaneousGesture(SpatialTapGesture().onEnded { v in tap(v.location) })
         .accessibilityLabel("Map of every title, with your ratings as constellations")
     }
 
     private func clamp01(_ v: Double) -> Double { min(1, max(0, v)) }
+
+    /// The map has stopped: new names may appear, and keep drawing long enough for them to fade in.
+    private func settle() {
+        moving = false
+        let at = Date()
+        settledAt = at
+        Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            if settledAt == at { settledAt = nil }
+        }
+    }
 
     private var focusedHood: Int? {
         if case .hood(let h) = focus { return h }
@@ -222,6 +275,7 @@ struct GalaxyView: View {
         Task {
             try? await Task.sleep(for: .milliseconds(720))
             flight = nil
+            settle()
         }
     }
 
@@ -305,10 +359,22 @@ struct GalaxyView: View {
     }
 
     static func draw(ctx: inout GraphicsContext, size: CGSize, cam c: Camera, sky: SkyData, byHood: [[Int]], rated: [(i: Int, v: Verdict)],
-                     watch: [Int], links: [(Int, Int)], seen: Set<Int>, highlight: Set<Int>?, show: Show, names: Bool,
-                     focusHood: Int?, selected: Int?, bottom: CGFloat, targets: Targets) {
+                     watch: [Int], links: [(Int, Int)], seen: Set<Int>, highlight: Set<Int>?, show: Show, names: Bool, posters: Bool,
+                     focusHood: Int?, selected: Int?, bottom: CGFloat, targets: Targets, now: Date, still: Bool) {
         targets.titles = []
         targets.hoods = []
+        let was = (titles: targets.shownTitles, hoods: targets.shownHoods)
+        var nowTitles: [Int: Date] = [:]
+        var nowHoods: [Int: Date] = [:]
+        defer {
+            targets.shownTitles = nowTitles
+            targets.shownHoods = nowHoods
+        }
+        /// How far a name has faded in; nil when it's new and the map is still moving.
+        func appear(_ memo: [Int: Date], _ id: Int) -> Double? {
+            guard let since = memo[id] ?? (still ? now : nil) else { return nil }
+            return min(1, now.timeIntervalSince(since) / 0.26)
+        }
         guard c.s > 0 else { return }
         func sx(_ x: Double) -> CGFloat { (x - c.x) * c.s + size.width / 2 }
         func sy(_ y: Double) -> CGFloat { (y - c.y) * c.s + size.height / 2 }
@@ -415,14 +481,21 @@ struct GalaxyView: View {
         }
         let hoodAlpha = max(0, min(1, (5 - zoom) / 2.5))
         if hoodAlpha > 0 {
-            for h in sky.hoods.sorted(by: { $0.n > $1.n }) {
+            // Names already showing keep their spot; then the biggest neighbourhoods.
+            let order = sky.hoods.sorted { a, b in
+                let (sa, sb) = (was.hoods[a.id] != nil, was.hoods[b.id] != nil)
+                return sa != sb ? sa : a.n > b.n
+            }
+            for h in order {
+                if !still && was.hoods[h.id] == nil { continue }
                 let text = ctx.resolve(Text(h.label).font(.system(size: 12, weight: .semibold)).foregroundColor(.white))
                 let ts = text.measure(in: CGSize(width: 400, height: 40))
                 let w = ts.width + 30
                 let rect = CGRect(x: sx(h.x) - w / 2, y: sy(h.y) - 12, width: w, height: 24)
-                guard fits(rect) else { continue }
-                if hoodAlpha > 0.4 { targets.hoods.append((id: h.id, box: rect)) }
-                ctx.opacity = hoodAlpha * (highlight != nil ? 0.6 : 1)
+                guard fits(rect), let k = appear(was.hoods, h.id) else { continue }
+                nowHoods[h.id] = was.hoods[h.id] ?? now
+                if hoodAlpha * k > 0.4 { targets.hoods.append((id: h.id, box: rect)) }
+                ctx.opacity = hoodAlpha * k * (highlight != nil ? 0.6 : 1)
                 ctx.fill(Path(roundedRect: rect, cornerRadius: 12), with: .color(Color(hex: 0x050610).opacity(focusHood == h.id ? 0.95 : 0.78)))
                 if focusHood == h.id { ctx.stroke(Path(roundedRect: rect, cornerRadius: 12), with: .color(h.color), lineWidth: 1.5) }
                 ctx.fill(Path(ellipseIn: CGRect(x: rect.minX + 8.5, y: rect.midY - 3.5, width: 7, height: 7)), with: .color(h.color))
@@ -436,35 +509,65 @@ struct GalaxyView: View {
         if zoom > 3 || (onlyMine && !rated.isEmpty) {
             let titleAlpha = onlyMine ? 1 : min(1, (zoom - 3) / 2)
             let mine = Set(rated.map(\.i))
+            // Your highlighted stars, your other stars, names already showing, then the best known.
             var picks = rated.map(\.i).filter { !faded($0) } + rated.map(\.i).filter(faded)
+            var queued = Set(picks)
+            for i in was.titles.keys.sorted() where i < sky.count && !queued.contains(i) && !faded(i)
+                && !(show == .unseen && seen.contains(i)) && !(show == .seen && !seen.contains(i)) {
+                picks.append(i)
+                queued.insert(i)
+            }
             if !onlyMine {
                 // Visible dots, best known first (catalog order is popularity order).
                 let x0 = c.x - size.width / 2 / c.s, x1 = c.x + size.width / 2 / c.s
                 let y0 = c.y - size.height / 2 / c.s, y1 = c.y + size.height / 2 / c.s
                 var i = 0
                 while i < sky.count && picks.count < 600 {
-                    if sky.xs[i] >= x0 && sky.xs[i] <= x1 && sky.ys[i] >= y0 && sky.ys[i] <= y1 && !faded(i) && !mine.contains(i)
+                    if sky.xs[i] >= x0 && sky.xs[i] <= x1 && sky.ys[i] >= y0 && sky.ys[i] <= y1 && !faded(i) && !queued.contains(i)
                         && !(show == .unseen && seen.contains(i)) {
                         picks.append(i)
                     }
                     i += 1
                 }
             }
+            // With posters, each name has a small poster between it and its dot, so fewer fit.
+            let thumb = CGSize(width: 22, height: 33)
+            let pw: CGFloat = posters ? thumb.width + 6 : 0
+            let ph: CGFloat = posters ? thumb.height : 18
             var placed = 0
             for i in picks where i != selected {
-                if placed >= 45 { break }
-                let name = Catalog.shared.titles[i].title
-                let label = name.count > 26 ? String(name.prefix(25)) + "…" : name
+                if placed >= (posters ? 18 : 30) { break }
+                if !still && was.titles[i] == nil { continue }
+                let t = Catalog.shared.titles[i]
+                let label = t.title.count > 26 ? String(t.title.prefix(25)) + "…" : t.title
                 let text = ctx.resolve(Text(label).font(.system(size: 12, weight: mine.contains(i) ? .semibold : .medium))
                     .foregroundColor(mine.contains(i) ? .white : Color(hex: 0xD6D4F2)))
                 let ts = text.measure(in: CGSize(width: 400, height: 40))
                 let x = sx(sky.xs[i]) + 8, y = sy(sky.ys[i])
-                let rect = CGRect(x: x - 3, y: y - 9, width: ts.width + 6, height: 18)
-                guard fits(rect) else { continue }
-                if titleAlpha > 0.4 { targets.titles.append((i: i, dot: CGPoint(x: x - 8, y: y), box: rect)) }
-                ctx.opacity = titleAlpha * (mine.contains(i) ? 1 : 0.85) * (faded(i) ? 0.5 : 1)
-                ctx.fill(Path(roundedRect: rect, cornerRadius: 5), with: .color(Color(hex: 0x04050E).opacity(0.7)))
-                ctx.draw(text, at: CGPoint(x: x, y: y), anchor: .leading)
+                let rect = CGRect(x: x - 3, y: y - ph / 2, width: pw + ts.width + 6, height: ph)
+                guard fits(rect), let k = appear(was.titles, i) else { continue }
+                nowTitles[i] = was.titles[i] ?? now
+                if titleAlpha * k > 0.4 { targets.titles.append((i: i, dot: CGPoint(x: x - 8, y: y), box: rect)) }
+                ctx.opacity = titleAlpha * k * (mine.contains(i) ? 1 : 0.85) * (faded(i) ? 0.5 : 1)
+                if posters {
+                    let slot = CGRect(x: x, y: y - thumb.height / 2, width: thumb.width, height: thumb.height)
+                    let shape = Path(roundedRect: slot, cornerRadius: 4)
+                    ctx.fill(shape, with: .color((sky.hood(at: i)?.color ?? .gray).opacity(0.33)))
+                    if let img = Thumbs.shared.image(for: t), img.size.width > 0, img.size.height > 0 {
+                        // Cover the slot: scale the poster to fill it, cropped from the middle.
+                        let scale = max(slot.width / img.size.width, slot.height / img.size.height)
+                        let drawn = CGSize(width: img.size.width * scale, height: img.size.height * scale)
+                        var inner = ctx
+                        inner.clip(to: shape)
+                        inner.draw(Image(uiImage: img), in: CGRect(x: slot.midX - drawn.width / 2, y: slot.midY - drawn.height / 2,
+                                                                  width: drawn.width, height: drawn.height))
+                    }
+                    ctx.stroke(shape, with: .color(.white.opacity(mine.contains(i) ? 0.85 : 0.22)), lineWidth: 1)
+                    ctx.draw(text, at: CGPoint(x: x + pw, y: y), anchor: .leading)
+                } else {
+                    ctx.fill(Path(roundedRect: rect, cornerRadius: 5), with: .color(Color(hex: 0x04050E).opacity(0.7)))
+                    ctx.draw(text, at: CGPoint(x: x, y: y), anchor: .leading)
+                }
                 ctx.opacity = 1
                 placed += 1
             }
@@ -554,7 +657,7 @@ struct GalaxyView: View {
         case .seen: "Only titles you’ve rated."
         case .unseen: "Only titles you haven’t rated yet."
         }
-        let off = names ? "" : " Names are off: tap your own stars."
+        let off = names ? (posters ? " Posters beside names, so fewer fit." : "") : " Names are off: tap your own stars."
         let across = picks.values.filter { !$0.isEmpty }.count > 1 ? " Highlighting titles that match every section you picked from." : ""
         return base + off + across
     }
@@ -569,6 +672,7 @@ struct GalaxyView: View {
                     .pickerStyle(.segmented)
                     .onChange(of: show) { focus = nil }
                     Toggle("Names", isOn: $names)
+                    Toggle("Posters beside names", isOn: $posters).disabled(!names)
                 } header: { Text("Show") } footer: { Text(showHint) }
                 ForEach(Dimension.allCases) { d in
                     Section {

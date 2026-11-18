@@ -2,6 +2,7 @@ import SwiftUI
 
 /// A full-screen feed of recommendations, one per page. Discover switches to well-known titles
 /// from genres and themes you haven't rated yet. Pull down on the first card for a fresh deal.
+/// Hiding a card re-deals the ones ahead without anything related to it for the next page.
 struct ForYouView: View {
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
@@ -9,6 +10,8 @@ struct ForYouView: View {
     @State private var seed = UInt32.random(in: 0...UInt32.max)
     @State private var feed: [Rec] = []
     @State private var dealtFor = -1
+    /// The card on screen.
+    @State private var current: String?
 
     /// Titles you've scrolled past lately, so the next feed leads with something else.
     @AppStorage("teli.seen") private var seenRaw = ""
@@ -23,8 +26,16 @@ struct ForYouView: View {
         let recs = store.recommendations
         feed = discovering
             ? Recommender.shared.discover(ratings: store.ratings, dismissed: Set(store.data.dismissed), recs: recs, seed: seed, seen: seen)
-            : Recommender.shared.shuffle(recs, seed: seed, seen: seen)
+            : Recommender.shared.shuffle(recs, seed: seed, seen: seen, avoid: Array(store.data.dismissed.reversed()))
         dealtFor = store.ratedCount
+    }
+
+    /// After you hide a card: keep the ones you've scrolled through and re-deal what's ahead.
+    private func redealAhead() {
+        guard !discovering, let at = current.flatMap({ id in feed.firstIndex { $0.id == id } }) else { return deal() }
+        let start = feed.prefix(at + 1).filter { store.ratings[$0.id] == nil && !store.isDismissed($0.id) }
+        feed = Recommender.shared.shuffle(store.recommendations, seed: seed, seen: seen,
+                                          avoid: Array(store.data.dismissed.reversed()), start: Array(start))
     }
 
     var body: some View {
@@ -65,6 +76,7 @@ struct ForYouView: View {
             }
             .scrollTargetLayout()
         }
+        .scrollPosition(id: $current)
         .scrollTargetBehavior(.paging)
         .scrollIndicators(.hidden)
         .ignoresSafeArea(edges: .top)
@@ -90,7 +102,9 @@ struct ForYouView: View {
             .accessibilityAddTraits(discovering ? .isSelected : [])
         }
         .onAppear { if dealtFor < 0 { deal() } }
-        .onChange(of: store.data.dismissed) { if feed.isEmpty { deal() } }
+        .onChange(of: store.data.dismissed) { old, new in
+            if feed.isEmpty { deal() } else if new.count > old.count { redealAhead() }
+        }
     }
 
     // MARK: First run
