@@ -10,6 +10,11 @@ enum Version {
     }
 
     static let notes: [Note] = [
+        Note(version: "1.8.1", date: "2026-11-19", items: [
+            "For You pages line up with the screen however far you scroll",
+            "Uncharted and neighbourhood cards no longer crash when you’ve added titles by hand",
+            "Galaxy always shows the map on first open",
+        ]),
         Note(version: "1.8.0", date: "2026-11-18", items: [
             "Ratings get a short note (up to 100 characters) instead of keywords; keywords you’d picked carry over as the note",
             "For You is more varied: liking a few of a franchise no longer fills the feed with it",

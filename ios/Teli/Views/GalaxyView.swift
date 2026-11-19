@@ -98,10 +98,13 @@ struct GalaxyView: View {
                 }
                 .onAppear {
                     mapSize = geo.size
-                    if cam.s == 0 { fitAll(geo.size) }
+                    fitIfNeeded(geo.size)
                     settle()
                 }
-                .onChange(of: geo.size) { mapSize = geo.size }
+                .onChange(of: geo.size) {
+                    mapSize = geo.size
+                    fitIfNeeded(geo.size)
+                }
             }
             .background(RadialGradient(colors: [Color(hex: 0x0B0D24), Color(hex: 0x04050E)], center: .center, startRadius: 0, endRadius: 600).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
@@ -257,7 +260,13 @@ struct GalaxyView: View {
         cam.y = clamp01(wy - (p.y - size.height / 2) / cam.s)
     }
 
+    /// The first layout can come with no size yet; fit the map once it has one, or it stays blank.
+    private func fitIfNeeded(_ size: CGSize) {
+        if !(cam.s > 0 && cam.fit > 0) { fitAll(size) }
+    }
+
     private func fitAll(_ size: CGSize) {
+        guard size.width > 0, size.height > 0 else { return }
         let e = sky.extent
         let fit = min(size.width / (e.width * 1.08), size.height / (e.height * 1.08))
         cam = Camera(x: e.midX, y: e.midY, s: fit, fit: fit)
@@ -265,6 +274,8 @@ struct GalaxyView: View {
 
     /// Flies the view to a spot, zoomed so `span` of the map fills most of it.
     private func fly(to p: CGPoint, span: Double, size: CGSize, bottom: CGFloat) {
+        fitIfNeeded(size)
+        guard cam.s > 0 else { return }
         var to = cam
         let room = size.height - bottom
         to.s = min(cam.fit * 40, max(cam.fit * 1.5, min(size.width / span, room / span) * 0.7))
@@ -731,7 +742,7 @@ struct GalaxyView: View {
             .padding(.horizontal, 12).padding(.bottom, 10)
             .onTapGesture { router.open(t.id) }
         case .hood(let id):
-            groupCard(label: sky.hoods[id].label, color: sky.hoods[id].color, total: sky.hoods[id].n) { _, i in sky.hoodOf[i] == id }
+            groupCard(label: sky.hoods[id].label, color: sky.hoods[id].color, total: sky.hoods[id].n) { _, i in sky.hood(at: i)?.id == id }
         case nil:
             if let lit {
                 let genres = picks[.genres] ?? []

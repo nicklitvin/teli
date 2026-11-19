@@ -59,27 +59,35 @@ struct ForYouView: View {
         feed.filter { store.ratings[$0.id] == nil && !store.isDismissed($0.id) }
     }
 
+    /// Every card is exactly as tall as the scroll view, which runs edge to edge (under the status
+    /// bar and tab bar) with no insets: if a page and a card differ by even the tab bar's height,
+    /// paging drifts a little further off with every swipe.
     private var reel: some View {
-        ScrollView(.vertical) {
-            LazyVStack(spacing: 0) {
-                ForEach(visible.prefix(60)) { rec in
-                    ReelCard(rec: rec, discovering: discovering)
-                        .containerRelativeFrame([.horizontal, .vertical])
-                        .onAppear { markSeen(rec.id) }
+        GeometryReader { geo in
+            let inset = geo.safeAreaInsets
+            let page = CGSize(width: geo.size.width + inset.leading + inset.trailing,
+                              height: geo.size.height + inset.top + inset.bottom)
+            ScrollView(.vertical) {
+                LazyVStack(spacing: 0) {
+                    ForEach(visible.prefix(60)) { rec in
+                        ReelCard(rec: rec, discovering: discovering, bottomInset: inset.bottom)
+                            .frame(width: page.width, height: page.height)
+                            .onAppear { markSeen(rec.id) }
+                    }
+                    if visible.isEmpty && dealtFor >= 0 {
+                        EmptyState(icon: discovering ? "map" : "sparkles",
+                                   title: discovering ? "Every frontier charted" : "Nothing left to pick",
+                                   message: discovering ? "Rate more titles to open new ones." : "Rate a few more titles for fresh picks.")
+                            .frame(width: page.width, height: page.height)
+                    }
                 }
-                if visible.isEmpty && dealtFor >= 0 {
-                    EmptyState(icon: discovering ? "map" : "sparkles",
-                               title: discovering ? "Every frontier charted" : "Nothing left to pick",
-                               message: discovering ? "Rate more titles to open new ones." : "Rate a few more titles for fresh picks.")
-                        .containerRelativeFrame([.horizontal, .vertical])
-                }
+                .scrollTargetLayout()
             }
-            .scrollTargetLayout()
+            .scrollPosition(id: $current)
+            .scrollTargetBehavior(.paging)
+            .scrollIndicators(.hidden)
+            .ignoresSafeArea()
         }
-        .scrollPosition(id: $current)
-        .scrollTargetBehavior(.paging)
-        .scrollIndicators(.hidden)
-        .ignoresSafeArea(edges: .top)
         .refreshable {
             seed = UInt32.random(in: 0...UInt32.max)
             deal()
@@ -144,6 +152,8 @@ struct ForYouView: View {
 private struct ReelCard: View {
     let rec: Rec
     let discovering: Bool
+    /// The tab bar and home indicator: the card runs under them, its buttons stay above.
+    var bottomInset: CGFloat = 0
     @Environment(Store.self) private var store
     @Environment(Router.self) private var router
 
@@ -201,7 +211,7 @@ private struct ReelCard: View {
             }
             .foregroundStyle(.white)
             .padding(.horizontal, 20)
-            .padding(.bottom, 28)
+            .padding(.bottom, 28 + bottomInset)
         }
         .contentShape(Rectangle())
         .onTapGesture { router.open(t.id) }
