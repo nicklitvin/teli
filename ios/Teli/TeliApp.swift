@@ -71,6 +71,7 @@ struct RootView: View {
         .sheet(item: $router.rating) { item in
             RateView(id: item.id)
                 .presentationDetents([.large])
+                .presentationDragIndicator(.visible)
                 .presentationBackground(Theme.bg)
         }
         .sheet(item: $router.detail) { item in

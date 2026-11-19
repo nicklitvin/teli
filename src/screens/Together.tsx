@@ -3,6 +3,7 @@ import type { MediaType } from '../types';
 import { GENRES, metaLine } from '../lib/catalog';
 import { CrewError, cleanCode, inviteLink, useCloudCrew, validCode } from '../lib/cloud';
 import { groupPicks, loadGroup, saveGroup, toMember, type GroupPick, type GroupState, type SeenMode } from '../lib/group';
+import { VERDICT_LABEL } from '../lib/rating';
 import { ratedCount, useStore } from '../lib/store';
 import { useNav } from '../nav';
 import { ShareIcon, UserIcon, UsersIcon, XIcon } from '../components/Icons';
@@ -19,7 +20,7 @@ const SEEN: { value: SeenMode; label: string }[] = [
 
 /** One line under a pick: who has seen it (with their verdict, and whether they'd watch it again), who wants to, or the usual details. */
 function pickDetail(p: GroupPick) {
-  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${s.verdict}${s.again ? ', would rewatch' : ''})`).join(', ')}`;
+  if (p.seenBy.length) return `Seen by ${p.seenBy.map((s) => `${s.name === 'You' ? 'you' : s.name} (${VERDICT_LABEL[s.verdict].toLowerCase()}${s.again ? ', would rewatch' : ''})`).join(', ')}`;
   if (p.wanted.length) return `On ${p.wanted.map((n) => (n === 'You' ? 'your' : `${n}'s`)).join(' & ')} watchlist`;
   return metaLine(p.title);
 }

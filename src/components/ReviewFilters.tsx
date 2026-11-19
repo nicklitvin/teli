@@ -2,7 +2,7 @@ import type { Verdict } from '../types';
 import { VERDICTS, VERDICT_LABEL, type ReviewFilter } from '../lib/rating';
 import { XIcon } from './Icons';
 
-const COLOR: Record<Verdict, string> = { good: 'var(--liked)', ok: 'var(--fine)', bad: 'var(--disliked)' };
+const COLOR: Record<Verdict, string> = { good: 'var(--liked)', ok: 'var(--fine)', bad: 'var(--disliked)', dnf: 'var(--quit)' };
 
 const toggle = <T,>(xs: T[], x: T) => (xs.includes(x) ? xs.filter((y) => y !== x) : [...xs, x]);
 

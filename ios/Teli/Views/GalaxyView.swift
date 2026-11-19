@@ -29,8 +29,9 @@ final class Thumbs {
 /// constellations. Drag to pan, pinch to zoom. Only things with a name showing can be tapped: a
 /// title's name (or its dot) opens it, a neighbourhood's name opens its card. Names hold their place
 /// while the map moves and new ones fade in once it settles. Filters show what you've seen,
-/// haven't, or both, turn names off or put posters beside them, and highlight any mix of genres, decades, themes
-/// and creators. Uncharted flies you to a neighbourhood you've barely rated that holds a lot of your picks.
+/// haven't, or both, turn names off or put posters beside them, and highlight any mix of genres,
+/// decades, themes and creators on the map itself; the filter sheet says how many titles that
+/// leaves. Uncharted flies you to a neighbourhood you've barely rated that holds a lot of your picks.
 struct GalaxyView: View {
     enum Show: String, CaseIterable, Identifiable {
         case all = "Both", seen = "Seen", unseen = "Not seen"
@@ -66,6 +67,8 @@ struct GalaxyView: View {
     @State private var show: Show = .all
     @State private var focus: Focus?
     @State private var showFilters = false
+    /// Filter sections open in the sheet; they start folded so it stays short.
+    @State private var unfolded: Set<Dimension> = []
     @State private var cam = Camera()
     @State private var flight: Flight?
     @State private var lastHood: Int?
@@ -109,7 +112,7 @@ struct GalaxyView: View {
             .background(RadialGradient(colors: [Color(hex: 0x0B0D24), Color(hex: 0x04050E)], center: .center, startRadius: 0, endRadius: 600).ignoresSafeArea())
             .toolbar(.hidden, for: .navigationBar)
             .sheet(isPresented: $showFilters) {
-                filters.presentationDetents([.medium, .large]).presentationBackground(.ultraThinMaterial)
+                filters.presentationDetents([.large]).presentationDragIndicator(.visible).presentationBackground(.ultraThinMaterial)
             }
             .onChange(of: picks) { lit = Self.highlight(picks, sky: sky, catalog: catalog) }
         }
@@ -153,16 +156,13 @@ struct GalaxyView: View {
 
     private var pickCount: Int { picks.values.reduce(0) { $0 + $1.count } }
     private var anyFilter: Bool { pickCount > 0 || show != .all }
-    /// "Comedy / Romance · 1990s", or when that's too long for the card, "Comedy + 2 more".
-    private var pickName: String {
-        let parts = Dimension.allCases.compactMap { d -> String? in
-            let ks = (picks[d] ?? []).sorted()
-            return ks.isEmpty ? nil : ks.joined(separator: " / ")
-        }
-        let full = parts.joined(separator: " · ")
-        guard full.count > 22, pickCount > 1 else { return full }
-        let first = Dimension.allCases.lazy.compactMap { (self.picks[$0] ?? []).sorted().first }.first ?? full
-        return "\(first) + \(pickCount - 1) more"
+    /// How many titles the map shows with these filters: only highlighted ones when anything is
+    /// picked, and only yours (or only the rest) when showing just what you have or haven't seen.
+    private var shownCount: Int {
+        if show == .all { return lit?.count ?? sky.count }
+        let seen = seenSet
+        guard let lit else { return show == .seen ? seen.count : sky.count - seen.count }
+        return lit.reduce(0) { $0 + (seen.contains($1) == (show == .seen) ? 1 : 0) }
     }
 
     // MARK: Map
@@ -189,7 +189,7 @@ struct GalaxyView: View {
         let show = self.show
         let focusHood = focusedHood
         let selected = selectedTitle
-        let bottom: CGFloat = focus == nil && lit == nil ? 0 : 230
+        let bottom: CGFloat = focus == nil ? 0 : 230
         let targets = self.targets
         let still = !moving && flight == nil
         let posters = names && self.posters
@@ -328,7 +328,7 @@ struct GalaxyView: View {
         guard mapSize != .zero, let ids = Self.highlight(next, sky: sky, catalog: catalog) else { return }
         let seen = seenSet
         let shown = ids.filter { show == .all || seen.contains($0) == (show == .seen) }
-        if let f = frameOf(Array(shown)) { fly(to: f.center, span: f.span, size: mapSize, bottom: 230) }
+        if let f = frameOf(Array(shown)) { fly(to: f.center, span: f.span, size: mapSize, bottom: 0) }
     }
 
     private func clearFilters() {
@@ -677,24 +677,42 @@ struct GalaxyView: View {
         NavigationStack {
             Form {
                 Section {
+                    Text("\(shownCount.formatted()) of \(sky.count.formatted()) titles shown")
+                        .font(.system(size: 15, weight: .semibold))
+                        .contentTransition(.numericText())
+                        .animation(.snappy, value: shownCount)
+                }
+                Section {
                     Picker("Show", selection: $show) {
                         ForEach(Show.allCases) { Text($0.rawValue).tag($0) }
                     }
                     .pickerStyle(.segmented)
                     .onChange(of: show) { focus = nil }
                     Toggle("Names", isOn: $names)
-                    Toggle("Posters beside names", isOn: $posters).disabled(!names)
+                    Toggle("Posters", isOn: $posters).disabled(!names)
                 } header: { Text("Show") } footer: { Text(showHint) }
                 ForEach(Dimension.allCases) { d in
+                    let n = picks[d]?.count ?? 0
                     Section {
-                        if universe(d).count > 24 {
-                            ScrollView { chips(d).padding(.vertical, 8) }.frame(maxHeight: 150)
-                        } else {
-                            chips(d).padding(.vertical, 8)
+                        DisclosureGroup(isExpanded: Binding(get: { unfolded.contains(d) },
+                                                            set: { if $0 { unfolded.insert(d) } else { unfolded.remove(d) } })) {
+                            if universe(d).count > 24 {
+                                ScrollView { chips(d).padding(.vertical, 8) }.frame(maxHeight: 220)
+                            } else {
+                                chips(d).padding(.vertical, 8)
+                            }
+                        } label: {
+                            HStack {
+                                Text(d.rawValue).font(.system(size: 16, weight: .semibold))
+                                if n > 1 { Text("any of these").font(.system(size: 13)).foregroundStyle(Theme.text3) }
+                                Spacer()
+                                if n > 0 {
+                                    Text("\(n)").font(.system(size: 12, weight: .bold)).foregroundStyle(Theme.onGlow)
+                                        .padding(.horizontal, 7).frame(minWidth: 22, minHeight: 22)
+                                        .background(Capsule().fill(Theme.accent))
+                                }
+                            }
                         }
-                    } header: {
-                        Text((picks[d]?.count ?? 0) > 1 ? "\(d.rawValue) · any of these" : d.rawValue)
-                            .padding(.bottom, 4)
                     }
                 }
             }
@@ -702,8 +720,7 @@ struct GalaxyView: View {
             .navigationTitle("Map filters")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                if anyFilter { ToolbarItem(placement: .cancellationAction) { Button("Clear all") { clearFilters() } } }
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { showFilters = false } }
+                if anyFilter { ToolbarItem(placement: .confirmationAction) { Button("Clear all") { clearFilters() } } }
             }
         }
     }
@@ -744,15 +761,11 @@ struct GalaxyView: View {
         case .hood(let id):
             groupCard(label: sky.hoods[id].label, color: sky.hoods[id].color, total: sky.hoods[id].n) { _, i in sky.hood(at: i)?.id == id }
         case nil:
-            if let lit {
-                let genres = picks[.genres] ?? []
-                groupCard(label: pickName, color: genres.count == 1 && pickCount == 1 ? Catalog.color(forGenre: genres.first!) : Theme.accent,
-                          total: lit.count) { _, i in lit.contains(i) }
-            }
+            EmptyView()
         }
     }
 
-    /// A neighbourhood or highlighted group: how much of it you've rated, and titles to try there.
+    /// A neighbourhood: how much of it you've rated, and titles to try there.
     private func groupCard(label: String, color: Color, total: Int, inGroup: @escaping (Title, Int) -> Bool) -> some View {
         let mine = store.ratings.values.filter { r in catalog.order(of: r.id).map { inGroup(catalog.titles[$0], $0) } ?? false }
         var picks = store.recommendations.filter { r in catalog.order(of: r.id).map { inGroup(r.title, $0) } ?? false }.prefix(10).map(\.title)
@@ -770,9 +783,7 @@ struct GalaxyView: View {
                         .font(.system(size: 12.5)).foregroundStyle(Theme.text2)
                 }
                 Spacer()
-                Button {
-                    if focus == nil { self.picks = [:] } else { focus = nil }
-                } label: { Image(systemName: "xmark").foregroundStyle(Theme.text2) }.accessibilityLabel("Close")
+                Button { focus = nil } label: { Image(systemName: "xmark").foregroundStyle(Theme.text2) }.accessibilityLabel("Close")
             }
             ScrollView(.horizontal) {
                 LazyHStack(spacing: 10) {

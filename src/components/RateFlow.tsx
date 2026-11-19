@@ -4,17 +4,18 @@ import { BY_ID, metaLine } from '../lib/catalog';
 import { MAX_NOTE, VERDICTS, VERDICT_LABEL } from '../lib/rating';
 import { pendingIds, useStore } from '../lib/store';
 import { useNav } from '../nav';
-import { CheckIcon, MehIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
+import { CheckIcon, MehIcon, PauseIcon, StarIcon, ThumbIcon, XIcon } from './Icons';
 import { Poster } from './Poster';
 
 const VERDICT_ICON: Record<Verdict, ReactNode> = {
   good: <ThumbIcon size={24} />,
   ok: <MehIcon size={24} />,
   bad: <ThumbIcon size={24} down />,
+  dnf: <PauseIcon size={24} />,
 };
 
 /**
- * Rating on one page: good, ok or bad, an optional short note, and whether you'd watch
+ * Rating on one page: good, ok, bad or didn't finish, an optional short note, and whether you'd watch
  * it again, then Finish. Given several `ids` it walks through them in turn (reviewing titles carried
  * over from the old rankings), and `intro` first explains why.
  */

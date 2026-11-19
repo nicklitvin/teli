@@ -137,11 +137,9 @@ export function Profile({ active, onSearch }: { active: boolean; onSearch: () =>
           {statsOpen ? null : list.length ? (
             shown.length ? (
               <>
-                {(narrowed || watching) && (
-                  <p className="list-caption">
-                    {narrowed ? `${shown.length} of ${list.length} ${noun}` : `${plural(list.length, tab === 'movie' ? 'movie' : 'show')} to watch`}
-                  </p>
-                )}
+                <p className="list-caption">
+                  {narrowed ? `${shown.length} of ${list.length} ${noun}` : `${plural(list.length, tab === 'movie' ? 'movie' : 'show')} ${watching ? 'to watch' : 'watched'}`}
+                </p>
                 <Cards>
                   {shown.map((x) => (
                     <TitleRow key={x.id} t={x.t} detail={watching ? undefined : ratedDetail(x.t, ratings.get(x.id)!, sort !== 'verdict')}
@@ -195,13 +193,14 @@ function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun:
   const n = countVerdicts(done);
   const today = new Date().setHours(0, 0, 0, 0);
   // Index 0 is 29 days ago, 29 is today.
-  const days = Array.from({ length: 30 }, () => ({ good: 0, ok: 0, bad: 0 }));
+  const days = Array.from({ length: 30 }, () => countVerdicts([]));
+  const sum = (d: Record<string, number>) => VERDICTS.reduce((s, v) => s + d[v], 0);
   for (const r of done) {
     const d = 29 - Math.floor((today - new Date(r.at).setHours(0, 0, 0, 0)) / DAY);
     if (d >= 0 && d < 30) days[d][r.verdict]++;
   }
-  const recent = days.reduce((s, d) => s + d.good + d.ok + d.bad, 0);
-  const peak = Math.max(1, ...days.map((d) => d.good + d.ok + d.bad));
+  const recent = days.reduce((s, d) => s + sum(d), 0);
+  const peak = Math.max(1, ...days.map(sum));
   const again = done.length ? Math.round((done.filter((r) => r.again).length / done.length) * 100) : 0;
   const genres = top(rated.flatMap((r) => BY_ID.get(r.id)!.genres), 4);
   // The ring: each verdict's share as an arc on a circle 100 long, starting at 12 o'clock.
@@ -214,6 +213,7 @@ function Stats({ rated, saved, noun }: { rated: Rating[]; saved: number[]; noun:
   });
   return (
     <div className="stats-panel">
+      <p className="stats-scope">Every {noun.slice(0, -1)} you’ve rated. Filters and search don’t apply here.</p>
       <div className="stat-tiles">
         <div className="stat"><strong>{rated.length}</strong><span>rated</span></div>
         <div className="stat"><strong>{recent}</strong><span>30 days</span></div>

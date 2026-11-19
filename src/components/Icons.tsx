@@ -64,6 +64,10 @@ export const ThumbIcon = ({ down, ...p }: P & { down?: boolean }) => (
 export const MehIcon = (p: P) => (
   <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M8 15h8" /><circle cx="9" cy="10" r=".8" fill="currentColor" /><circle cx="15" cy="10" r=".8" fill="currentColor" /></Svg>
 );
+/** Paused: stopped partway through. */
+export const PauseIcon = (p: P) => (
+  <Svg {...p}><circle cx="12" cy="12" r="9" /><path d="M10 9v6M14 9v6" /></Svg>
+);
 export const MapIcon = (p: P) => (
   <Svg {...p}>
     <path d="M7.5 7.5l3 8M9 6h6.5M16.5 8l-2.5 7.5" />

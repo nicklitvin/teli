@@ -83,6 +83,8 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
   const [panel, setOpen] = useState<Tool | null>(null);
   // One panel at a time: opening stats closes the filters or search, and the other way round.
   const open = statsOpen && stats ? 'stats' : panel;
+  // Stats always cover the whole tab: while they're open, filters and search step aside (and come back after).
+  const paused = open === 'stats';
   const optionOn = !!option && option.value !== option.initial;
   const anyOn = !!genre || optionOn || !!more?.active;
   const toggle = (k: Tool | 'stats') => {
@@ -110,18 +112,18 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
           </button>
         )}
         {extra}
-        <button className={`icon-btn tool ${open === 'genre' || anyOn ? 'on' : ''}`} onClick={() => toggle('genre')}
-          aria-expanded={open === 'genre'} aria-label="Filters">
+        <button className={`icon-btn tool ${open === 'genre' || (anyOn && !paused) ? 'on' : ''}`} onClick={() => toggle('genre')}
+          disabled={paused} aria-expanded={open === 'genre'} aria-label={paused ? 'Filters (not used by stats)' : 'Filters'}>
           <FilterIcon size={17} />
         </button>
         {onQuery && (
-          <button className={`icon-btn tool ${open === 'search' || query ? 'on' : ''}`} onClick={() => toggle('search')}
-            aria-expanded={open === 'search'} aria-label="Search this list">
+          <button className={`icon-btn tool ${open === 'search' || (query && !paused) ? 'on' : ''}`} onClick={() => toggle('search')}
+            disabled={paused} aria-expanded={open === 'search'} aria-label={paused ? 'Search (not used by stats)' : 'Search this list'}>
             <SearchIcon size={17} />
           </button>
         )}
       </div>
-      {onQuery && (open === 'search' || query) && (
+      {onQuery && !paused && (open === 'search' || query) && (
         <label className="search-field slim">
           <SearchIcon size={16} />
           <input type="search" autoFocus value={query} placeholder={placeholder ?? 'Search'} onChange={(e) => onQuery(e.target.value)}
@@ -160,7 +162,7 @@ export function ListTools<T extends string>({ tab, tabs, onTab, genre, genres, o
             </div>
           </div>
         </div>
-      ) : anyOn && (
+      ) : anyOn && !paused && (
         <div className="genre-wrap">
           {option && optionOn && (
             <button className="chip removable" style={{ ['--c' as string]: 'var(--accent-2)' }} onClick={() => option.onChange(option.initial)}

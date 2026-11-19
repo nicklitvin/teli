@@ -30,14 +30,14 @@ in the target's Copy Bundle Resources.
 | `TeliApp.swift` | App entry, tab bar, the router for the rate and detail sheets, toasts |
 | `Models/Models.swift` | Title, Review (with its note), Rating, AppData (the backup format), Rec |
 | `Models/Catalog.swift` | Loads the library, posters and merged ids; poster URLs (Wikimedia thumbnail widths, TVmaze) |
-| `Models/Store.swift` | Your data, saved as JSON in Application Support; rate, watchlist, hide, keywords, import/export |
+| `Models/Store.swift` | Your data, saved as JSON in Application Support; rate (good, ok, bad, didn't finish), watchlist, hide, notes, import/export |
 | `Models/Recommender.swift` | The same recommender as the web app: feature vectors, inverted index, diminishing returns, a varied shuffle that keeps titles like hidden ones off the next page, and Discover |
 | `Models/SearchIndex.swift` | Name, director, genre, theme, year and acronym search |
 | `Models/SkyData.swift` | The Galaxy map: positions, neighbourhoods and their patches |
 | `Models/Version.swift` | Version number and patch notes (keep in step with `src/lib/version.ts`) |
 | `Views/ForYouView.swift` | Full-screen paging feed with Discover and pull to refresh |
 | `Views/SearchView.swift` | Search, filters, browse by genre, back to top, add a missing title |
-| `Views/GalaxyView.swift` | The map in a Canvas: pan and pinch, seen / not seen / both, names on or off (held still while moving), posters beside names, highlights across sections, taps on names only, Uncharted |
+| `Views/GalaxyView.swift` | The map in a Canvas: pan and pinch, seen / not seen / both, names on or off (held still while moving), posters, highlights across sections (on the map only), a full-height filter sheet with folding sections and a count of titles shown, taps on names only, Uncharted |
 | `Views/ProfileView.swift` | Logbook, filters, watchlist, stats (Swift Charts), hidden titles |
 | `Views/SettingsView.swift` | Name, export / import / reset (each confirmed), version and notes |
 | `Views/RateView.swift`, `DetailView.swift`, `CrewView.swift`, `Components.swift` | Rating sheet (verdict, a short note, would watch again), title page, crew (under construction), shared pieces |

@@ -6,7 +6,7 @@ import { EXTENT, HOODS, sky, type Hood } from '../lib/skymap';
 /** Where to point the view: a spot and how much of the map around it to show. `key` makes a repeat request fly again. */
 export interface FlyTo { x: number; y: number; w: number; h: number; key: number }
 
-const VERDICT_COLOR = { good: '#2fd393', ok: '#f8b940', bad: '#fb6b8a' };
+const VERDICT_COLOR = { good: '#2fd393', ok: '#f8b940', bad: '#fb6b8a', dnf: '#9aa0c8' };
 const LINK = 0.045; // constellation lines longer than this (in map units) aren't drawn
 const MAX_ZOOM = 140;
 const REACH = 16; // how far from a dot (in screen pixels) a tap still counts as on it
@@ -250,7 +250,7 @@ export function SkyMap({ ratings, seen, watch, highlight, selected, onPick, onHo
       const y = sy(sky.y[i]);
       if (x < -12 || y < -12 || x > c.w + 12 || y > c.h + 12) continue;
       const big = r.verdict === 'good' ? 1.25 : r.verdict === 'ok' ? 1 : 0.8;
-      ctx.globalAlpha = (r.verdict === 'bad' ? 0.7 : 1) * (highlight && !highlight.has(i) ? 0.22 : 1);
+      ctx.globalAlpha = (r.verdict === 'bad' || r.verdict === 'dnf' ? 0.7 : 1) * (highlight && !highlight.has(i) ? 0.22 : 1);
       ctx.fillStyle = `${VERDICT_COLOR[r.verdict]}40`;
       ctx.beginPath();
       ctx.arc(x, y, (5 + grow) * big, 0, Math.PI * 2);

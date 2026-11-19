@@ -135,9 +135,12 @@ struct ProfileView: View {
                 } label: {
                     Image(systemName: "line.3.horizontal.decrease")
                         .frame(width: 36, height: 36)
-                        .background(Circle().fill(narrowing || sort != .verdict ? Theme.accent.opacity(0.3) : Color.white.opacity(0.07)))
+                        .background(Circle().fill(!stats && (narrowing || sort != .verdict) ? Theme.accent.opacity(0.3) : Color.white.opacity(0.07)))
                 }
-                .accessibilityLabel("Filters")
+                // Stats always cover the whole tab: filters step aside while they're open and come back after.
+                .disabled(stats)
+                .opacity(stats ? 0.35 : 1)
+                .accessibilityLabel(stats ? "Filters (not used by stats)" : "Filters")
             }
             if !stats {
                 HStack {
@@ -187,10 +190,8 @@ struct ProfileView: View {
         } else if items.isEmpty {
             EmptyState(icon: "magnifyingglass", title: "Nothing matches", message: "None of your \(watching ? "saved" : "rated") \(tab.noun) match that filter.")
         } else {
-            if narrowing || watching {
-                Text(narrowing ? "\(items.count) of \(list.count) \(tab.noun)" : "\(list.count) to watch")
-                    .font(.system(size: 13)).foregroundStyle(Theme.text2).frame(maxWidth: .infinity, alignment: .leading)
-            }
+            Text(narrowing ? "\(items.count) of \(list.count) \(tab.noun)" : "\(list.count) \(list.count == 1 ? String(tab.noun.dropLast()) : tab.noun) \(watching ? "to watch" : "watched")")
+                .font(.system(size: 13)).foregroundStyle(Theme.text2).frame(maxWidth: .infinity, alignment: .leading)
             LazyVStack(spacing: 12) {
                 ForEach(items) { t in
                     let r = store.data.reviews[t.id]
@@ -217,7 +218,7 @@ struct ProfileView: View {
     }
 }
 
-/// Charts for a tab: counts, the good / ok / bad split, the last 30 days, top genres, and the watchlist.
+/// Charts for a tab (always all of it, whatever the logbook filters): counts, the verdict split, the last 30 days, top genres, and the watchlist.
 struct StatsView: View {
     let rated: [Rating]
     /// When each title still on your watchlist was saved (0 if from before that was kept).
@@ -231,6 +232,8 @@ struct StatsView: View {
             EmptyState(icon: "chart.bar", title: "No stats yet", message: "Rate a few \(noun) to see your stats.")
         } else {
             VStack(spacing: 14) {
+                Text("Every \(noun.dropLast()) you’ve rated. Filters and search don’t apply here.")
+                    .font(.system(size: 12.5)).foregroundStyle(Theme.text3).frame(maxWidth: .infinity, alignment: .leading)
                 let month = Date().addingTimeInterval(-30 * 86400)
                 HStack(spacing: 10) {
                     tile("\(done.count)", "rated")

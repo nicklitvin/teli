@@ -1,6 +1,7 @@
 import SwiftUI
 
-/// Rating takes one page: good, ok or bad; an optional short note; would you watch it again.
+/// Rating takes one page: good, ok, bad or didn't finish; an optional short note; would you watch it
+/// again. Swipe it down to leave without saving.
 struct RateView: View {
     let id: String
     @Environment(Store.self) private var store
@@ -10,6 +11,8 @@ struct RateView: View {
     @State private var note = ""
     @FocusState private var writing: Bool
     @State private var again = false
+
+    private static let icon: [Verdict: String] = [.good: "hand.thumbsup.fill", .ok: "face.smiling", .bad: "hand.thumbsdown.fill", .dnf: "pause.fill"]
 
     var body: some View {
         if let t = Catalog.shared[id] {
@@ -32,16 +35,17 @@ struct RateView: View {
                         }
 
                         Text("How was it?").font(.system(size: 17, weight: .bold))
-                        HStack(spacing: 12) {
+                        HStack(alignment: .top, spacing: 8) {
                             ForEach(Verdict.allCases) { v in
                                 Button { verdict = v } label: {
                                     VStack(spacing: 8) {
-                                        Image(systemName: v == .good ? "hand.thumbsup.fill" : v == .ok ? "face.smiling" : "hand.thumbsdown.fill")
-                                            .font(.system(size: 24))
-                                            .frame(width: 64, height: 64)
+                                        Image(systemName: Self.icon[v] ?? "circle")
+                                            .font(.system(size: 22))
+                                            .frame(width: 58, height: 58)
                                             .background(Circle().fill(verdict == v ? Theme.verdict(v) : Color.white.opacity(0.07)))
                                             .foregroundStyle(verdict == v ? Theme.onGlow : Theme.verdict(v))
-                                        Text(v.label).font(.system(size: 14, weight: .semibold))
+                                        Text(v.label).font(.system(size: 13.5, weight: .semibold))
+                                            .multilineTextAlignment(.center).lineLimit(2).fixedSize(horizontal: false, vertical: true)
                                     }
                                     .frame(maxWidth: .infinity)
                                 }
@@ -101,9 +105,6 @@ struct RateView: View {
                     .disabled(verdict == nil)
                     .padding(.horizontal, 20).padding(.vertical, 10)
                     .background(Theme.bg)
-                }
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 }
             }
             .onAppear {

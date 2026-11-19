@@ -28,6 +28,7 @@ enum Theme {
         case .good: Color(hex: 0x2FD393)
         case .ok: Color(hex: 0xF8B940)
         case .bad: Color(hex: 0xFB6B8A)
+        case .dnf: Color(hex: 0x9AA0C8)
         }
     }
 }

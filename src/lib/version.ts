@@ -1,6 +1,17 @@
 /** What changed in each release, newest first. Shown in Settings; the first entry is the current version. */
 export const NOTES: { version: string; date: string; items: string[] }[] = [
   {
+    version: '1.9.0',
+    date: '2026-11-19',
+    items: [
+      'Rate something as didn\'t finish, alongside good, ok and bad',
+      'Galaxy: highlighting genres, decades, themes or creators changes the map only, with no list card',
+      'Galaxy: filter sections fold open and closed, and the panel says how many titles are shown',
+      'Profile: a count of what you\'ve watched, like the watchlist\'s count of what\'s to watch',
+      'Profile: filters and search step aside while stats are open (stats always cover everything) and come back after',
+    ],
+  },
+  {
     version: '1.8.0',
     date: '2026-11-18',
     items: [

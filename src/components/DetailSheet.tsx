@@ -7,7 +7,7 @@ import { BookmarkIcon, ChevronLeft, EyeSlashIcon, StarIcon, TrashIcon, XIcon } f
 import { POSTER_PX, Poster, VerdictBadge, posterArt } from './Poster';
 import { PosterCard, SectionHeader, Shelf } from './ui';
 
-const VERDICT_WORD = { good: 'You liked it', ok: 'It was ok', bad: 'Not for you' } as const;
+const VERDICT_WORD = { good: 'You liked it', ok: 'It was ok', bad: 'Not for you', dnf: 'You didn’t finish it' } as const;
 
 export function DetailSheet({ id, canGoBack, onBack, onClose }: {
   id: string;

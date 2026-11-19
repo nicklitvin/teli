@@ -7,7 +7,7 @@ import { HAS_MAP, HOODS, frame, hoodOf, sky, syncSky, type Hood } from '../lib/s
 import { useStore } from '../lib/store';
 import { UNIVERSE, keysOf, type Dimension } from '../lib/taste';
 import { useNav } from '../nav';
-import { BookmarkIcon, FilterIcon, PlanetIcon, RefreshIcon, XIcon } from '../components/Icons';
+import { BookmarkIcon, ChevronDown, FilterIcon, PlanetIcon, RefreshIcon, XIcon } from '../components/Icons';
 import { Poster, VerdictBadge } from '../components/Poster';
 import { ReviewFilterChips, ReviewFilterGroups } from '../components/ReviewFilters';
 import { SkyMap, WHOLE_SKY, type FlyTo, type Show } from '../components/SkyMap';
@@ -64,14 +64,14 @@ function VerdictMix({ n }: { n: Record<Verdict, number> }) {
   );
 }
 
-/** What the card at the bottom is showing: a title you tapped, a neighbourhood, or the group you highlighted. */
+/** What the card at the bottom is showing: a title you tapped or a neighbourhood. */
 type Focus = { kind: 'title'; i: number } | { kind: 'hood'; hood: Hood } | null;
 
 /**
  * The galaxy: every title in the library on one map, similar ones together, your ratings lit up
  * as constellations. Filters show what you've seen, haven't, or both; highlight genres, decades,
- * themes and creators (several at once, from any sections); narrow which of your ratings show;
- * and turn names off. Only named titles and neighbourhoods can be tapped. Uncharted flies you to
+ * themes and creators on the map itself (several at once, from any sections); narrow which of your
+ * ratings show; and turn names or posters off. The filter panel says how many titles that leaves. Only named titles and neighbourhoods can be tapped. Uncharted flies you to
  * a part of the map you haven't explored that it thinks you'd like.
  */
 export function TasteMap({ active }: { active: boolean }) {
@@ -82,6 +82,8 @@ export function TasteMap({ active }: { active: boolean }) {
   const [show, setShow] = useState<Show>('all');
   const [rf, setRf] = useState<ReviewFilter>(NO_FILTER);
   const [filterOpen, setFilterOpen] = useState(false);
+  // Filter sections start folded so the panel stays short; one with picks says how many.
+  const [unfolded, setUnfolded] = useState<Dimension[]>([]);
   const [focus, setFocus] = useState<Focus>(null);
   const [fly, setFly] = useState<FlyTo | null>(null);
   const lastHood = useRef<number | null>(null);
@@ -170,11 +172,20 @@ export function TasteMap({ active }: { active: boolean }) {
     setPicks(NO_PICKS);
     setShow('all');
   };
-  // "Comedy / Romance · 1990s", or when that's too long for the card, "Comedy + 2 more".
-  const fullName = DIMS.map(({ value }) => picks[value].join(' / ')).filter(Boolean).join(' · ');
-  const pickName = fullName.length > 22 && picked.length > 1 ? `${picked[0].k} + ${picked.length - 1} more` : fullName;
+  // How many titles the map shows with these filters: yours that pass the rating filters, the rest
+  // unless showing only what you've seen, and only highlighted ones when anything is picked.
+  const shownCount = useMemo(() => {
+    if (!filterOpen) return 0;
+    const mine = new Set([...shownRatings.keys()].map((id) => ORDER.get(id)));
+    let n = 0;
+    for (let i = 0; i < sky.n; i++) {
+      if (highlight && !highlight.has(i)) continue;
+      if (seen.has(i) ? show !== 'unseen' && mine.has(i) : show !== 'seen') n++;
+    }
+    return n;
+  }, [filterOpen, shownRatings, highlight, seen, show]);
 
-  // The card: a tapped title wins, then a neighbourhood, then the highlighted group.
+  // The card: a tapped title wins, then a neighbourhood. Highlighting only changes the map.
   let card = null;
   if (focus?.kind === 'title') {
     const t = CATALOG[focus.i];
@@ -205,23 +216,22 @@ export function TasteMap({ active }: { active: boolean }) {
         </div>
       </div>
     );
-  } else if (focus?.kind === 'hood' || highlight) {
-    const hood = focus?.kind === 'hood' ? focus.hood : null;
-    const inGroup = hood ? (_: Title, i: number) => sky.c[i] === hood.id : (_: Title, i: number) => !!highlight?.has(i);
-    const mine = [...ratings.values()].filter((r) => inGroup(BY_ID.get(r.id)!, ORDER.get(r.id)!));
-    const total = hood ? hood.n : highlight?.size ?? 0;
+  } else if (focus?.kind === 'hood') {
+    const hood = focus.hood;
+    const inGroup = (_: Title, i: number | undefined) => i !== undefined && i < sky.n && sky.c[i] === hood.id;
+    const mine = [...ratings.values()].filter((r) => inGroup(BY_ID.get(r.id)!, ORDER.get(r.id)));
     const n = countVerdicts(mine);
     const picks = suggest(inGroup);
     card = (
-      <div className="sky-card group-card" key={hood ? `h${hood.id}` : `k${pickName}`} style={{ ['--c' as string]: hood?.color ?? 'var(--accent)' }}>
+      <div className="sky-card group-card" key={`h${hood.id}`} style={{ ['--c' as string]: hood.color }}>
         <div className="group-head">
           <span className="swatch" />
           <div>
-            <strong>{hood ? hood.label : pickName}</strong>
-            <small>{total.toLocaleString()} titles · {mine.length ? `you've rated ${mine.length}` : 'uncharted for you'}</small>
+            <strong>{hood.label}</strong>
+            <small>{hood.n.toLocaleString()} titles · {mine.length ? `you've rated ${mine.length}` : 'uncharted for you'}</small>
           </div>
           {mine.length > 0 && <VerdictMix n={n} />}
-          <button className="icon-btn ghost" onClick={() => (hood ? setFocus(null) : setPicks(NO_PICKS))} aria-label="Close"><XIcon size={14} /></button>
+          <button className="icon-btn ghost" onClick={() => setFocus(null)} aria-label="Close"><XIcon size={14} /></button>
         </div>
         {picks.length > 0 && (
           <div className="sky-shelf">
@@ -241,7 +251,7 @@ export function TasteMap({ active }: { active: boolean }) {
     <Screen title="Galaxy" active={active} className="sky">
       {HAS_MAP ? (
         <SkyMap ratings={shownRatings} seen={seen} watch={watch} highlight={highlight} size={sky.n}
-          selected={focus?.kind === 'title' ? focus.i : null} fly={fly} bottom={focus?.kind === 'title' ? 110 : focus || highlight ? 220 : 0}
+          selected={focus?.kind === 'title' ? focus.i : null} fly={fly} bottom={focus?.kind === 'title' ? 110 : focus ? 220 : 0}
           show={show} names={names === 'on'} posters={posters === 'on'} focusHood={focus?.kind === 'hood' ? focus.hood.id : null}
           onHood={(h) => setFocus({ kind: 'hood', hood: h })}
           onPick={(i) => setFocus(i === null ? (focus?.kind === 'hood' ? focus : null) : { kind: 'title', i })} />
@@ -269,6 +279,9 @@ export function TasteMap({ active }: { active: boolean }) {
             <p className="filter-title">Map filters</p>
             {anyFilter && <button className="filter-clear" onClick={clearAll}>Clear all</button>}
           </div>
+          <p className="filter-count" aria-live="polite">
+            <b>{shownCount.toLocaleString()}</b> {shownCount === sky.n ? 'titles: everything' : `of ${sky.n.toLocaleString()} titles shown`}
+          </p>
           <div className="filter-group" role="group" aria-label="Show">
             <p className="filter-label">Show</p>
             <Segmented<Show> value={show} options={SHOWS} onChange={(v) => { setShow(v); setFocus(null); }} />
@@ -283,17 +296,28 @@ export function TasteMap({ active }: { active: boolean }) {
               {names === 'off' ? ' Names are off: tap your own stars.' : posters === 'on' ? ' Posters beside names, so fewer fit.' : ''}
             </p>
           </div>
-          {DIMS.map(({ value, label }) => (
-            <div key={value} className="filter-group" role="group" aria-label={label}>
-              <p className="filter-label">{label}{picks[value].length > 1 ? ' \u00b7 any of these' : ''}</p>
-              <div className={`genre-wrap ${UNIVERSE[value].length > 24 ? 'chip-scroll' : ''}`}>
-                {UNIVERSE[value].map((k) => {
-                  const on = picks[value].includes(k);
-                  return <button key={k} className={`chip toggle any ${on ? 'on' : ''}`} onClick={() => togglePick(value, k)} aria-pressed={on}>{k}</button>;
-                })}
+          {DIMS.map(({ value, label }) => {
+            const open = unfolded.includes(value);
+            const n = picks[value].length;
+            return (
+              <div key={value} className="filter-group" role="group" aria-label={label}>
+                <button className={`filter-label filter-fold ${open ? 'open' : ''}`} aria-expanded={open}
+                  onClick={() => setUnfolded(open ? unfolded.filter((d) => d !== value) : [...unfolded, value])}>
+                  <span>{label}{n > 1 && open ? ' \u00b7 any of these' : ''}</span>
+                  {n > 0 && <b className="fold-count">{n}</b>}
+                  <ChevronDown size={16} />
+                </button>
+                {open && (
+                  <div className={`genre-wrap ${UNIVERSE[value].length > 24 ? 'chip-scroll' : ''}`}>
+                    {UNIVERSE[value].map((k) => {
+                      const on = picks[value].includes(k);
+                      return <button key={k} className={`chip toggle any ${on ? 'on' : ''}`} onClick={() => togglePick(value, k)} aria-pressed={on}>{k}</button>;
+                    })}
+                  </div>
+                )}
               </div>
-            </div>
-          ))}
+            );
+          })}
           {new Set(picked.map((p) => p.dim)).size > 1 && <p className="filter-hint">Highlighting titles that match every section you picked from.</p>}
           {show !== 'unseen' && <ReviewFilterGroups value={rf} onChange={setRf} />}
         </div>

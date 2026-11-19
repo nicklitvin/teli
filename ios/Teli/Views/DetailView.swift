@@ -40,7 +40,7 @@ struct DetailView: View {
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(review.pending == true ? "Needs a quick review" : "Your take").font(.system(size: 15, weight: .semibold))
                                 Text(review.pending == true ? "Carried over from your old rankings"
-                                     : review.again ? "Would watch again" : review.verdict == .good ? "You liked it" : review.verdict == .ok ? "It was ok" : "Not for you")
+                                     : review.again ? "Would watch again" : Self.verdictWord[review.verdict] ?? "")
                                     .font(.system(size: 13)).foregroundStyle(Theme.text2)
                                 if review.pending != true, let note = review.note {
                                     Text("“\(note)”").font(.system(size: 14).italic()).padding(.top, 2)
@@ -123,10 +123,12 @@ struct DetailView: View {
             }
             .navigationDestination(for: Router.Item.self) { item in DetailView(id: item.id) }
             .sheet(isPresented: $rating) {
-                RateView(id: id).presentationBackground(Theme.bg)
+                RateView(id: id).presentationDragIndicator(.visible).presentationBackground(Theme.bg)
             }
         }
     }
+
+    private static let verdictWord: [Verdict: String] = [.good: "You liked it", .ok: "It was ok", .bad: "Not for you", .dnf: "You didn’t finish it"]
 
     private func shelf(_ title: String, _ items: [Title]) -> some View {
         VStack(alignment: .leading, spacing: 10) {

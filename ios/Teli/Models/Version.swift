@@ -10,6 +10,16 @@ enum Version {
     }
 
     static let notes: [Note] = [
+        Note(version: "1.9.0", date: "2026-11-19", items: [
+            "Rate something as didn’t finish, alongside good, ok and bad",
+            "Galaxy: highlighting genres, decades, themes or creators changes the map only, with no list card",
+            "Galaxy: filter sections fold open and closed, and the panel says how many titles are shown",
+            "Profile: a count of what you’ve watched, like the watchlist’s count of what’s to watch",
+            "Profile: filters and search step aside while stats are open (stats always cover everything) and come back after",
+            "Rating has no Cancel button: swipe it down to leave",
+            "Map filters open at full height, with no Done button",
+            "Posters beside names is now just Posters",
+        ]),
         Note(version: "1.8.1", date: "2026-11-19", items: [
             "For You pages line up with the screen however far you scroll",
             "Uncharted and neighbourhood cards no longer crash when you’ve added titles by hand",

@@ -8,22 +8,26 @@ enum MediaType: String, Codable, CaseIterable, Identifiable {
     var noun: String { self == .movie ? "movies" : "shows" }
 }
 
+/// Good, ok or bad, or `dnf`: you didn't finish it.
 enum Verdict: String, Codable, CaseIterable, Identifiable {
-    case good, ok, bad
+    case good, ok, bad, dnf
     var id: String { rawValue }
     var label: String {
         switch self {
         case .good: "Good"
         case .ok: "Ok"
         case .bad: "Bad"
+        case .dnf: "Didn’t finish"
         }
     }
-    /** How strongly a rating pulls similar titles up (positive) or pushes them down (negative). */
+    /// How strongly a rating pulls similar titles up (positive) or pushes them down (negative).
+    /// Giving up on something counts against titles like it, but less than bad.
     func pull(again: Bool) -> Double {
         let base: Double = switch self {
         case .good: 0.75
         case .ok: -0.1
         case .bad: -0.9
+        case .dnf: -0.5
         }
         return base + (again ? 0.25 : 0)
     }
