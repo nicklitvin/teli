@@ -72,6 +72,7 @@ struct ForYouView: View {
                     ForEach(visible.prefix(60)) { rec in
                         ReelCard(rec: rec, discovering: discovering, bottomInset: inset.bottom)
                             .frame(width: page.width, height: page.height)
+                            .clipped()
                             .onAppear { markSeen(rec.id) }
                     }
                     if visible.isEmpty && dealtFor >= 0 {

@@ -10,6 +10,9 @@ enum Version {
     }
 
     static let notes: [Note] = [
+        Note(version: "1.9.1", date: "2026-11-19", items: [
+            "For You cards fit the screen: the poster, title and buttons no longer run off the sides",
+        ]),
         Note(version: "1.9.0", date: "2026-11-19", items: [
             "Rate something as didn’t finish, alongside good, ok and bad",
             "Galaxy: highlighting genres, decades, themes or creators changes the map only, with no list card",

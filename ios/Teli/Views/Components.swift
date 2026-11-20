@@ -41,14 +41,17 @@ struct PosterView: View {
     var px = 330
     var showTitle = true
 
+    /// The art sets the size (whatever it's offered) and the image fills it as an overlay, cropped.
+    /// In a ZStack, a filled image would report its own, wider size and stretch whatever holds it
+    /// past the screen edges.
     var body: some View {
-        ZStack {
-            PosterArt(title: title, showTitle: showTitle)
-            if let ref = title.image, let url = Catalog.imageURL(ref, px: px) {
-                RetryingImage(url: url, wide: ref.aspect > 0.85)
+        PosterArt(title: title, showTitle: showTitle)
+            .overlay {
+                if let ref = title.image, let url = Catalog.imageURL(ref, px: px) {
+                    RetryingImage(url: url, wide: ref.aspect > 0.85)
+                }
             }
-        }
-        .clipped()
+            .clipped()
     }
 }
 
